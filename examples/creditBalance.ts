@@ -1,5 +1,11 @@
-import { BasicEntity } from './interfaces/entity';
-import { DomainEvent } from './interfaces/domainEvent';
+import { randomUUID } from 'crypto';
+
+import { Result, err, ok } from 'neverthrow';
+
+import { DomainEntity } from '../src/interfaces/entity';
+import { DomainEvent } from '../src/interfaces/domainEvent';
+
+import { NotEnoughFunds } from './errors/notEnoughFunds';
 
 export interface CreditBalanceState {
   id: string;
@@ -10,7 +16,7 @@ export interface CreditBalanceState {
   purchasedCreditBalance: number;
 }
 
-export class CreditBalance extends BasicEntity<CreditBalanceState> {
+export class CreditBalance extends DomainEntity<CreditBalanceState> {
   private constructor(id: string, state: CreditBalanceState) {
     super(id, state);
   }
@@ -23,7 +29,7 @@ export class CreditBalance extends BasicEntity<CreditBalanceState> {
     creditBalance: CreditBalance;
     creationEvent: DomainEvent;
   } {
-    const id = ''; // TODO: UUID
+    const id = randomUUID();
 
     const creationEvent = {
       entityId: id,
@@ -52,6 +58,7 @@ export class CreditBalance extends BasicEntity<CreditBalanceState> {
 
   credit(params: { amount: number }) {
     this.state.subCreditBalance += params.amount;
+
     return {
       name: 'CREDIT',
       entityId: this.id(),
@@ -62,16 +69,21 @@ export class CreditBalance extends BasicEntity<CreditBalanceState> {
     };
   }
 
-  debit(params: { amount: number }) {
+  debit(params: { amount: number }): Result<DomainEvent, NotEnoughFunds> {
+    if (this.state.availableBalance < params.amount) {
+      return err(new NotEnoughFunds(this.state.availableBalance));
+    }
+
     this.state.subCreditBalance -= params.amount;
-    return {
+
+    return ok({
       name: 'DEBIT',
       entityId: this.id(),
       version: 1,
       payload: {
         amount: params.amount,
       },
-    };
+    });
   }
 }
 

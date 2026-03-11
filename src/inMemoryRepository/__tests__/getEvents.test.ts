@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InMemoryRepository } from '../inMemoryRepository';
+import { InMemoryRepository } from '../../inMemoryRepository';
 import { DomainEvent } from '../../interfaces/domainEvent';
 import { UserState, User, makeUser, makeEvent } from './helpers';
 

@@ -14,4 +14,3 @@ export class EntityNotFound extends CustomError<'ENTITY_NOT_FOUND', { entityId: 
     Object.setPrototypeOf(this, EntityNotFound.prototype);
   }
 }
-

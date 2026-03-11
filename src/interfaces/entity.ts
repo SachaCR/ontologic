@@ -1,9 +1,4 @@
-export interface Entity<State> {
-  id(): string;
-  readState(): State;
-}
-
-export class BasicEntity<State> implements Entity<State> {
+export class DomainEntity<State> {
   protected state: State;
   #id: string;
 
@@ -20,4 +15,3 @@ export class BasicEntity<State> implements Entity<State> {
     return structuredClone(this.state);
   }
 }
-

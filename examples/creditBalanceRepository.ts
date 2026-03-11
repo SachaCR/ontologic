@@ -1,5 +1,6 @@
+import { InMemoryRepository } from '../src/inMemoryRepository';
+
 import { CreditBalanceState, CreditBalance } from './creditBalance';
-import { InMemoryRepository } from './inMemoryRepository';
 
 export class CreditBalanceRepository extends InMemoryRepository<CreditBalanceState, CreditBalance> {
   constructor() {

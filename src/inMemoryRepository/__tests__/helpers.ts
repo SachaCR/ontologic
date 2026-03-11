@@ -1,4 +1,4 @@
-import { BasicEntity } from '../../interfaces/entity';
+import { DomainEntity } from '../../interfaces/entity';
 import { DomainEvent } from '../../interfaces/domainEvent';
 
 export interface UserState {
@@ -6,7 +6,7 @@ export interface UserState {
   name: string;
 }
 
-export class User extends BasicEntity<UserState> {
+export class User extends DomainEntity<UserState> {
   constructor(id: string, state: UserState) {
     super(id, state);
   }
