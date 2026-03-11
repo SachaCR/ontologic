@@ -77,3 +77,4 @@ export interface CustomErrorJSON {
   context: unknown;
   stack: string | null;
 }
+

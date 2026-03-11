@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryRepository } from '../inMemoryRepository';
 import { DomainEvent } from '../../interfaces/domainEvent';
-import { User, makeUser, makeEvent } from './helpers';
+import { UserState, User, makeUser, makeEvent } from './helpers';
 
 describe('InMemoryRepository.getEvents', () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<UserState, User>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>();
+    repo = new InMemoryRepository<UserState, User>(User.fromState);
   });
 
   it('returns ok with an empty array when no events have been saved', async () => {

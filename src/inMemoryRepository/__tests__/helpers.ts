@@ -1,4 +1,4 @@
-import { Entity } from '../../interfaces/entity';
+import { BasicEntity } from '../../interfaces/entity';
 import { DomainEvent } from '../../interfaces/domainEvent';
 
 export interface UserState {
@@ -6,24 +6,18 @@ export interface UserState {
   name: string;
 }
 
-export class User implements Entity<UserState> {
-  private _state: UserState;
-
-  constructor(state: UserState) {
-    this._state = state;
+export class User extends BasicEntity<UserState> {
+  constructor(id: string, state: UserState) {
+    super(id, state);
   }
 
-  id(): string {
-    return this._state.id;
-  }
-
-  state(): UserState {
-    return this._state;
+  static fromState(id: string, state: UserState): User {
+    return new User(id, state);
   }
 }
 
 export function makeUser(id: string, name = 'Alice'): User {
-  return new User({ id, name });
+  return new User(id, { id, name });
 }
 
 export function makeEvent(entityId: string, name = 'UserCreated'): DomainEvent {

@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryRepository } from '../inMemoryRepository';
-import { User, makeUser } from './helpers';
+import { UserState, User, makeUser } from './helpers';
 
 describe('InMemoryRepository.getById', () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<UserState, User>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>();
+    repo = new InMemoryRepository<UserState, User>(User.fromState);
   });
 
   it('returns err when entity does not exist', async () => {
@@ -21,6 +21,6 @@ describe('InMemoryRepository.getById', () => {
 
     const result = await repo.getById('42');
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap().state()).toEqual({ id: '42', name: 'Charlie' });
+    expect(result._unsafeUnwrap().readState()).toEqual({ id: '42', name: 'Charlie' });
   });
 });

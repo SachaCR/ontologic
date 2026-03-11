@@ -1,12 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { InMemoryRepository } from '../inMemoryRepository';
-import { User, makeUser } from './helpers';
+import { UserState, User, makeUser } from './helpers';
 
 describe('InMemoryRepository.save', () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<UserState, User>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>();
+    repo = new InMemoryRepository<UserState, User>(User.fromState);
   });
 
   it('returns ok', async () => {
@@ -20,7 +20,7 @@ describe('InMemoryRepository.save', () => {
 
     const result = await repo.getById('1');
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap()).toBe(user);
+    expect(result._unsafeUnwrap().readState()).toEqual(user.readState());
   });
 
   it('overwrites an existing entity with the same id', async () => {
@@ -29,6 +29,6 @@ describe('InMemoryRepository.save', () => {
     await repo.save(updated);
 
     const result = await repo.getById('1');
-    expect(result._unsafeUnwrap().state().name).toBe('Bob');
+    expect(result._unsafeUnwrap().readState().name).toBe('Bob');
   });
 });

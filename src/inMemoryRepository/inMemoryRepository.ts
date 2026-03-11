@@ -1,24 +1,29 @@
 import { ok, err, Result } from 'neverthrow';
 
-import { Entity } from "../interfaces/entity";
+import { BasicEntity } from "../interfaces/entity";
 import { DomainEvent } from "../interfaces/domainEvent";
-import { Repository } from '../interfaces/repository';
 import { EntityNotFound } from './errors/entityNotFound';
+import { Repository } from '../interfaces/repository';
 
-export class InMemoryRepository<T extends Entity<object>>
-  implements Repository<T> {
+export class InMemoryRepository<State, Entity extends BasicEntity<State>> implements Repository<State, Entity> {
+  #mapper: (id: string, state: State) => Entity;
 
-  private readonly store = new Map<string, T>();
+  constructor(mapper: (id: string, state: State) => Entity) {
+    this.#mapper = mapper
+  }
+
+  private readonly store = new Map<string, State>();
 
   private readonly eventStore = new Map<string, DomainEvent[]>();
 
-  async save(entity: T): Promise<Result<void, Error>> {
-    this.store.set(entity.id(), entity)
+  async save(entity: BasicEntity<State>): Promise<Result<void, Error>> {
+    this.store.set(entity.id(), entity.readState())
     return Promise.resolve(ok());
   }
 
-  async saveWithEvents(entity: T, domainEvents: DomainEvent[]): Promise<Result<void, Error>> {
-    this.store.set(entity.id(), entity)
+  async saveWithEvents(entity: BasicEntity<State>, domainEvents: DomainEvent[]): Promise<Result<void, Error>> {
+    this.store.set(entity.id(), entity.readState());
+
     const events = this.eventStore.get(entity.id()) || [];
 
     events.push(...domainEvents);
@@ -28,18 +33,22 @@ export class InMemoryRepository<T extends Entity<object>>
     return Promise.resolve(ok());
   }
 
-  getById(id: string): Promise<Result<T, EntityNotFound>> {
-    const entity = this.store.get(id);
+  getById(id: string): Promise<Result<Entity, EntityNotFound>> {
+    const state = this.store.get(id);
 
-    if (entity === undefined) {
+    if (state === undefined) {
       return Promise.resolve(err(new EntityNotFound(id)));
     }
 
-    return Promise.resolve(ok(entity));
+    return Promise.resolve(ok(this.#mapper(id, state)));
   }
 
-  list(params: { limit: number, offset: number }): Promise<Result<{ limit: number, offset: number, data: T[] }, Error>> {
-    const entities = Array.from(this.store.values());
+  list(params: { limit: number, offset: number }): Promise<Result<{ limit: number, offset: number, data: Entity[] }, Error>> {
+    const entities: Entity[] = [];
+
+    this.store.forEach((state, id) => {
+      entities.push(this.#mapper(id, state));
+    });
 
     const paginatedEntities = entities.slice(params.offset, params.offset + params.limit);
 
@@ -60,3 +69,4 @@ export class InMemoryRepository<T extends Entity<object>>
     return Promise.resolve(ok(paginatedEvents));
   }
 }
+

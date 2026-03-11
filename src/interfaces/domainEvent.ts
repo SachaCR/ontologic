@@ -4,3 +4,4 @@ export interface DomainEvent {
   entityId: string;
   payload: unknown;
 }
+
