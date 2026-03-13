@@ -5,7 +5,7 @@ Interfaces and base types to implement **Domain Entities** and **Domain Events**
 ## Installation
 
 ```bash
-pnpm add domain-entity
+pnpm add ontologic
 ```
 
 ## What this library provides
