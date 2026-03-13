@@ -1,17 +1,23 @@
 import { randomUUID } from 'crypto';
-
 import { Result, err, ok } from 'neverthrow';
 
-import { DomainEntity } from '../src/interfaces/entity';
-import { DomainEvent } from '../src/interfaces/domainEvent';
+import { DomainEntity, IDomainEvent } from '../src';
 
 import { NotEnoughFunds } from './errors/notEnoughFunds';
+
+import { CreditBalanceCreated } from './events/creditBalanceCreated';
+import { CreditBalanceCredited } from './events/creditBalanceCredited';
+import { CreditBalanceDebited } from './events/creditBalanceDebited';
+import { CreditLocked } from './events/creditLocked';
+import { SubCreditReseted } from './events/subCreditReseted';
+
+export { NotEnoughFunds } from './errors/notEnoughFunds';
+export { EntityNotFound } from './errors/entityNotFound';
 
 export interface CreditBalanceState {
   id: string;
   organizationId: string;
   subCreditBalance: number;
-  availableBalance: number;
   lockedBalance: number;
   purchasedCreditBalance: number;
 }
@@ -27,28 +33,20 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
 
   static create(params: { organizationId: string }): {
     creditBalance: CreditBalance;
-    creationEvent: DomainEvent;
+    creationEvent: CreditBalanceCreated;
   } {
     const id = randomUUID();
 
-    const creationEvent = {
-      entityId: id,
-      name: 'CREDIT_BALANCE_CREATED',
-      version: 1,
-      offset: 1,
-      payload: {
-        organizationId: params.organizationId,
-        subCreditBalance: 0,
-        availableBalance: 0,
-        lockedBalance: 0,
-        purchasedCreditBalance: 0,
-      },
-    };
+    const creationEvent = new CreditBalanceCreated(id, {
+      organizationId: params.organizationId,
+      subCreditBalance: 0,
+      lockedBalance: 0,
+      purchasedCreditBalance: 0,
+    })
 
     const initialState: CreditBalanceState = {
-      ...creationEvent.payload,
       id,
-      organizationId: params.organizationId,
+      ...creationEvent.payload(),
     };
 
     const creditBalance = new CreditBalance(id, initialState);
@@ -56,34 +54,53 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     return { creditBalance, creationEvent };
   }
 
-  credit(params: { amount: number }) {
-    this.state.subCreditBalance += params.amount;
+  credit(params: { amount: number }): CreditBalanceCredited {
+    const { amount } = params;
 
-    return {
-      name: 'CREDIT',
-      entityId: this.id(),
-      version: 1,
-      payload: {
-        amount: params.amount,
-      },
-    };
-  }
+    this.state.subCreditBalance += amount;
 
-  debit(params: { amount: number }): Result<DomainEvent, NotEnoughFunds> {
-    if (this.state.availableBalance < params.amount) {
-      return err(new NotEnoughFunds(this.state.availableBalance));
-    }
-
-    this.state.subCreditBalance -= params.amount;
-
-    return ok({
-      name: 'DEBIT',
-      entityId: this.id(),
-      version: 1,
-      payload: {
-        amount: params.amount,
-      },
+    return new CreditBalanceCredited(this.id(), {
+      amount: amount,
     });
   }
+
+  resetSubCredit(params: { amount: number }): SubCreditReseted {
+    const { amount } = params;
+
+    this.state.subCreditBalance = amount;
+
+    return new SubCreditReseted(this.id(), { amount });
+  }
+
+  lockCredits(params: { amount: number }): Result<CreditLocked, NotEnoughFunds> {
+    const { amount } = params;
+
+    if (this.state.subCreditBalance < params.amount) {
+      return err(new NotEnoughFunds(this.state.subCreditBalance));
+    }
+
+    this.state.lockedBalance += amount;
+
+    return ok(new CreditLocked(this.id(), { amount }));
+  }
+
+  debit(params: { amount: number }): Result<IDomainEvent, NotEnoughFunds> {
+    const { amount } = params;
+
+    if (this.state.subCreditBalance < amount) {
+      return err(new NotEnoughFunds(this.state.subCreditBalance));
+    }
+
+    this.state.subCreditBalance -= amount;
+
+    return ok(new CreditBalanceDebited(this.id(), {
+      amount: amount,
+    }));
+  }
+
+  available(): number {
+    return this.state.subCreditBalance - this.state.lockedBalance;
+  }
+
 }
 

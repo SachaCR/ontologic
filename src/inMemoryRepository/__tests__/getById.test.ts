@@ -9,10 +9,10 @@ describe('InMemoryRepository.getById', () => {
     repo = new InMemoryRepository<UserState, User>(User.fromState);
   });
 
-  it('returns err when entity does not exist', async () => {
+  it('returns ok with undefined when entity does not exist', async () => {
     const result = await repo.getById('missing');
-    expect(result.isErr()).toBe(true);
-    expect(result._unsafeUnwrapErr().message).toBe('Entity Not Found');
+    expect(result.isOk()).toBe(true);
+    expect(result._unsafeUnwrap()).toBe(undefined);
   });
 
   it('returns ok with the entity when it exists', async () => {
@@ -21,6 +21,6 @@ describe('InMemoryRepository.getById', () => {
 
     const result = await repo.getById('42');
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap().readState()).toEqual({ id: '42', name: 'Charlie' });
+    expect(result._unsafeUnwrap()?.readState()).toEqual({ id: '42', name: 'Charlie' });
   });
 });

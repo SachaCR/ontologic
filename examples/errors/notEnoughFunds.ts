@@ -1,5 +1,4 @@
-
-import { CustomError } from '../../src/interfaces/customError';
+import { CustomError } from '../../src';
 
 export class NotEnoughFunds extends CustomError<'NOT_ENOUGH_FUNDS', { available: number }> {
   constructor(available: number) {

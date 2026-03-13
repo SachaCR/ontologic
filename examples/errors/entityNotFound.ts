@@ -1,4 +1,4 @@
-import { CustomError } from '../../interfaces/customError';
+import { CustomError } from '../../src/';
 
 export class EntityNotFound extends CustomError<'ENTITY_NOT_FOUND', { entityId: string }> {
   constructor(entityId: string) {

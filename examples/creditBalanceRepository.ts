@@ -1,4 +1,4 @@
-import { InMemoryRepository } from '../src/inMemoryRepository';
+import { InMemoryRepository } from '../src';
 
 import { CreditBalanceState, CreditBalance } from './creditBalance';
 

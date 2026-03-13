@@ -1,9 +1,7 @@
-import { ok, err, Result } from 'neverthrow';
-
-import { EntityNotFound } from './errors/entityNotFound';
+import { ok, Result } from 'neverthrow';
 
 import { DomainEntity } from "../interfaces/entity";
-import { DomainEvent } from "../interfaces/domainEvent";
+import { IDomainEvent } from "../interfaces/domainEvent";
 import { Repository } from '../interfaces/repository';
 
 export class InMemoryRepository<State, Entity extends DomainEntity<State>> implements Repository<State, Entity> {
@@ -15,14 +13,14 @@ export class InMemoryRepository<State, Entity extends DomainEntity<State>> imple
 
   private readonly store = new Map<string, State>();
 
-  private readonly eventStore = new Map<string, DomainEvent[]>();
+  private readonly eventStore = new Map<string, IDomainEvent[]>();
 
   async save(entity: Entity): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState())
     return Promise.resolve(ok());
   }
 
-  async saveWithEvents(entity: Entity, domainEvents: DomainEvent[]): Promise<Result<void, Error>> {
+  async saveWithEvents(entity: Entity, domainEvents: IDomainEvent[]): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState());
 
     const events = this.eventStore.get(entity.id()) || [];
@@ -34,11 +32,11 @@ export class InMemoryRepository<State, Entity extends DomainEntity<State>> imple
     return Promise.resolve(ok());
   }
 
-  getById(id: string): Promise<Result<Entity, EntityNotFound>> {
+  getById(id: string): Promise<Result<Entity | undefined, Error>> {
     const state = this.store.get(id);
 
     if (state === undefined) {
-      return Promise.resolve(err(new EntityNotFound(id)));
+      return Promise.resolve(ok(undefined));
     }
 
     return Promise.resolve(ok(this.#mapper(id, state)));
@@ -60,7 +58,7 @@ export class InMemoryRepository<State, Entity extends DomainEntity<State>> imple
     }));
   }
 
-  getEvents(id: string, options?: { limit: number, offset: number }): Promise<Result<DomainEvent[], Error>> {
+  getEvents(id: string, options?: { limit: number, offset: number }): Promise<Result<IDomainEvent[], Error>> {
     const paginationOptions = options || { limit: 100, offset: 0 }
 
     const events = this.eventStore.get(id) || [];
@@ -70,3 +68,4 @@ export class InMemoryRepository<State, Entity extends DomainEntity<State>> imple
     return Promise.resolve(ok(paginatedEvents));
   }
 }
+
