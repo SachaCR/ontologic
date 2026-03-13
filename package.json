@@ -1,5 +1,5 @@
 {
-  "name": "domain-entity",
+  "name": "ontologic",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,8 +7,8 @@
     "test": "vitest run"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "SachaCR",
+  "license": "MIT",
   "packageManager": "pnpm@10.29.2",
   "dependencies": {
     "neverthrow": "^8.2.0"

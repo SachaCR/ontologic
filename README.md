@@ -1,4 +1,4 @@
-# domain-entity
+# Ontologic 
 
 Interfaces and base types to implement **Domain Entities** and **Domain Events** in TypeScript. Includes a generic **in-memory repository** so you can prototype and test without a persistence layer. The repository interface can be implemented for any database or storage engine by the consumer of the library.
 
