@@ -1,10 +1,8 @@
 import { randomUUID } from 'crypto';
-import { Result, err, ok } from 'neverthrow';
 
-import { DomainEntity, IDomainEvent } from '../src';
+import { Result, err, ok, DomainEntity, IDomainEvent } from '../src';
 
 import { NotEnoughFunds } from './errors/notEnoughFunds';
-
 import { CreditBalanceCreated } from './events/creditBalanceCreated';
 import { CreditBalanceCredited } from './events/creditBalanceCredited';
 import { CreditBalanceDebited } from './events/creditBalanceDebited';
@@ -76,7 +74,10 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < params.amount) {
-      return err(new NotEnoughFunds(this.state.subCreditBalance));
+      return err(new NotEnoughFunds('You dont have enough credits to lock this amount', {
+        available: this.state.subCreditBalance,
+        amount,
+      }));
     }
 
     this.state.lockedBalance += amount;
@@ -88,7 +89,10 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < amount) {
-      return err(new NotEnoughFunds(this.state.subCreditBalance));
+      return err(new NotEnoughFunds('You dont have enough credits to spend this amount', {
+        available: this.state.subCreditBalance,
+        amount,
+      }));
     }
 
     this.state.subCreditBalance -= amount;

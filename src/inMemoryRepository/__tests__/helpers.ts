@@ -1,5 +1,5 @@
-import { DomainEntity } from '../../interfaces/entity';
-import { DomainEvent } from '../../interfaces/domainEvent';
+import { DomainEntity } from '../../interfaces/domainEntity';
+import { IDomainEvent } from '../../interfaces/domainEvent';
 
 export interface UserState {
   id: string;
@@ -20,6 +20,6 @@ export function makeUser(id: string, name = 'Alice'): User {
   return new User(id, { id, name });
 }
 
-export function makeEvent(entityId: string, name = 'UserCreated'): DomainEvent {
+export function makeEvent(entityId: string, name = 'UserCreated'): IDomainEvent {
   return { name, version: 1, entityId, payload: {} };
 }

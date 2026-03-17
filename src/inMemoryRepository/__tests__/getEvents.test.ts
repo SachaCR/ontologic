@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { InMemoryRepository } from '../../inMemoryRepository';
-import { DomainEvent } from '../../interfaces/domainEvent';
+import { IDomainEvent } from '../../interfaces/domainEvent';
 import { UserState, User, makeUser, makeEvent } from './helpers';
 
 describe('InMemoryRepository.getEvents', () => {
@@ -30,9 +31,9 @@ describe('InMemoryRepository.getEvents', () => {
   });
 
   describe('pagination', () => {
-    let event1: DomainEvent;
-    let event2: DomainEvent;
-    let event3: DomainEvent;
+    let event1: IDomainEvent;
+    let event2: IDomainEvent;
+    let event3: IDomainEvent;
 
     beforeEach(async () => {
       event1 = makeEvent('1', 'Created');

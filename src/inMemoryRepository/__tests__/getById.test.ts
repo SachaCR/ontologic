@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { InMemoryRepository } from '../../inMemoryRepository';
 import { UserState, User, makeUser } from './helpers';
 

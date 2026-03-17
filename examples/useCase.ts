@@ -1,13 +1,11 @@
-import { ok, err, Result } from 'neverthrow';
-
-import { IDomainEvent } from "../src";
+import { IDomainEvent, switchGuard, ok, err, Result } from "../src";
 
 import { CreditBalance, CreditBalanceState, NotEnoughFunds, EntityNotFound } from './creditBalance';
 import { CreditBalanceRepository } from './creditBalanceRepository';
 
 const creditBalanceRepository = new CreditBalanceRepository();
 
-async function createBalanceWithCredits(organizationId: string, amount: number) {
+export async function createBalanceWithCredits(organizationId: string, amount: number) {
   const domainEvents: IDomainEvent[] = [];
 
   const { creditBalance, creationEvent } = CreditBalance.create({
@@ -31,7 +29,7 @@ async function createBalanceWithCredits(organizationId: string, amount: number) 
   return creditBalance.readState();
 }
 
-async function readBalanceUseCase(id: string): Promise<Result<CreditBalanceState, EntityNotFound>> {
+export async function readBalanceUseCase(id: string): Promise<Result<CreditBalanceState, EntityNotFound>> {
   const resultGetById = await creditBalanceRepository.getById(id);
 
   if (resultGetById.isErr()) {
@@ -41,13 +39,13 @@ async function readBalanceUseCase(id: string): Promise<Result<CreditBalanceState
   const creditBalance = resultGetById.value;
 
   if (creditBalance === undefined) {
-    return err(new EntityNotFound(id));
+    return err(new EntityNotFound('This credit balance does not exists', { entityId: id }));
   }
 
   return ok(creditBalance.readState());
 }
 
-async function debitBalanceUseCase(id: string, amount: number): Promise<Result<CreditBalanceState, NotEnoughFunds | EntityNotFound>> {
+export async function debitBalanceUseCase(id: string, amount: number): Promise<Result<CreditBalanceState, NotEnoughFunds | EntityNotFound>> {
   const resultGetById = await creditBalanceRepository.getById(id);
 
   if (resultGetById.isErr()) {
@@ -57,25 +55,29 @@ async function debitBalanceUseCase(id: string, amount: number): Promise<Result<C
   const creditBalance = resultGetById.value;
 
   if (creditBalance === undefined) {
-    return err(new EntityNotFound(id));
+    return err(new EntityNotFound('This credit balance does not exists', { entityId: id }));
   }
 
   const result = creditBalance.debit({ amount });
 
   if (result.isErr()) {
-    switch (result.error.code) {
+    switch (result.error.name) {
       case 'NOT_ENOUGH_FUNDS':
         return err(result.error);
 
       default:
-        throw result.error;
+        switchGuard(result.error.name);
     }
   }
 
-  return ok(creditBalance.readState());
-}
+  const debitEvent = result.value;
 
-interface DomainError {
-  message: string;
+  const saveResult = await creditBalanceRepository.saveWithEvents(creditBalance, debitEvent);
+
+  if (saveResult.isErr()) {
+    throw saveResult.error;
+  }
+
+  return ok(creditBalance.readState());
 }
 

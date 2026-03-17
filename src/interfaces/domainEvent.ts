@@ -16,7 +16,7 @@ export class DomainEvent<Name extends string, Version extends number, Payload> i
     this.#entityId = entityId;
     this.#name = name;
     this.#version = version;
-    this.#payload = payload; // TODO: Verify it's JSON compatible
+    this.#payload = payload; // TODO: Verify it's JSON compatible ??
   }
 
   get entityId(): string {

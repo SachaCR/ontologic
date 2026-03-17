@@ -1,5 +1,9 @@
-export * from './interfaces/customError';
+export * from './interfaces/domainError';
 export * from './interfaces/domainEvent';
-export * from './interfaces/entity';
+export * from './interfaces/domainEntity';
 export * from './interfaces/repository';
+export * from './interfaces/result';
+
 export * from './inMemoryRepository';
+export * from './switchGuard';
+

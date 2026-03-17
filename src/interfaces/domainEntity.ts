@@ -4,7 +4,7 @@ export class DomainEntity<State> {
 
   constructor(id: string, state: State) {
     this.#id = id;
-    this.state = structuredClone(state); // TODO: Verify it's JSON compatible
+    this.state = structuredClone(state); // TODO: Verify it's JSON compatible ??
   }
 
   id(): string {

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { InMemoryRepository } from '../../inMemoryRepository';
 import { UserState, User, makeUser, makeEvent } from './helpers';
 
@@ -19,7 +20,7 @@ describe('InMemoryRepository.saveWithEvents', () => {
     await repo.saveWithEvents(user, [makeEvent('1')]);
 
     const result = await repo.getById('1');
-    expect(result._unsafeUnwrap().readState()).toEqual(user.readState());
+    expect(result._unsafeUnwrap()?.readState()).toEqual(user.readState());
   });
 
   it('stores the provided events', async () => {

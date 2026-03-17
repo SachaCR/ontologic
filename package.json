@@ -4,15 +4,13 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run"
+    "test": "vitest run",
+    "build": "tsc ."
   },
-  "keywords": [],
+  "keywords": ['DDD', 'Domain', 'Entity', 'Clean Code'],
   "author": "SachaCR",
   "license": "MIT",
   "packageManager": "pnpm@10.29.2",
-  "dependencies": {
-    "neverthrow": "^8.2.0"
-  },
   "devDependencies": {
     "@types/node": "^25.4.0",
     "typescript": "^5.9.3",

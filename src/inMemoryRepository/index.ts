@@ -1,8 +1,4 @@
-import { ok, Result } from 'neverthrow';
-
-import { DomainEntity } from "../interfaces/entity";
-import { IDomainEvent } from "../interfaces/domainEvent";
-import { Repository } from '../interfaces/repository';
+import { ok, Result, DomainEntity, IDomainEvent, Repository } from '../../src';
 
 export class InMemoryRepository<State, Entity extends DomainEntity<State>> implements Repository<State, Entity> {
   #mapper: (id: string, state: State) => Entity;
@@ -11,21 +7,20 @@ export class InMemoryRepository<State, Entity extends DomainEntity<State>> imple
     this.#mapper = mapper
   }
 
-  private readonly store = new Map<string, State>();
-
-  private readonly eventStore = new Map<string, IDomainEvent[]>();
+  protected readonly store = new Map<string, State>();
+  protected readonly eventStore = new Map<string, IDomainEvent[]>();
 
   async save(entity: Entity): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState())
     return Promise.resolve(ok());
   }
 
-  async saveWithEvents(entity: Entity, domainEvents: IDomainEvent[]): Promise<Result<void, Error>> {
+  async saveWithEvents(entity: Entity, domainEvents: IDomainEvent | IDomainEvent[]): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState());
 
     const events = this.eventStore.get(entity.id()) || [];
 
-    events.push(...domainEvents);
+    events.push(...Array.isArray(domainEvents) ? domainEvents : [domainEvents]);
 
     this.eventStore.set(entity.id(), events);
 

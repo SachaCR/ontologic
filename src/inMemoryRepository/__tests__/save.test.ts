@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
+
 import { InMemoryRepository } from '../../inMemoryRepository';
 import { UserState, User, makeUser } from './helpers';
 
@@ -20,7 +21,7 @@ describe('InMemoryRepository.save', () => {
 
     const result = await repo.getById('1');
     expect(result.isOk()).toBe(true);
-    expect(result._unsafeUnwrap().readState()).toEqual(user.readState());
+    expect(result._unsafeUnwrap()?.readState()).toEqual(user.readState());
   });
 
   it('overwrites an existing entity with the same id', async () => {
@@ -29,6 +30,6 @@ describe('InMemoryRepository.save', () => {
     await repo.save(updated);
 
     const result = await repo.getById('1');
-    expect(result._unsafeUnwrap().readState().name).toBe('Bob');
+    expect(result._unsafeUnwrap()?.readState().name).toBe('Bob');
   });
 });

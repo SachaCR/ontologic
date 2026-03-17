@@ -1,14 +1,15 @@
-import { CustomError } from '../../src/';
+import { DomainError } from '../../src/';
 
-export class EntityNotFound extends CustomError<'ENTITY_NOT_FOUND', { entityId: string }> {
-  constructor(entityId: string) {
+const NAME = 'ENTITY_NOT_FOUND';
+
+export class EntityNotFound extends DomainError<typeof NAME, { entityId: string }> {
+  name: typeof NAME;
+
+  constructor(message: string, context: { entityId: string }) {
     super({
-      message: 'Entity Not Found',
-      errorCode: 'ENTITY_NOT_FOUND',
-      name: 'DOMAIN_ERROR',
-      context: {
-        entityId,
-      }
+      message: message,
+      name: NAME,
+      context: context,
     })
 
     Object.setPrototypeOf(this, EntityNotFound.prototype);
