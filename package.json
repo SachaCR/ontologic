@@ -5,9 +5,14 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
-    "build": "tsc ."
+    "build": "tsc"
   },
-  "keywords": ['DDD', 'Domain', 'Entity', 'Clean Code'],
+  "keywords": [
+    "DDD",
+    "Domain",
+    "Entity",
+    "Clean Code"
+  ],
   "author": "SachaCR",
   "license": "MIT",
   "packageManager": "pnpm@10.29.2",

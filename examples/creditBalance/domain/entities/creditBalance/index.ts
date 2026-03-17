@@ -1,16 +1,22 @@
-import { randomUUID } from 'crypto';
+import { randomUUID } from "crypto";
 
-import { Result, err, ok, DomainEntity, IDomainEvent } from '../src';
+import {
+  Result,
+  err,
+  ok,
+  DomainEntity,
+  DomainEventInterface
+} from "../../../../../src";
 
-import { NotEnoughFunds } from './errors/notEnoughFunds';
-import { CreditBalanceCreated } from './events/creditBalanceCreated';
-import { CreditBalanceCredited } from './events/creditBalanceCredited';
-import { CreditBalanceDebited } from './events/creditBalanceDebited';
-import { CreditLocked } from './events/creditLocked';
-import { SubCreditReseted } from './events/subCreditReseted';
+import { CreditBalanceCreated } from "./events/creditBalanceCreated";
+import { CreditBalanceCredited } from "./events/creditBalanceCredited";
+import { CreditLocked } from "./events/creditLocked";
+import { NotEnoughFunds } from "./errors/notEnoughFunds";
+import { CreditBalanceDebited } from "./events/creditBalanceDebited";
+import { SubCreditReseted } from "./events/subCreditReseted";
 
-export { NotEnoughFunds } from './errors/notEnoughFunds';
-export { EntityNotFound } from './errors/entityNotFound';
+export { NotEnoughFunds } from "./errors/notEnoughFunds";
+export { EntityNotFound } from "./errors/entityNotFound";
 
 export interface CreditBalanceState {
   id: string;
@@ -40,7 +46,7 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
       subCreditBalance: 0,
       lockedBalance: 0,
       purchasedCreditBalance: 0,
-    })
+    });
 
     const initialState: CreditBalanceState = {
       id,
@@ -70,14 +76,21 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     return new SubCreditReseted(this.id(), { amount });
   }
 
-  lockCredits(params: { amount: number }): Result<CreditLocked, NotEnoughFunds> {
+  lockCredits(params: {
+    amount: number;
+  }): Result<CreditLocked, NotEnoughFunds> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < params.amount) {
-      return err(new NotEnoughFunds('You dont have enough credits to lock this amount', {
-        available: this.state.subCreditBalance,
-        amount,
-      }));
+      return err(
+        new NotEnoughFunds(
+          `You don't have enough credits to lock this amount`,
+          {
+            available: this.state.subCreditBalance,
+            amount,
+          },
+        ),
+      );
     }
 
     this.state.lockedBalance += amount;
@@ -85,26 +98,31 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     return ok(new CreditLocked(this.id(), { amount }));
   }
 
-  debit(params: { amount: number }): Result<IDomainEvent, NotEnoughFunds> {
+  debit(params: { amount: number }): Result<DomainEventInterface, NotEnoughFunds> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < amount) {
-      return err(new NotEnoughFunds('You dont have enough credits to spend this amount', {
-        available: this.state.subCreditBalance,
-        amount,
-      }));
+      return err(
+        new NotEnoughFunds(
+          `You don't have enough credits to spend this amount`,
+          {
+            available: this.state.subCreditBalance,
+            amount,
+          },
+        ),
+      );
     }
 
     this.state.subCreditBalance -= amount;
 
-    return ok(new CreditBalanceDebited(this.id(), {
-      amount: amount,
-    }));
+    return ok(
+      new CreditBalanceDebited(this.id(), {
+        amount: amount,
+      }),
+    );
   }
 
   available(): number {
     return this.state.subCreditBalance - this.state.lockedBalance;
   }
-
 }
-

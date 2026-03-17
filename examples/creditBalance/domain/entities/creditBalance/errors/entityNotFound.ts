@@ -1,16 +1,17 @@
-import { DomainError } from '../../src/';
+import { DomainError } from "../../../../../../src";
 
-const NAME = 'ENTITY_NOT_FOUND';
+const NAME = "ENTITY_NOT_FOUND";
 
-export class EntityNotFound extends DomainError<typeof NAME, { entityId: string }> {
-  name: typeof NAME;
-
+export class EntityNotFound extends DomainError<
+  typeof NAME,
+  { entityId: string }
+> {
   constructor(message: string, context: { entityId: string }) {
     super({
       message: message,
       name: NAME,
       context: context,
-    })
+    });
 
     Object.setPrototypeOf(this, EntityNotFound.prototype);
   }

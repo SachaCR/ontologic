@@ -1,6 +1,7 @@
 export class DomainError<Name extends string, Context> extends Error {
-  public context?: Context;
-  public cause?: unknown;
+  public context: Context | undefined;
+
+  declare public name: Name;
 
   constructor(params: {
     message: string;
@@ -10,13 +11,13 @@ export class DomainError<Name extends string, Context> extends Error {
   }) {
     const { message, name, context, cause } = params;
 
-    super(message);
+    super(message, {
+      cause,
+    });
 
     this.name = name;
     this.context = context;
-    this.cause = cause;
 
     Object.setPrototypeOf(this, DomainError.prototype);
   }
 }
-

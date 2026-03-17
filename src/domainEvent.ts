@@ -1,11 +1,11 @@
-export interface IDomainEvent {
+export interface DomainEventInterface {
   name: string;
   version: number;
   entityId: string;
   payload: unknown;
 }
 
-export class DomainEvent<Name extends string, Version extends number, Payload> implements IDomainEvent {
+export class DomainEvent<Name extends string, Version extends number, Payload> implements DomainEventInterface {
   #entityId: string;
   #name: Name;
   #version: Version;
@@ -16,7 +16,7 @@ export class DomainEvent<Name extends string, Version extends number, Payload> i
     this.#entityId = entityId;
     this.#name = name;
     this.#version = version;
-    this.#payload = payload; // TODO: Verify it's JSON compatible ??
+    this.#payload = structuredClone(payload); // TODO: Verify it's JSON compatible ??
   }
 
   get entityId(): string {

@@ -1,4 +1,4 @@
-import { Result } from './';
+import { Result } from '.';
 
 export interface ErrorConfig {
   withStackTrace: boolean
@@ -27,8 +27,11 @@ export class ResultError<T, E> extends Error {
     this.data = result.isOk()
       ? { type: 'Ok', value: result.value }
       : { type: 'Err', value: result.error }
+  
 
-    this.stack = config.withStackTrace ? new Error().stack : undefined
+    if(config.withStackTrace) {
+      this.stack = new Error().stack || 'No stack found' 
+    }
 
     Object.setPrototypeOf(this, ResultError.prototype);
   }

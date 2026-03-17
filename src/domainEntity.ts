@@ -1,4 +1,9 @@
-export class DomainEntity<State> {
+export interface IDomainEntity {
+  id(): string;
+  readState(): unknown;
+}
+
+export class DomainEntity<State> implements IDomainEntity {
   protected state: State;
   #id: string;
 
