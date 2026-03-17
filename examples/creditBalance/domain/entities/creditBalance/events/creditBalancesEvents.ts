@@ -1,6 +1,6 @@
-import { CreditBalanceCreated } from "./creditBalanceCreated";
-import { CreditBalanceCredited } from "./creditBalanceCredited";
-import { CreditBalanceDebited } from "./creditBalanceDebited";
+import { CreditBalanceCreated } from "./creditBalanceCreated.event";
+import { CreditBalanceCredited } from "./creditBalanceCredited.event";
+import { CreditBalanceDebited } from "./creditBalanceDebited.event";
 
 export type CreditBalanceEvent =
   | CreditBalanceCreated

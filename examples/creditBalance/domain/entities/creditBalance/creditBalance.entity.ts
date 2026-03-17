@@ -8,15 +8,15 @@ import {
   DomainEventInterface
 } from "../../../../../src";
 
-import { CreditBalanceCreated } from "./events/creditBalanceCreated";
-import { CreditBalanceCredited } from "./events/creditBalanceCredited";
-import { CreditLocked } from "./events/creditLocked";
 import { NotEnoughFunds } from "./errors/notEnoughFunds";
-import { CreditBalanceDebited } from "./events/creditBalanceDebited";
-import { SubCreditReseted } from "./events/subCreditReseted";
+
+import { CreditBalanceCreated } from "./events/creditBalanceCreated.event";
+import { CreditBalanceCredited } from "./events/creditBalanceCredited.event";
+import { CreditLocked } from "./events/creditLocked.event";
+import { CreditBalanceDebited } from "./events/creditBalanceDebited.event";
+import { SubCreditReseted } from "./events/subCreditReseted.event";
 
 export { NotEnoughFunds } from "./errors/notEnoughFunds";
-export { EntityNotFound } from "./errors/entityNotFound";
 
 export interface CreditBalanceState {
   id: string;

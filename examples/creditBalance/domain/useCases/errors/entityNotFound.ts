@@ -1,4 +1,4 @@
-import { DomainError } from "../../../../../../src";
+import { DomainError } from "../../../../../src";
 
 const NAME = "ENTITY_NOT_FOUND";
 

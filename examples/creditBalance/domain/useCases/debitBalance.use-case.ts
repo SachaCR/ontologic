@@ -3,9 +3,9 @@ import { switchGuard, ok, err, Result } from "../../../../src";
 import {
   CreditBalanceState,
   NotEnoughFunds,
-  EntityNotFound,
-} from "../entities/creditBalance";
-import { CreditBalanceRepository } from "../../creditBalanceRepository";
+} from "../entities/creditBalance/creditBalance.entity";
+import { CreditBalanceRepository } from "../../creditBalance.repository";
+import { EntityNotFound } from "./errors/entityNotFound";
 
 const creditBalanceRepository = new CreditBalanceRepository();
 

@@ -1,7 +1,7 @@
 import { DomainEventInterface } from "../../../../src";
 
-import { CreditBalanceRepository } from "../../creditBalanceRepository";
-import { CreditBalance } from "../entities/creditBalance";
+import { CreditBalanceRepository } from "../../creditBalance.repository";
+import { CreditBalance } from "../entities/creditBalance/creditBalance.entity";
 
 const creditBalanceRepository = new CreditBalanceRepository();
 

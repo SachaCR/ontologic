@@ -1,7 +1,8 @@
 import { Result, err, ok } from "../../../../src";
 
-import { CreditBalanceState, EntityNotFound } from "../entities/creditBalance";
-import { CreditBalanceRepository } from "../../creditBalanceRepository";
+import { CreditBalanceState } from "../entities/creditBalance/creditBalance.entity";
+import { CreditBalanceRepository } from "../../creditBalance.repository";
+import { EntityNotFound } from "./errors/entityNotFound";
 
 const creditBalanceRepository = new CreditBalanceRepository();
 
