@@ -136,7 +136,14 @@ This lets you build complex business rules from simple, readable, named pieces.
 
 Domain logic is **behavior that belongs to the entity itself**, not to a service or a controller. If the bank account knows how to validate a withdrawal, you never need to duplicate that check anywhere else in the codebase.
 
-In `ontologic`, you express domain logic as methods on your entity. When a business rule can fail, you return a `Result<Success, Failure>` instead of throwing:
+In `ontologic`, you express domain logic as methods on your entity. When a business rule can fail, you return a `Result<Success, DomainError>` instead of throwing.
+
+But `Result` is not meant to wrap every possible failure — only **domain failures**. The distinction matters:
+
+- An **insufficient funds** error is a domain error. It is a valid, expected branch of the business logic. The caller must handle it explicitly, because it is part of the domain's vocabulary.
+- A **JSON parse failure** or a database connection timeout is a technical error. It is unexpected, it is not part of the domain, and it should be thrown and caught at the application boundary like any other exception.
+
+Using `Result` for technical errors would pollute every call site with error handling for things that are not the domain's concern. Reserve it for failures that have **business meaning**.
 
 ```typescript
 import { Result, ok, err, DomainError } from "ontologic";
@@ -187,6 +194,7 @@ Notice what this achieves:
 - The error is **typed** — you know exactly what can go wrong and what context it carries
 - The caller **cannot ignore** the failure case (no silent exceptions)
 - The entity remains in **valid state** — you never mutate the balance if the rule fails
+- The failure is **meaningful to the domain** — `InsufficientFunds` is something a business person would recognize, not a technical artifact
 
 This is domain logic done right: the entity is the single source of truth for what is allowed.
 
@@ -217,7 +225,9 @@ class MoneyWithdrawn extends DomainEvent<"MONEY_WITHDRAWN", 1, MoneyWithdrawnPay
 }
 ```
 
-Then your entity methods **return events** when they mutate state:
+Returning an event from a method is **optional** — not every state change needs to produce one. But it is highly recommended for any operation that has meaning outside the entity itself. If something happened that another part of the system might care about, make it explicit with an event rather than leaving observers to poll or infer.
+
+When you do return events, your entity methods become the natural place to emit them:
 
 ```typescript
 class BankAccount extends DomainEntity<BankAccountState> {
