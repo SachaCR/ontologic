@@ -3,6 +3,7 @@ export * from "./domainEvent";
 export * from "./domainEntity";
 export * from "./repository";
 export * from "./result";
+export * from "./domainInvariant";
 
 export * from "./inMemoryRepository";
 export * from "./switchGuard";

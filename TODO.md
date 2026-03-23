@@ -4,3 +4,4 @@
 - [ ] Think about using Result types for repository interface
 - [x] Think about implementing Result pattern in the library to avoid forcing user using neverthrow
 - [x] Remove State from repository interface.
+- [ ] Think about returning an error with context when invariant are brokens.

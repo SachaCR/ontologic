@@ -3,6 +3,7 @@ import { DomainInvariant } from "./domainInvariant/interfaces";
 export interface IDomainEntity {
   id(): string;
   readState(): unknown;
+  addInvariant(invariant: DomainInvariant<unknown>): void
 }
 
 export class DomainEntity<State> implements IDomainEntity {
@@ -33,8 +34,8 @@ export class DomainEntity<State> implements IDomainEntity {
   private checkInvariants() {
     const isValid = this.#invariants.every(invariant => invariant.complyWith(this.state).isCompliant);
 
-    if(!isValid) {
+    if (!isValid) {
       throw new Error('Corrupted state detected')
-    } 
+    }
   }
 }

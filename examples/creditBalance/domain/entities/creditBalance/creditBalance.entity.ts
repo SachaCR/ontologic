@@ -5,18 +5,19 @@ import {
   err,
   ok,
   DomainEntity,
-  DomainEventInterface
+  DomainEventInterface,
 } from "../../../../../src";
 
-import { NotEnoughFunds } from "./errors/notEnoughFunds";
+import { NotEnoughFunds } from "./errors/notEnoughFunds.error";
 
 import { CreditBalanceCreated } from "./events/creditBalanceCreated.event";
 import { CreditBalanceCredited } from "./events/creditBalanceCredited.event";
 import { CreditLocked } from "./events/creditLocked.event";
 import { CreditBalanceDebited } from "./events/creditBalanceDebited.event";
 import { SubCreditReseted } from "./events/subCreditReseted.event";
+import { balanceIsPositiveInvariant } from "./invariants/balanceIsPositive";
 
-export { NotEnoughFunds } from "./errors/notEnoughFunds";
+export { NotEnoughFunds } from "./errors/notEnoughFunds.error";
 
 export interface CreditBalanceState {
   id: string;
@@ -29,6 +30,8 @@ export interface CreditBalanceState {
 export class CreditBalance extends DomainEntity<CreditBalanceState> {
   private constructor(id: string, state: CreditBalanceState) {
     super(id, state);
+
+    this.addInvariant(balanceIsPositiveInvariant);
   }
 
   static fromState(id: string, state: CreditBalanceState) {
