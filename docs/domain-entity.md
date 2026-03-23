@@ -255,6 +255,30 @@ if (result.isOk()) {
 }
 ```
 
+### Events from use cases
+
+Events don't always belong on the entity. Sometimes the entity simply doesn't have enough context to produce a meaningful event — that context only exists at the use case level.
+
+Consider creating a new account and immediately crediting it in one operation. The entity knows how to create itself, and it knows how to apply a credit. But the fact that *"an account was opened with an initial deposit"* is a higher-level business concept that neither operation alone can express. The use case has the full picture.
+
+In that case, the use case itself is responsible for producing the event:
+
+```typescript
+async function openAccountWithDeposit(ownerId: string, initialDeposit: number) {
+  const events: DomainEventInterface[] = [];
+
+  const { account, creationEvent } = BankAccount.create({ ownerId });
+  events.push(creationEvent);
+
+  const depositEvent = account.deposit({ amount: initialDeposit });
+  events.push(depositEvent);
+
+  await repository.saveWithEvents(account, events);
+}
+```
+
+The rule of thumb: if the event can be produced with only the entity's internal state, let the entity produce it. If the event requires knowledge that only the use case has (other entities, input parameters, business context), produce it in the use case.
+
 A few things worth noting about how `ontologic` models events:
 
 - The **name** is a string literal type (`"MONEY_WITHDRAWN"`) — it's both a runtime value and a compile-time type
