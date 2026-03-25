@@ -7,7 +7,7 @@ Model your business rules, protect your invariants, and make failures explicit.
 
 Full documentation, guides, and examples are available at:
 
-**[https://sachacr.github.io/ontologic](https://sachacr.github.io/ontologic)**
+**[ontologic.site](https://ontologic.site)**
 
 ## Quick start
 
