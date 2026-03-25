@@ -150,3 +150,13 @@ This makes error handling at the application layer clean and reliable, without a
 | **Context** | A message string | Typed, structured data |
 
 The Result pattern is not about avoiding exceptions. It is about being honest in your code about what can go wrong in your domain — and giving the caller the tools to respond to it meaningfully.
+
+---
+
+## A note on the implementation
+
+The `Result` type in `ontologic` — `ok`, `err`, and the `Result<T, E>` type — is directly inspired by and largely copied from [neverthrow](https://github.com/supermacro/neverthrow), an excellent library by Gil Mizrahi.
+
+It was vendored rather than listed as a dependency so that installing `ontologic` does not force a transitive dependency on your project. You get the same clean API without the version management overhead.
+
+If you're already using `neverthrow` in your project, the two `Result` types are different implementations with the same shape — they won't conflict, but you shouldn't mix them in the same function signature.
