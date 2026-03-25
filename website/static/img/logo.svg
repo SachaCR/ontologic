@@ -1,0 +1,74 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+
+    <!--
+      Solid filled arrowheads — one per note color.
+      Each arc takes the color of the note it points *toward*,
+      so the arrowhead color matches the arc stroke.
+      markerUnits="userSpaceOnUse" keeps physical size fixed.
+    -->
+    <marker id="h-amber"  viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#FBBF24"/>
+    </marker>
+    <marker id="h-sky"    viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#38BDF8"/>
+    </marker>
+    <marker id="h-orange" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#F97316"/>
+    </marker>
+    <marker id="h-green"  viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L8 4 L0 8 Z" fill="#34D399"/>
+    </marker>
+
+  </defs>
+
+  <!--
+    Arc endpoints at ±20° from each note centre on radius 78:
+      Actor (−90°)      → −70° (146.7, 46.7)  and  −20° (193.3,  93.3)
+      Command (0°)      →  20° (193.3,146.7)  and   70° (146.7, 193.3)
+      Domain Event (90°)→ 110° ( 93.3,193.3)  and  160° ( 46.7, 146.7)
+      View (180°)       → 200° ( 46.7, 93.3)  and  250° ( 93.3,  46.7)
+  -->
+
+  <!-- Actor → Command  (colored sky: destination is Command) -->
+  <path d="M 146.7 46.7  A 78 78 0 0 1 193.3 93.3"
+        stroke="#38BDF8" stroke-width="4" stroke-linecap="round"
+        marker-end="url(#h-sky)"/>
+
+  <!-- Command → Domain Event  (colored orange) -->
+  <path d="M 193.3 146.7 A 78 78 0 0 1 146.7 193.3"
+        stroke="#F97316" stroke-width="4" stroke-linecap="round"
+        marker-end="url(#h-orange)"/>
+
+  <!-- Domain Event → View  (colored green) -->
+  <path d="M 93.3 193.3  A 78 78 0 0 1 46.7 146.7"
+        stroke="#34D399" stroke-width="4" stroke-linecap="round"
+        marker-end="url(#h-green)"/>
+
+  <!-- View → Actor  (colored amber) -->
+  <path d="M 46.7 93.3   A 78 78 0 0 1 93.3 46.7"
+        stroke="#FBBF24" stroke-width="4" stroke-linecap="round"
+        marker-end="url(#h-amber)"/>
+
+  <!--
+    Sticky notes — flat, 40×40, rx=10, slight alternating tilt.
+    Drawn after arcs so they sit cleanly on top.
+  -->
+
+  <!-- Actor (top) — amber -->
+  <rect x="100" y="22" width="40" height="40" rx="10"
+        fill="#FBBF24" transform="rotate(-7 120 42)"/>
+
+  <!-- Command (right) — sky blue -->
+  <rect x="178" y="100" width="40" height="40" rx="10"
+        fill="#38BDF8" transform="rotate(7 198 120)"/>
+
+  <!-- Domain Event (bottom) — orange -->
+  <rect x="100" y="178" width="40" height="40" rx="10"
+        fill="#F97316" transform="rotate(7 120 198)"/>
+
+  <!-- View (left) — emerald -->
+  <rect x="22" y="100" width="40" height="40" rx="10"
+        fill="#34D399" transform="rotate(-7 42 120)"/>
+
+</svg>

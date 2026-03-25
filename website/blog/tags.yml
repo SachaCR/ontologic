@@ -1,0 +1,19 @@
+ddd:
+  label: Domain-Driven Design
+  permalink: /ddd
+  description: Posts about Domain-Driven Design concepts and practices.
+
+typescript:
+  label: TypeScript
+  permalink: /typescript
+  description: Posts about TypeScript patterns and tooling.
+
+architecture:
+  label: Architecture
+  permalink: /architecture
+  description: Posts about software architecture and design.
+
+release:
+  label: Release
+  permalink: /release
+  description: Release notes and announcements.

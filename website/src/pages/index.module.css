@@ -1,0 +1,192 @@
+/**
+ * CSS files with the .module.css suffix will be treated as CSS modules
+ * and scoped locally.
+ */
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.heroBanner {
+  padding: 5rem 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%);
+  color: white;
+}
+
+@media screen and (max-width: 996px) {
+  .heroBanner {
+    padding: 3rem 1rem;
+  }
+}
+
+.heroTitle {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+@media screen and (max-width: 996px) {
+  .heroTitle {
+    font-size: 2.5rem;
+  }
+}
+
+.heroSubtitle {
+  max-width: 560px;
+  margin: 0 auto 2.5rem;
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.btnPrimary {
+  background: white;
+  color: #4f46e5 !important;
+  font-weight: 600;
+  border: none;
+}
+
+.btnPrimary:hover {
+  background: #e0e7ff;
+  color: #4338ca !important;
+}
+
+.btnSecondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: white !important;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  display: inline-flex;
+  align-items: center;
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: white !important;
+}
+
+.install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+  padding: 0.35rem 0.35rem 0.35rem 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+.install code {
+  background: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+  padding: 0;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+/* ── Concept sections ─────────────────────────────────────────────────────── */
+
+.conceptSection {
+  padding: 5rem 0;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.conceptSection:nth-child(even) {
+  background: var(--ifm-background-surface-color);
+}
+
+.conceptInner {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4rem;
+  align-items: center;
+}
+
+.conceptInnerReverse {
+  direction: rtl;
+}
+
+.conceptInnerReverse > * {
+  direction: ltr;
+}
+
+@media screen and (max-width: 996px) {
+  .conceptInner,
+  .conceptInnerReverse {
+    grid-template-columns: 1fr;
+    direction: ltr;
+    gap: 2rem;
+  }
+}
+
+.conceptTag {
+  display: inline-block;
+  margin-bottom: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.conceptTitle {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 1rem;
+}
+
+.conceptDescription p {
+  color: var(--ifm-color-content-secondary);
+  line-height: 1.75;
+  margin-bottom: 0.75rem;
+}
+
+.conceptDescription p:last-child {
+  margin-bottom: 1.5rem;
+}
+
+.conceptCode {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.conceptCode > div {
+  margin: 0 !important;
+}

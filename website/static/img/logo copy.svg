@@ -1,0 +1,90 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+
+    <!-- Sticky note gradients — darker band at top simulates the adhesive strip -->
+    <linearGradient id="gActor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#B45309"/>
+      <stop offset="22%"  stop-color="#B45309"/>
+      <stop offset="22%"  stop-color="#FCD34D"/>
+      <stop offset="100%" stop-color="#FCD34D"/>
+    </linearGradient>
+    <linearGradient id="gCommand" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#0369A1"/>
+      <stop offset="22%"  stop-color="#0369A1"/>
+      <stop offset="22%"  stop-color="#7DD3FC"/>
+      <stop offset="100%" stop-color="#7DD3FC"/>
+    </linearGradient>
+    <linearGradient id="gEvent" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#9A3412"/>
+      <stop offset="22%"  stop-color="#9A3412"/>
+      <stop offset="22%"  stop-color="#FB923C"/>
+      <stop offset="100%" stop-color="#FB923C"/>
+    </linearGradient>
+    <linearGradient id="gView" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"   stop-color="#166534"/>
+      <stop offset="22%"  stop-color="#166534"/>
+      <stop offset="22%"  stop-color="#4ADE80"/>
+      <stop offset="100%" stop-color="#4ADE80"/>
+    </linearGradient>
+
+    <!-- Subtle drop shadow -->
+    <filter id="shadow" x="-20%" y="-20%" width="150%" height="160%">
+      <feDropShadow dx="0" dy="3" stdDeviation="4" flood-color="#000" flood-opacity="0.18"/>
+    </filter>
+
+    <!-- Arrowhead marker -->
+    <marker id="arr" viewBox="0 0 10 7" markerWidth="10" markerHeight="7"
+            refX="9" refY="3.5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0 0 L10 3.5 L0 7 Z" fill="#94A3B8"/>
+    </marker>
+
+  </defs>
+
+  <!--
+    Circle layout — center (120,120), note centers on radius 75:
+      Actor        → top    (120,  45)
+      Command      → right  (195, 120)
+      Domain Event → bottom (120, 195)
+      View         → left   ( 45, 120)
+
+    Arc endpoints sit at ±20° from each note center (gap = 40°)
+    so the arrows stay clear of the note bounds.
+  -->
+
+  <!-- Actor → Command -->
+  <path d="M 145.65 49.5 A 75 75 0 0 1 190.5 94.35"
+        stroke="#94A3B8" stroke-width="2" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+
+  <!-- Command → Domain Event -->
+  <path d="M 190.5 145.65 A 75 75 0 0 1 145.65 190.5"
+        stroke="#94A3B8" stroke-width="2" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+
+  <!-- Domain Event → View -->
+  <path d="M 94.35 190.5 A 75 75 0 0 1 49.5 145.65"
+        stroke="#94A3B8" stroke-width="2" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+
+  <!-- View → Actor -->
+  <path d="M 49.5 94.35 A 75 75 0 0 1 94.35 49.5"
+        stroke="#94A3B8" stroke-width="2" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+
+  <!-- Actor (top) — yellow -->
+  <rect x="101" y="27" width="38" height="36" rx="4"
+        fill="url(#gActor)" filter="url(#shadow)"/>
+
+  <!-- Command (right) — blue -->
+  <rect x="176" y="102" width="38" height="36" rx="4"
+        fill="url(#gCommand)" filter="url(#shadow)"/>
+
+  <!-- Domain Event (bottom) — orange -->
+  <rect x="101" y="177" width="38" height="36" rx="4"
+        fill="url(#gEvent)" filter="url(#shadow)"/>
+
+  <!-- View (left) — green -->
+  <rect x="26" y="102" width="38" height="36" rx="4"
+        fill="url(#gView)" filter="url(#shadow)"/>
+
+</svg>

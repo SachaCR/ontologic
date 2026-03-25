@@ -5,7 +5,7 @@ import {
   NotEnoughFunds,
 } from "../entities/creditBalance/creditBalance.entity";
 import { CreditBalanceRepository } from "../../creditBalance.repository";
-import { EntityNotFound } from "./errors/entityNotFound";
+import { EntityNotFound } from "./errors/entityNotFound.error";
 
 const creditBalanceRepository = new CreditBalanceRepository();
 

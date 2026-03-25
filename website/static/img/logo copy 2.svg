@@ -1,0 +1,74 @@
+<svg viewBox="0 0 240 240" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+
+    <!--
+      Open chevron arrowhead — modern, clean, no fill
+      markerUnits="userSpaceOnUse" keeps size independent of stroke-width
+    -->
+    <marker id="arr" viewBox="0 0 12 12" markerWidth="10" markerHeight="10"
+            refX="9" refY="6" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M2 2 L10 6 L2 10"
+            stroke="#94A3B8" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round"/>
+    </marker>
+
+  </defs>
+
+  <!--
+    Layout — center (120,120), note centers on radius 78:
+      Actor        → top    (120,  42)   angle −90°
+      Command      → right  (198, 120)   angle   0°
+      Domain Event → bottom (120, 198)   angle  90°
+      View         → left   ( 42, 120)   angle 180°
+
+    Arc endpoints at ±20° from each note center for clean visual spacing.
+      −70° → (146.7,  46.7)   −20° → (193.3,  93.3)
+       20° → (193.3, 146.7)    70° → (146.7, 193.3)
+      110° → ( 93.3, 193.3)   160° → ( 46.7, 146.7)
+      200° → ( 46.7,  93.3)   250° → ( 93.3,  46.7)
+  -->
+
+  <!-- Very faint guide ring — reinforces the circular "O" concept -->
+  <circle cx="120" cy="120" r="78" stroke="#E2E8F0" stroke-width="1.5"/>
+
+  <!-- Arcs (clockwise flow) -->
+  <path d="M 146.7 46.7  A 78 78 0 0 1 193.3 93.3"
+        stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+  <path d="M 193.3 146.7 A 78 78 0 0 1 146.7 193.3"
+        stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+  <path d="M 93.3 193.3  A 78 78 0 0 1 46.7 146.7"
+        stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+  <path d="M 46.7 93.3   A 78 78 0 0 1 93.3 46.7"
+        stroke="#CBD5E1" stroke-width="1.5" stroke-linecap="round"
+        marker-end="url(#arr)"/>
+
+  <!--
+    Sticky notes — flat colour, generous corner radius, slight tilt.
+    Each note is 40×40, centered on its circle position.
+    Alternating −7° / +7° rotation for a natural "placed" feel.
+  -->
+
+  <!-- Actor (top) — amber, tilted left -->
+  <rect x="100" y="22" width="40" height="40" rx="10"
+        fill="#FBBF24"
+        transform="rotate(-7 120 42)"/>
+
+  <!-- Command (right) — sky blue, tilted right -->
+  <rect x="178" y="100" width="40" height="40" rx="10"
+        fill="#38BDF8"
+        transform="rotate(7 198 120)"/>
+
+  <!-- Domain Event (bottom) — orange, tilted right -->
+  <rect x="100" y="178" width="40" height="40" rx="10"
+        fill="#F97316"
+        transform="rotate(7 120 198)"/>
+
+  <!-- View (left) — emerald, tilted left -->
+  <rect x="22" y="100" width="40" height="40" rx="10"
+        fill="#34D399"
+        transform="rotate(-7 42 120)"/>
+
+</svg>

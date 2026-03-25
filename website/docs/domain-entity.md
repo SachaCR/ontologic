@@ -1,3 +1,7 @@
+---
+sidebar_position: 2
+---
+
 # Domain Entity
 
 Domain-Driven Design (DDD) is an approach to software development that puts the **business domain** at the center of your code. Rather than thinking in terms of database tables or HTTP endpoints, you model the real world: its concepts, its rules, its vocabulary.
@@ -205,6 +209,7 @@ This is domain logic done right: the entity is the single source of truth for wh
 A **Domain Event** is a record that something meaningful happened in your domain. Not a log line — a first-class object that says *"this happened, at this time, to this entity"*.
 
 Domain events are useful for:
+
 - **Reacting** to changes in other parts of the system (e.g. send an email when an account is opened)
 - **Auditing** what happened over time
 - **Event sourcing** — rebuilding state by replaying events
