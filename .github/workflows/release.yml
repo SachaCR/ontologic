@@ -41,7 +41,7 @@ jobs:
         run: pnpm version ${{ github.event.inputs.release_type }}
 
       - name: Build
-        run: pnpm build
+        run: pnpm tsc --project tsconfig-release.json
 
       - name: Push version commit and tag
         run: git push --follow-tags
