@@ -7,7 +7,7 @@ Model your business rules, protect your invariants, and make failures explicit.
 
 Full documentation, guides, and examples are available at:
 
-**[ontologic.site](https://ontologic.site)**
+**[ontologic.site](http://ontologic.site)**
 
 ## Quick start
 
