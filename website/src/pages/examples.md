@@ -1,0 +1,28 @@
+---
+title: Examples
+description: End-to-end examples showing how to model real domains with Ontologic.
+---
+
+# Examples
+
+End-to-end examples showing how to model real domains with Ontologic.
+
+---
+
+## Credit Balance
+
+A credit wallet that supports crediting, debiting, locking funds, and sub-credit resets. Demonstrates domain invariants, typed errors, and multiple state transitions on a single entity.
+
+**Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
+
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/examples/creditBalance)
+
+---
+
+## Order
+
+An order lifecycle that moves through `DRAFT → PLACED → PAID` states. Demonstrates state-machine transitions, voucher application, multi-invariant validation, and comprehensive use-case test coverage.
+
+**Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
+
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/examples/order)

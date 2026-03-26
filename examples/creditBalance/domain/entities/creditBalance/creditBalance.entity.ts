@@ -53,7 +53,7 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
 
     const initialState: CreditBalanceState = {
       id,
-      ...creationEvent.payload(),
+      ...creationEvent.payload,
     };
 
     const creditBalance = new CreditBalance(id, initialState);

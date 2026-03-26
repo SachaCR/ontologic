@@ -31,7 +31,7 @@ export class DomainEvent<Name extends string, Version extends number, Payload> i
     return this.#version;
   }
 
-  payload(): Payload {
+  get payload(): Payload {
     return structuredClone(this.#payload);
   }
 }
