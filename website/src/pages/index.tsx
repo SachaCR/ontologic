@@ -164,6 +164,35 @@ const conceptSections: ConceptSectionProps[] = [
 }`,
   },
   {
+    tag: 'Domain Events',
+    accent: '#10b981',
+    title: 'History you can trust',
+    description: (
+      <>
+        <p>A Domain Event is a record that something meaningful happened — past tense, immutable, and named after a business fact.</p>
+        <p>Events are a versioned contract. Once consumers depend on them, they are public API. The Outbox pattern ensures every saved event is eventually delivered, with no risk of silent loss.</p>
+      </>
+    ),
+    link: '/docs/domain-events',
+    linkLabel: 'Learn about Domain Events',
+    reverse: true,
+    codeTitle: 'money-withdrawn.event.ts',
+    code: `class MoneyWithdrawn extends DomainEvent<
+  "MONEY_WITHDRAWN",
+  1,
+  { amount: number }
+> {
+  constructor(entityId: string, payload: { amount: number }) {
+    super({ name: "MONEY_WITHDRAWN", version: 1,
+            entityId, payload });
+  }
+}
+
+// Payload is deep-cloned at construction — immutable
+const event = new MoneyWithdrawn(account.id(), { amount: 200 });
+event.payload.amount = 0; // has no effect`,
+  },
+  {
     tag: 'Invariants',
     accent: '#ec4899',
     title: 'Rules that never sleep',
@@ -221,35 +250,6 @@ if (result.isErr()) {
 
 // TypeScript knows we succeeded here
 await repository.saveWithEvents(account, [result.value]);`,
-  },
-  {
-    tag: 'Domain Events',
-    accent: '#10b981',
-    title: 'History you can trust',
-    description: (
-      <>
-        <p>A Domain Event is a record that something meaningful happened — past tense, immutable, and named after a business fact.</p>
-        <p>Events are a versioned contract. Once consumers depend on them, they are public API. The Outbox pattern ensures every saved event is eventually delivered, with no risk of silent loss.</p>
-      </>
-    ),
-    link: '/docs/domain-events',
-    linkLabel: 'Learn about Domain Events',
-    reverse: true,
-    codeTitle: 'money-withdrawn.event.ts',
-    code: `class MoneyWithdrawn extends DomainEvent<
-  "MONEY_WITHDRAWN",
-  1,
-  { amount: number }
-> {
-  constructor(entityId: string, payload: { amount: number }) {
-    super({ name: "MONEY_WITHDRAWN", version: 1,
-            entityId, payload });
-  }
-}
-
-// Payload is deep-cloned at construction — immutable
-const event = new MoneyWithdrawn(account.id(), { amount: 200 });
-event.payload.amount = 0; // has no effect`,
   },
   {
     tag: 'Repository',
