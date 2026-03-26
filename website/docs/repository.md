@@ -29,7 +29,7 @@ class BankAccount extends DomainEntity<BankAccountState> {
 
 // The repository has no idea about domain rules
 class BankAccountRepository {
-  async findById(id: string): Promise<BankAccount> { ... }
+  async getById(id: string): Promise<BankAccount> { ... }
   async save(account: BankAccount): Promise<void> { ... }
 }
 ```
@@ -62,11 +62,11 @@ Both the updated entity state and the event are written in a single database tra
 
 A useful mental model: think of the repository as a collection that happens to be backed by a database.
 
-You don't call `INSERT INTO accounts ...` — you call `repository.save(account)`. You don't call `SELECT * FROM accounts WHERE id = $1` — you call `repository.findById(id)`. The persistence mechanism is completely hidden behind a clean, domain-friendly interface.
+You don't call `INSERT INTO accounts ...` — you call `repository.save(account)`. You don't call `SELECT * FROM accounts WHERE id = $1` — you call `repository.getById(id)`. The persistence mechanism is completely hidden behind a clean, domain-friendly interface.
 
 ```typescript
 interface BankAccountRepository {
-  findById(id: string): Promise<BankAccount | null>;
+  getById(id: string): Promise<BankAccount | null>;
   save(account: BankAccount): Promise<void>;
   saveWithEvents(account: BankAccount, events: DomainEvent[]): Promise<void>;
 }
