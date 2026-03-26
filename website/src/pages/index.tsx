@@ -175,7 +175,6 @@ const conceptSections: ConceptSectionProps[] = [
     ),
     link: '/docs/domain-events',
     linkLabel: 'Learn about Domain Events',
-    reverse: true,
     codeTitle: 'money-withdrawn.event.ts',
     code: `class MoneyWithdrawn extends DomainEvent<
   "MONEY_WITHDRAWN",
@@ -204,7 +203,6 @@ event.payload.amount = 0; // has no effect`,
     ),
     link: '/docs/invariants',
     linkLabel: 'Learn about Invariants',
-    reverse: true,
     codeTitle: 'bank-account.invariants.ts',
     code: `const balanceIsPositive =
   new BaseDomainInvariant<BankAccountState>(
@@ -289,7 +287,7 @@ export default function Home(): ReactNode {
       <HomepageHeader />
       <main>
         {conceptSections.map((section, idx) => (
-          <ConceptSection key={idx} {...section} />
+          <ConceptSection key={idx} {...section} reverse={idx % 2 === 1} />
         ))}
       </main>
     </Layout>
