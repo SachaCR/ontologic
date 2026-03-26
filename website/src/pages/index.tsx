@@ -262,19 +262,19 @@ await repository.saveWithEvents(account, [result.value]);`,
     link: '/docs/repository',
     linkLabel: 'Learn about the Repository',
     codeTitle: 'bank-account.repository.ts',
-    code: `interface BankAccountRepository {
-  findById(id: string): Promise<BankAccount | null>;
-  saveWithEvents(
-    account: BankAccount,
-    events: DomainEvent[]
-  ): Promise<void>;
+    code: `// Extend the built-in generic — no boilerplate needed
+class BankAccountRepository
+  extends InMemoryRepository<BankAccount> {
+  constructor() {
+    super(BankAccount.fromState);
+  }
 }
 
-// Swap in-memory for tests — no infrastructure needed
-const repository = new InMemoryBankAccountRepository();
+// Ready for tests and prototyping instantly
+const repository = new BankAccountRepository();
 
 // Entity state and event saved atomically
-await repository.saveWithEvents(account, [event]);`,
+await repository.saveWithEvents(account, result.value);`,
   },
 ];
 

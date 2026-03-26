@@ -76,31 +76,39 @@ This interface is what the domain and use cases depend on. The actual implementa
 
 ---
 
-## Testing with an in-memory repository
+## Testing with the built-in in-memory repository
 
-Because your use cases depend on the repository *interface*, not a specific implementation, you can swap in an in-memory version for tests:
+`ontologic` ships with a generic `InMemoryRepository` that you can use directly — no need to write your own. Just extend it with your entity type and you're ready to go:
 
 ```typescript
-class InMemoryBankAccountRepository implements BankAccountRepository {
-  private store = new Map<string, BankAccount>();
-  private events: DomainEvent[] = [];
+import { InMemoryRepository } from 'ontologic';
 
-  async findById(id: string): Promise<BankAccount | null> {
-    return this.store.get(id) ?? null;
-  }
-
-  async save(account: BankAccount): Promise<void> {
-    this.store.set(account.id(), account);
-  }
-
-  async saveWithEvents(account: BankAccount, events: DomainEvent[]): Promise<void> {
-    this.store.set(account.id(), account);
-    this.events.push(...events);
+class BankAccountRepository extends InMemoryRepository<BankAccount> {
+  constructor() {
+    super(BankAccount.fromState);
   }
 }
 ```
 
-Your tests become fast, deterministic, and free of infrastructure setup — without sacrificing any coverage of the domain logic.
+That's it. The repository is ready to use in your tests and for rapid prototyping:
+
+```typescript
+const repository = new BankAccountRepository();
+
+// Save an entity and its events atomically
+const result = account.withdraw(200);
+if (result.isOk()) {
+  await repository.saveWithEvents(account, result.value);
+}
+
+// Retrieve the entity
+const found = await repository.getById(account.id());
+
+// Inspect stored events
+const events = await repository.getEvents(account.id());
+```
+
+Your tests become fast, deterministic, and free of infrastructure setup — without sacrificing any coverage of the domain logic. When you are ready to move to a real database, replace `InMemoryRepository` with your production implementation without touching a single line of domain code.
 
 ---
 
