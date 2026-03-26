@@ -88,8 +88,6 @@ describe("orderInvariant", () => {
     const order: Order = { items: [widget], vouchers: ["SAVE10"], orderedBy: "customer" };
     const result = orderInvariant.complyWith(order);
 
-    console.log(result.description);
-
     // expect(result.details).toHaveLength(6);
     // expect(result.details[0]).toEqual({ isCompliant: true, description: "Order must have at least one item" });
     // expect(result.details[1]).toEqual({ isCompliant: true, description: "Order has a voucher" });

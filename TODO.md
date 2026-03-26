@@ -8,7 +8,7 @@
 - [x] Remove State from repository interface.
 - [ ] Think about returning an error with context when invariant are brokens.
 - [x] Create a Docusaurus website to share the documentation
-- [ ] Publish the package to NPM
-- [ ] Deploy the website on github pages
-- [ ] Get a domain name
-- [ ] make the repository public
+- [x] Publish the package to NPM
+- [x] Deploy the website on github pages
+- [x] Get a domain name
+- [x] make the repository public

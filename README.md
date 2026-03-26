@@ -25,7 +25,7 @@ npm install ontologic
 
 ## Examples
 
-A complete example (entity, invariants, events, use cases) is in the [`examples/`](./examples) directory — a credit balance aggregate with creation, credit, debit, and error handling.
+A complete example (entity, invariants, events, use cases) is in the [`examples/`](https://github.com/SachaCR/ontologic/tree/main/examples) directory — a credit balance aggregate with creation, credit, debit, and error handling.
 
 ## License
 

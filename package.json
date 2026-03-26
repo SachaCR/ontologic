@@ -9,6 +9,7 @@
   ],
   "scripts": {
     "test": "vitest run",
+    "test:report": "vitest run && npx vite preview --outDir html",
     "build": "tsc"
   },
   "keywords": [
@@ -22,6 +23,8 @@
   "packageManager": "pnpm@10.29.2",
   "devDependencies": {
     "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "4.0.18",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18"
   }
