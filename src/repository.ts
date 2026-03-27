@@ -1,7 +1,7 @@
 import { Result } from "./result/index";
 
 import { DomainEntity } from "./domainEntity";
-import {  DomainEventInterface } from "./domainEvent";
+import { DomainEventInterface } from "./domainEvent";
 
 export interface EventWithMetadata {
   event: DomainEventInterface;
