@@ -1,12 +1,16 @@
+import { EventEmitter } from "node:events";
 import { ok, Result } from "../result";
 import { DomainEntity } from "../domainEntity";
 import { DomainEventInterface } from "../domainEvent";
-import { Repository, EventWithMetadata } from "../repository";
+import { EventWithMetadata, Repository } from "../repository";
 
 export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
 > implements Repository<Entity> {
   #mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity;
+  #emitter = new EventEmitter({
+    captureRejections: true
+  });
 
   constructor(
     mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity,
@@ -49,6 +53,8 @@ export class InMemoryRepository<
     );
 
     this.eventStore.set(entity.id(), events);
+
+    this.#emitter.emit("domainEventsSaved", entity.id());
 
     return Promise.resolve(ok());
   }
@@ -103,5 +109,9 @@ export class InMemoryRepository<
     );
 
     return Promise.resolve(ok(paginatedEvents));
+  }
+
+  on(handler: (entityId: string) => void): void {
+    this.#emitter.on("domainEventsSaved", handler);
   }
 }

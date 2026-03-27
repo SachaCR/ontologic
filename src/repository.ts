@@ -32,4 +32,6 @@ export interface Repository<
     entityId: string,
     options?: { limit: number; offset: number },
   ): Promise<Result<EventWithMetadata[], Error>>;
+
+  on(handler: (entityId: string) => void): void;
 }
