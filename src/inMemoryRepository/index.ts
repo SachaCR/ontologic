@@ -1,4 +1,7 @@
-import { ok, Result, DomainEntity, DomainEventInterface, Repository, EventWithMetadata } from "../../src";
+import { ok, Result } from "../result";
+import { DomainEntity } from "../domainEntity";
+import { DomainEventInterface, EventWithMetadata } from "../domainEvent";
+import { Repository } from "../repository";
 
 export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
