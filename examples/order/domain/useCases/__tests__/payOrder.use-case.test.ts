@@ -51,11 +51,11 @@ describe("payOrderUseCase", () => {
     await payOrderUseCase(repository, orderId, "invoice-123");
 
     const events = (await repository.getEvents(orderId))._unsafeUnwrap();
-    const paidEvent = events.find((e) => e.name === "ORDER_PAID");
+    const paidEvent = events.find((e) => e.event.name === "ORDER_PAID");
 
     expect(paidEvent).toBeDefined();
-    expect(paidEvent?.entityId).toBe(orderId);
-    expect(paidEvent?.payload).toMatchObject({ status: "PAID", invoiceId: "invoice-123" });
+    expect(paidEvent?.event.entityId).toBe(orderId);
+    expect(paidEvent?.event.payload).toMatchObject({ status: "PAID", invoiceId: "invoice-123" });
   });
 
   it("accumulates events: ORDER_CREATED, ORDER_PLACED, then ORDER_PAID", async () => {
@@ -65,9 +65,9 @@ describe("payOrderUseCase", () => {
 
     const events = (await repository.getEvents(orderId))._unsafeUnwrap();
     expect(events).toHaveLength(3);
-    expect(events[0]?.name).toBe("ORDER_CREATED");
-    expect(events[1]?.name).toBe("ORDER_PLACED");
-    expect(events[2]?.name).toBe("ORDER_PAID");
+    expect(events[0]?.event.name).toBe("ORDER_CREATED");
+    expect(events[1]?.event.name).toBe("ORDER_PLACED");
+    expect(events[2]?.event.name).toBe("ORDER_PAID");
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {

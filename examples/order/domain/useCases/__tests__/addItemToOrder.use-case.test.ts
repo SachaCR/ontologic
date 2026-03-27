@@ -51,11 +51,11 @@ describe("addItemToOrderUseCase", () => {
     await addItemToOrderUseCase(repository, created.id, secondItem);
 
     const events = (await repository.getEvents(created.id))._unsafeUnwrap();
-    const addedEvent = events.find((e) => e.name === "ORDER_ITEM_ADDED");
+    const addedEvent = events.find((e) => e.event.name === "ORDER_ITEM_ADDED");
 
     expect(addedEvent).toBeDefined();
-    expect(addedEvent?.entityId).toBe(created.id);
-    expect(addedEvent?.payload).toMatchObject({ item: secondItem });
+    expect(addedEvent?.event.entityId).toBe(created.id);
+    expect(addedEvent?.event.payload).toMatchObject({ item: secondItem });
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {

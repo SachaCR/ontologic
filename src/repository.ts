@@ -1,7 +1,15 @@
 import { Result } from "./result/index";
 
 import { DomainEntity } from "./domainEntity";
-import { DomainEventInterface } from "./domainEvent";
+import {  DomainEventInterface } from "./domainEvent";
+
+export interface EventWithMetadata {
+  event: DomainEventInterface;
+  metadata: {
+    offset: number;
+    createdAt: string;
+  }
+}
 
 export interface Repository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
@@ -23,5 +31,5 @@ export interface Repository<
   getEvents(
     entityId: string,
     options?: { limit: number; offset: number },
-  ): Promise<Result<DomainEventInterface[], Error>>;
+  ): Promise<Result<EventWithMetadata[], Error>>;
 }

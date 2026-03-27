@@ -35,7 +35,9 @@ export class DomainEntity<State> implements IDomainEntity {
     const isValid = this.#invariants.every(invariant => invariant.complyWith(this.state).isCompliant);
 
     if (!isValid) {
-      throw new Error('Corrupted state detected')
+      throw new Error('Corrupted state detected',{
+        cause:this.state
+      })
     }
   }
 }
