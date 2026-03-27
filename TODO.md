@@ -6,7 +6,7 @@
 - [x] Think about using Result types for repository interface
 - [x] Think about implementing Result pattern in the library to avoid forcing user using neverthrow
 - [x] Remove State from repository interface.
-- [x] Think about returning an error with context when invariant are brokens.
+- [x] Think about returning an error with context when invariants are broken.
 - [x] Create a Docusaurus website to share the documentation
 - [x] Publish the package to NPM
 - [x] Deploy the website on github pages
