@@ -17,19 +17,6 @@
   color: white;
 }
 
-.heroBanner::before {
-  content: '';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 600px;
-  height: 600px;
-  background: url('/img/logo.svg') center / contain no-repeat;
-  opacity: 0.06;
-  pointer-events: none;
-}
-
 @media screen and (max-width: 996px) {
   .heroBanner {
     padding: 3rem 1rem;
