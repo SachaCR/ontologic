@@ -87,6 +87,7 @@ describe("orderInvariant", () => {
   it("Given a customer order with 1 item and 1 voucher, it returns details for each invariant", () => {
     const order: Order = { items: [widget], vouchers: ["SAVE10"], orderedBy: "customer" };
     const result = orderInvariant.complyWith(order);
+    expect(result.isCompliant).toBe(true)
 
     // expect(result.details).toHaveLength(6);
     // expect(result.details[0]).toEqual({ isCompliant: true, description: "Order must have at least one item" });

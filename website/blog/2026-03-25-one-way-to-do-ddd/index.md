@@ -23,11 +23,11 @@ Other developers have built other libraries, other frameworks, other patterns th
 
 ## Minimal by design
 
-Ontologic is intentionally small. It gives you base classes and types for the core DDD building blocks: entities, invariants, events, results, and a repository interface. It does not give you a full application framework, a dependency injection container, event bus infrastructure, or opinions about your folder structure.
+Ontologic is intentionally small. It gives you base classes and types for the core DDD building blocks: entities, invariants, events, results, and a repository interface. It does not give you a full application framework, a dependency injection container, or opinions about your folder structure.
 
 This is a deliberate constraint.
 
-A smaller library is easier to understand, easier to trust, and easier to adapt. If Ontologic does 80% of what you need but the last 20% requires a different shape, the right answer should be to fork it and change it — not to file a feature request and wait, or to work around it with hacks.
+A smaller library is easier to understand, easier to trust, and easier to adapt. If Ontologic does 80% of what you need but the last 20% requires a different shape, feel free to extends the base classes and interfaces. If it's not flexible enough for you the right answer should be to fork it and change it or to work around it with hacks.
 
 The source is short. The concepts are explicit. If you need more, take what's here and build on it.
 
@@ -46,6 +46,7 @@ The `Result` type in Ontologic — `ok`, `err`, `Result<T, E>` — is directly i
 I did not want to add neverthrow as a dependency for the reasons above. But I also did not want to reinvent the API — neverthrow's design is clean and the developer experience is good. So I vendored the relevant parts: copied the source, adapted it slightly, and include it directly in the Ontologic package.
 
 This means:
+
 - You do not need to install neverthrow separately
 - There is no version conflict risk between the two
 - The API is familiar if you already know neverthrow

@@ -54,9 +54,9 @@ describe("createOrderUseCase", () => {
       throw new Error('oups')
     }
 
-    expect(event.name).toBe("ORDER_CREATED");
-    expect(event.entityId).toBe(state.id);
-    expect(event.payload).toMatchObject({
+    expect(event.event.name).toBe("ORDER_CREATED");
+    expect(event.event.entityId).toBe(state.id);
+    expect(event.event.payload).toMatchObject({
       customerId: "customer-1",
       status: "DRAFT",
       items: [firstItem],

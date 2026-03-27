@@ -28,7 +28,9 @@ describe("InMemoryRepository.saveWithEvents", () => {
     await repo.saveWithEvents(makeUser("1"), [event]);
 
     const events = (await repo.getEvents("1"))._unsafeUnwrap();
-    expect(events).toEqual([event]);
+    expect(events).toHaveLength(1);
+    expect(events[0]?.event).toEqual(event);
+    expect(events[0]?.metadata.offset).toBe(0);
   });
 
   it("accumulates events across multiple calls for the same entity", async () => {
@@ -40,7 +42,9 @@ describe("InMemoryRepository.saveWithEvents", () => {
     await repo.saveWithEvents(user, [event2]);
 
     const events = (await repo.getEvents("1"))._unsafeUnwrap();
-    expect(events).toEqual([event1, event2]);
+    expect(events.map((e) => e.event)).toEqual([event1, event2]);
+    expect(events[0]?.metadata.offset).toBe(0);
+    expect(events[1]?.metadata.offset).toBe(1);
   });
 
   it("does not mix events between different entities", async () => {
@@ -51,7 +55,7 @@ describe("InMemoryRepository.saveWithEvents", () => {
     const events2 = (await repo.getEvents("2"))._unsafeUnwrap();
     expect(events1).toHaveLength(1);
     expect(events2).toHaveLength(1);
-    expect(events1[0]?.entityId).toBe("1");
-    expect(events2[0]?.entityId).toBe("2");
+    expect(events1[0]?.event.entityId).toBe("1");
+    expect(events2[0]?.event.entityId).toBe("2");
   });
 });

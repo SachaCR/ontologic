@@ -1,4 +1,4 @@
-import { ok, Result, DomainEntity, DomainEventInterface, Repository } from "../../src";
+import { ok, Result, DomainEntity, DomainEventInterface, Repository, EventWithMetadata } from "../../src";
 
 export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
@@ -12,7 +12,7 @@ export class InMemoryRepository<
   }
 
   protected readonly store = new Map<string, ReturnType<Entity["readState"]>>();
-  protected readonly eventStore = new Map<string, DomainEventInterface[]>();
+  protected readonly eventStore = new Map<string, EventWithMetadata[]>();
 
   async save(entity: Entity): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState());
@@ -27,8 +27,22 @@ export class InMemoryRepository<
 
     const events = this.eventStore.get(entity.id()) || [];
 
+    if(!Array.isArray(domainEvents)) {
+      domainEvents =[domainEvents] 
+    }
+
+    const integrationEvents = domainEvents.map((event, index) => {
+      return {
+        event,
+        metadata: {
+          createdAt: new Date().toISOString(),
+          offset: events.length + index,
+        }
+      }
+    })
+
     events.push(
-      ...(Array.isArray(domainEvents) ? domainEvents : [domainEvents]),
+      ...integrationEvents
     );
 
     this.eventStore.set(entity.id(), events);
@@ -75,7 +89,7 @@ export class InMemoryRepository<
   getEvents(
     entityId: string,
     options?: { limit: number; offset: number },
-  ): Promise<Result<DomainEventInterface[], Error>> {
+  ): Promise<Result<EventWithMetadata[], Error>> {
     const paginationOptions = options || { limit: 100, offset: 0 };
 
     const events = this.eventStore.get(entityId) || [];

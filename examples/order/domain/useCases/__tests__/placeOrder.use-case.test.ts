@@ -47,11 +47,11 @@ describe("placeOrderUseCase", () => {
     await placeOrderUseCase(repository, created.id);
 
     const events = (await repository.getEvents(created.id))._unsafeUnwrap();
-    const placedEvent = events.find((e) => e.name === "ORDER_PLACED");
+    const placedEvent = events.find((e) => e.event.name === "ORDER_PLACED");
 
     expect(placedEvent).toBeDefined();
-    expect(placedEvent?.entityId).toBe(created.id);
-    expect(placedEvent?.payload).toMatchObject({ status: "PLACED" });
+    expect(placedEvent?.event.entityId).toBe(created.id);
+    expect(placedEvent?.event.payload).toMatchObject({ status: "PLACED" });
   });
 
   it("accumulates events: ORDER_CREATED then ORDER_PLACED", async () => {
@@ -64,8 +64,8 @@ describe("placeOrderUseCase", () => {
 
     const events = (await repository.getEvents(created.id))._unsafeUnwrap();
     expect(events).toHaveLength(2);
-    expect(events[0]?.name).toBe("ORDER_CREATED");
-    expect(events[1]?.name).toBe("ORDER_PLACED");
+    expect(events[0]?.event.name).toBe("ORDER_CREATED");
+    expect(events[1]?.event.name).toBe("ORDER_PLACED");
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {
