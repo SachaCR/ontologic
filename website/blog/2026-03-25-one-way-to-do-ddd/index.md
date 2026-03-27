@@ -27,7 +27,7 @@ Ontologic is intentionally small. It gives you base classes and types for the co
 
 This is a deliberate constraint.
 
-A smaller library is easier to understand, easier to trust, and easier to adapt. If Ontologic does 80% of what you need but the last 20% requires a different shape, feel free to extends the base classes and interfaces. If it's not flexible enough for you the right answer should be to fork it and change it or to work around it with hacks.
+A smaller library is easier to understand, easier to trust, and easier to adapt. If Ontologic does 80% of what you need but the last 20% requires a different shape, feel free to extend the base classes and interfaces. If it's not flexible enough for you, the right answer should be to fork it and change it, or to work around it with hacks.
 
 The source is short. The concepts are explicit. If you need more, take what's here and build on it.
 
