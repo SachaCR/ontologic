@@ -1,11 +1,21 @@
 import { DomainEventInterface } from "../domainEvent";
+import { EventMetadata } from "../repository";
 
-export interface DomainEventBus<Event extends DomainEventInterface> {
+export interface IDomainEventBusPublisher<Event extends DomainEventInterface> {
   start(): void | Promise<void>
-
   stop(): void | Promise<void>
-
-  listenTo(eventName: string, handler: (event: Event) => void): void
-
-  publish(event: Event): Promise<void>
+  publish(event:Extract<Event, { name: Event["name"] }>, metadata: EventMetadata): Promise<void>
 }
+
+export interface IDomainEventBusListener<Event extends DomainEventInterface> {
+  start(): void | Promise<void>
+  stop(): void | Promise<void>
+  listenTo<EventName extends Event["name"]>(eventName:EventName | '*', handler: EventHandler<Extract<Event, { name: EventName }>>): void
+}
+
+export type EventHandler<Event extends DomainEventInterface> = (
+  event: Event,
+  metadata: EventMetadata
+) => void | Promise<void>;
+
+

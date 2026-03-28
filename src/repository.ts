@@ -5,12 +5,14 @@ import { DomainEventInterface } from "./domainEvent";
 
 export interface EventWithMetadata {
   event: DomainEventInterface;
-  metadata: {
-    offset: number;
-    createdAt: string;
-  }
+  metadata: EventMetadata
 }
 
+export interface EventMetadata {
+  id: string;
+  offset?: number;
+  createdAt: string;
+}
 export interface Repository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
 > {
@@ -32,6 +34,8 @@ export interface Repository<
     entityId: string,
     options?: { limit: number; offset: number },
   ): Promise<Result<EventWithMetadata[], Error>>;
+
+  getEventsAfter(entityId: string, eventId: string, limit: number): Promise<Result<EventWithMetadata[],Error>>;
 
   on(handler: (entityId: string) => void): void;
 }

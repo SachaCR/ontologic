@@ -3,6 +3,7 @@ import { ok, Result } from "../result";
 import { DomainEntity } from "../domainEntity";
 import { DomainEventInterface } from "../domainEvent";
 import { EventWithMetadata, Repository } from "../repository";
+import { randomUUID } from "node:crypto";
 
 export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
@@ -38,10 +39,11 @@ export class InMemoryRepository<
       domainEvents =[domainEvents] 
     }
 
-    const integrationEvents = domainEvents.map((event, index) => {
+    const eventsWithMetadata = domainEvents.map((event, index) => {
       return {
         event,
         metadata: {
+          id: randomUUID(),
           createdAt: new Date().toISOString(),
           offset: events.length + index,
         }
@@ -49,7 +51,7 @@ export class InMemoryRepository<
     })
 
     events.push(
-      ...integrationEvents
+      ...eventsWithMetadata
     );
 
     this.eventStore.set(entity.id(), events);
@@ -111,6 +113,27 @@ export class InMemoryRepository<
     return Promise.resolve(ok(paginatedEvents));
   }
 
+  getEventsAfter(
+    entityId: string,
+    eventId: string,
+    limit: number = 50
+  ): Promise<Result<EventWithMetadata[], Error>> {
+
+    const events = this.eventStore.get(entityId) || [];
+
+    const foundPrecedingEventIndex = events.findIndex(event => event.metadata.id === eventId)
+
+    if(foundPrecedingEventIndex === -1) { 
+      throw new Error("Unknown event id");
+    }
+
+    const paginatedEvents = events.slice(
+      foundPrecedingEventIndex,
+      foundPrecedingEventIndex + limit,
+    );
+
+    return Promise.resolve(ok(paginatedEvents));
+  }
   on(handler: (entityId: string) => void): void {
     this.#emitter.on("domainEventsSaved", handler);
   }
