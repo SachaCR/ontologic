@@ -10,7 +10,6 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
   constructor(params: {
     publisherConnector: PublisherConnector;
-    
   }) {
     const { publisherConnector } = params;
 
@@ -30,7 +29,6 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
   async start() {
     // TODO: Attach the handler to the connector
- 
     await this.#listenerConnector.start();
   }
 
