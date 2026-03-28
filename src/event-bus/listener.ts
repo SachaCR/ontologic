@@ -1,25 +1,25 @@
-import { PublisherConnector } from "./connectors/publisher";
+import {ListenerConnector} from "./connectors/interfaces";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 
 export class DomainEventBusListener<Event extends DomainEventInterface>
   implements IDomainEventBusListener<Event>
 {
-  #listenerConnector: PublisherConnector;
+  #listenerConnector: ListenerConnector
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
 
   constructor(params: {
-    publisherConnector: PublisherConnector;
+    listenerConnector: ListenerConnector;
   }) {
-    const { publisherConnector } = params;
+    const { listenerConnector  } = params;
 
-    if (!publisherConnector) {
+    if (!listenerConnector) {
       throw new Error(
         "[DomainEventBusListener] Must have a listener connector",
       );
     }
 
-    this.#listenerConnector = publisherConnector;
+    this.#listenerConnector = listenerConnector;
     this.#eventHandlersMap = new Map<Event["name"] | "*", EventHandler<Event>>()
   }
 
