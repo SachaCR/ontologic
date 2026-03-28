@@ -1,4 +1,4 @@
-import { PublisherConnector } from "./connectors/publisher";
+import { PublisherConnector } from "./connectors/interfaces";
 import { IDomainEventBusPublisher } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { EventMetadata } from "../repository";
