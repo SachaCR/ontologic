@@ -1,21 +1,15 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-import { DomainEvent } from "../../domainEvent";
 import type { EventMetadata } from "../../repository";
 import { InMemoryConnectors } from "../connectors/in-memory";
 import { DomainEventBusListener } from "../listener";
 import { DomainEventBusPublisher } from "../publisher";
-
-type TestEvent = DomainEvent<"TestEvent", 1, { foo: string }>;
-
-function makeEvent(overrides?: Partial<{ entityId: string; payload: { foo: string } }>): TestEvent {
-  return new DomainEvent({
-    entityId: overrides?.entityId ?? "entity-1",
-    name: "TestEvent",
-    version: 1,
-    payload: overrides?.payload ?? { foo: "bar" },
-  });
-}
+import { DomainEvent } from "../../domainEvent";
+import {
+  makeEvent,
+  parseTestEvent,
+  type TestEvent,
+} from "./helpers/testEventValidator";
 
 function makeMetadata(overrides?: Partial<EventMetadata>): EventMetadata {
   return {
@@ -202,6 +196,138 @@ describe("DomainEventBusListener", () => {
     await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
     expect(handler.mock.calls[0]?.[0]).toBeNull();
     expect(handler.mock.calls[0]?.[1]).toEqual(makeMetadata());
+  });
+});
+
+describe("event validator option", () => {
+  let connectors: InMemoryConnectors;
+
+  beforeEach(() => {
+    connectors = new InMemoryConnectors();
+  });
+
+  it("DomainEventBusPublisher calls parseTestEvent and rejects publish when the event is invalid", async () => {
+    const validator = vi.fn(parseTestEvent);
+
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.publisher,
+      options: { validator },
+    });
+
+    const invalid = {
+      entityId: "e1",
+      name: "WrongEvent",
+      version: 1,
+      payload: { foo: "x" },
+    } as unknown as TestEvent;
+
+    await expect(publisher.publish(invalid, makeMetadata())).rejects.toThrow(
+      'TestEvent: expected name "TestEvent"',
+    );
+
+    expect(validator).toHaveBeenCalledTimes(1);
+    expect(validator).toHaveBeenCalledWith(invalid);
+  });
+
+  it("DomainEventBusPublisher does not run the event validator when metadata validation fails first", async () => {
+    const validator = vi.fn(parseTestEvent);
+
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.publisher,
+      options: { validator },
+    });
+
+    await expect(
+      publisher.publish(makeEvent(), {
+        id: "",
+        createdAt: "2026-01-01T00:00:00.000Z",
+      }),
+    ).rejects.toThrow("Invalid Metadata: id is an empty string");
+
+    expect(validator).not.toHaveBeenCalled();
+  });
+
+  it("DomainEventBusListener calls parseTestEvent and does not run the handler when the event is invalid", async () => {
+    const validator = vi.fn(parseTestEvent);
+
+    const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const onError = vi.fn<(error: unknown) => void>();
+
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: connectors.listener,
+      options: { validator },
+    });
+
+    listener.listenTo("TestEvent", handler);
+    listener.onError(onError);
+
+    await listener.start();
+
+    connectors.publisher.publish(
+      "TestEvent",
+      JSON.stringify({ event: null, metadata: makeMetadata() }),
+    );
+
+    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+
+    expect(validator).toHaveBeenCalledTimes(1);
+    expect(validator).toHaveBeenCalledWith(null);
+    expect(handler).not.toHaveBeenCalled();
+    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
+    expect((onError.mock.calls[0]?.[0] as Error).message).toBe("TestEvent: expected an object");
+  });
+
+  it("publishes and delivers the event when parseTestEvent accepts the wire payload", async () => {
+    const publisherValidator = vi.fn(parseTestEvent);
+    const listenerValidator = vi.fn(parseTestEvent);
+
+    const received: Array<{ event: TestEvent; metadata: EventMetadata }> = [];
+
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: connectors.listener,
+      options: { validator: listenerValidator },
+    });
+
+    listener.listenTo("TestEvent", async (event, metadata) => {
+      received.push({ event, metadata });
+    });
+
+    await listener.start();
+
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.publisher,
+      options: { validator: publisherValidator },
+    });
+
+    const event = makeEvent({ payload: { foo: "accepted" } });
+    const metadata = makeMetadata({ id: "m-ok" });
+
+    await publisher.publish(event, metadata);
+
+    await vi.waitFor(() => expect(received).toHaveLength(1));
+
+    expect(publisherValidator).toHaveBeenCalledTimes(1);
+    expect(publisherValidator).toHaveBeenCalledWith(event);
+
+    expect(listenerValidator).toHaveBeenCalledTimes(1);
+    const wirePayload = listenerValidator.mock.calls[0]?.[0];
+    expect(wirePayload).toEqual({
+      entityId: event.entityId,
+      name: "TestEvent",
+      version: 1,
+      payload: { foo: "accepted" },
+    });
+
+    expect(received[0]?.event).toEqual({
+      entityId: event.entityId,
+      name: "TestEvent",
+      version: 1,
+      payload: { foo: "accepted" },
+    });
+    expect(received[0]?.metadata).toEqual(metadata);
+
+    const parsedEvent = listenerValidator.mock.results[0]?.value;
+    expect(parsedEvent).toBeInstanceOf(DomainEvent);
   });
 });
 
