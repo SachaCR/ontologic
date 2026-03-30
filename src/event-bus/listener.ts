@@ -1,15 +1,17 @@
-import {ListenerConnector} from "./connectors/interfaces";
+import {IListenerConnector, ReceivedMessage} from "./connectors/interfaces";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
+import { EventEmitter } from "node:events";
 
 export class DomainEventBusListener<Event extends DomainEventInterface>
   implements IDomainEventBusListener<Event>
 {
-  #listenerConnector: ListenerConnector
+  #listenerConnector: IListenerConnector
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
+  #eventEmitter: EventEmitter;
 
   constructor(params: {
-    listenerConnector: ListenerConnector;
+    listenerConnector: IListenerConnector;
   }) {
     const { listenerConnector  } = params;
 
@@ -21,6 +23,9 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
     this.#listenerConnector = listenerConnector;
     this.#eventHandlersMap = new Map<Event["name"] | "*", EventHandler<Event>>()
+    this.#eventEmitter = new EventEmitter({
+      captureRejections: true
+    })
   }
 
   listenTo<EventName extends Event["name"]>(eventName:EventName | '*', handler: EventHandler<Extract<Event, { name: EventName }>>): void {
@@ -28,7 +33,41 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
   }
 
   async start() {
-    // TODO: Attach the handler to the connector
+    if(this.#eventHandlersMap.size === 0) {
+      throw new Error("[DomainEventBusListener]: Cannot start the listener if you have no listener registered. Use listenTo() before start()")
+    }
+
+    this.#listenerConnector.onMessage(async (message: ReceivedMessage)=> {
+      const eventHandler =
+        this.#eventHandlersMap.get(message.name) ??
+        this.#eventHandlersMap.get("*");
+
+      if (!eventHandler) {
+        this.#eventEmitter.emit("error", new Error("[DomainEventBusListener]: No event handler found"));
+        return
+      }
+
+      // TODO: Refactor the message parsing
+      const parsedMessage = JSON.parse(message.content);
+      const { event, metadata } = parsedMessage;
+
+      // TODO: Validate Event
+
+      // TODO: Validate Meatadata
+
+      if(!event || !metadata)  {
+        this.#eventEmitter.emit("error", new Error("[DomainEventBusListener]: Invalid event received"));
+        return
+      }
+
+      try {
+        await eventHandler(event, metadata);
+        await message.ack();
+      } catch {
+        await message.nack();
+      }
+    });
+
     await this.#listenerConnector.start();
   }
 
@@ -42,5 +81,6 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
   onError(handler: (error: unknown) => void): void {
     this.#listenerConnector.onError(handler);
+    this.#eventEmitter.on("error", handler)
   }
 }

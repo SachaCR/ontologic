@@ -1,4 +1,4 @@
-import { PublisherConnector } from "./connectors/interfaces";
+import { IPublisherConnector } from "./connectors/interfaces";
 import { IDomainEventBusPublisher } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { EventMetadata } from "../repository";
@@ -6,10 +6,10 @@ import { EventMetadata } from "../repository";
 export class DomainEventBusPublisher<Event extends DomainEventInterface>
   implements IDomainEventBusPublisher<Event>
 {
-  #publisherConnector: PublisherConnector;
+  #publisherConnector: IPublisherConnector;
 
   constructor(params: {
-    publisherConnector: PublisherConnector;
+    publisherConnector: IPublisherConnector;
   }) {
     const { publisherConnector } = params;
 
@@ -23,11 +23,17 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
   }
 
   async publish(event: Extract<Event, { name: Event["name"] }>, metadata: EventMetadata) {
+
     // TODO: Validate metadata
 
     // TODO: Validate event
 
-    this.#publisherConnector.publish(event, metadata);
+    const message = {
+      event,
+      metadata
+    }
+
+    this.#publisherConnector.publish(event.name, JSON.stringify(message));
   }
 
   async start() {
