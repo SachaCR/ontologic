@@ -34,4 +34,13 @@ export class DomainEvent<Name extends string, Version extends number, Payload> i
   get payload(): Payload {
     return structuredClone(this.#payload);
   }
+
+  toJSON(): { entityId: string; name: Name; version: Version; payload: Payload } {
+    return {
+      entityId: this.#entityId,
+      name: this.#name,
+      version: this.#version,
+      payload: this.payload,
+    };
+  }
 }

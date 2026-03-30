@@ -18,4 +18,3 @@ export type EventHandler<Event extends DomainEventInterface> = (
   metadata: EventMetadata
 ) => void | Promise<void>;
 
-
