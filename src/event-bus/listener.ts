@@ -2,18 +2,20 @@ import {IListenerConnector, ReceivedMessage} from "./connectors/interfaces";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { EventEmitter } from "node:events";
+import { validateMetadata } from "./validateMetadata";
 
 export class DomainEventBusListener<Event extends DomainEventInterface>
-  implements IDomainEventBusListener<Event>
-{
+  implements IDomainEventBusListener<Event> {
   #listenerConnector: IListenerConnector
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
   #eventEmitter: EventEmitter;
+  #validator?:  (event: unknown) => Event | undefined;
 
   constructor(params: {
     listenerConnector: IListenerConnector;
+    options?: { validator?: (event: unknown) => Event; }
   }) {
-    const { listenerConnector  } = params;
+    const { listenerConnector, options } = params;
 
     if (!listenerConnector) {
       throw new Error(
@@ -26,6 +28,10 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
     this.#eventEmitter = new EventEmitter({
       captureRejections: true
     })
+
+    if(options?.validator){
+      this.#validator = options.validator
+    }
   }
 
   listenTo<EventName extends Event["name"]>(eventName:EventName | '*', handler: EventHandler<Extract<Event, { name: EventName }>>): void {
@@ -47,21 +53,17 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
         return
       }
 
-      // TODO: Refactor the message parsing
       const parsedMessage = JSON.parse(message.content);
       const { event, metadata } = parsedMessage;
 
-      // TODO: Validate Event
-
-      // TODO: Validate Meatadata
-
-      if(!event || !metadata)  {
-        this.#eventEmitter.emit("error", new Error("[DomainEventBusListener]: Invalid event received"));
-        return
+      if(this.#validator) {
+        this.#validator(event)
       }
 
+      const validatedMetadata = validateMetadata(metadata)
+
       try {
-        await eventHandler(event, metadata);
+        await eventHandler(event, validatedMetadata);
         await message.ack();
       } catch {
         await message.nack();

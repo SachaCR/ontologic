@@ -184,22 +184,24 @@ describe("DomainEventBusListener", () => {
     expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain("No event handler found");
   });
 
-  it("notifies onError when the payload is missing event or metadata", async () => {
-    const onError = vi.fn<(error: unknown) => void>();
+  it("invokes the handler with a null event when the envelope has event: null (listener does not validate event shape)", async () => {
+    const handler = vi.fn<(event: TestEvent | null, metadata: EventMetadata) => Promise<void>>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
     });
 
-    listener.listenTo("TestEvent", async () => {});
-    listener.onError(onError);
+    listener.listenTo("TestEvent", handler);
 
     await listener.start();
 
-    connectors.publisher.publish("TestEvent", JSON.stringify({ event: null, metadata: makeMetadata() }));
+    connectors.publisher.publish(
+      "TestEvent",
+      JSON.stringify({ event: null, metadata: makeMetadata() }),
+    );
 
-    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
-
-    expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain("Invalid event received");
+    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+    expect(handler.mock.calls[0]?.[0]).toBeNull();
+    expect(handler.mock.calls[0]?.[1]).toEqual(makeMetadata());
   });
 });
 

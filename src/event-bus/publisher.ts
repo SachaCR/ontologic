@@ -1,17 +1,19 @@
 import { IPublisherConnector } from "./connectors/interfaces";
 import { IDomainEventBusPublisher } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
-import { EventMetadata } from "../repository";
+import { validateMetadata } from "./validateMetadata";
 
 export class DomainEventBusPublisher<Event extends DomainEventInterface>
   implements IDomainEventBusPublisher<Event>
 {
   #publisherConnector: IPublisherConnector;
+  #validator?:  (event: unknown) => Event | undefined;
 
   constructor(params: {
     publisherConnector: IPublisherConnector;
+    options?: { validator?: (event: unknown) => Event; }
   }) {
-    const { publisherConnector } = params;
+    const { publisherConnector, options } = params;
 
     if (!publisherConnector) {
       throw new Error(
@@ -20,17 +22,27 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
     }
 
     this.#publisherConnector = publisherConnector;
+
+    if(options?.validator){
+      this.#validator = options.validator
+    }
   }
 
-  async publish(event: Extract<Event, { name: Event["name"] }>, metadata: EventMetadata) {
+  async publish(event: Extract<Event, { name: Event["name"] }>, metadata: {
+    id:string;
+    offset?: number;
+    createdAt: string;
+  }) {
 
-    // TODO: Validate metadata
+    const validatedMetadata = validateMetadata(metadata);
 
-    // TODO: Validate event
+    if(this.#validator) {
+      this.#validator(event)
+    }
 
     const message = {
       event,
-      metadata
+      metadata: validatedMetadata,
     }
 
     this.#publisherConnector.publish(event.name, JSON.stringify(message));
