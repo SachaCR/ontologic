@@ -26,7 +26,7 @@ export class InMemoryListenerConnector implements IListenerConnector {
     }
 
     if (!this.#handler) {
-      throw new Error("[InMemoryListenerConnector]: Cannot start if no handler has been register. Use onMessage() before start()")
+      throw new Error("[InMemoryListenerConnector]: Cannot start if no handler has been registered. Use onMessage() before start()")
     }
 
     const handler = this.#handler;
