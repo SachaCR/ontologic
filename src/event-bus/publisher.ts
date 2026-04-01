@@ -32,7 +32,9 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
     id:string;
     offset?: number;
     createdAt: string;
-  }) {
+  }, options?: {
+      orderingKey?: string
+    }) {
 
     const validatedMetadata = validateMetadata(metadata);
 
@@ -45,7 +47,7 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
       metadata: validatedMetadata,
     }
 
-    this.#publisherConnector.publish(event.name, JSON.stringify(message));
+    await this.#publisherConnector.publish(event.name, JSON.stringify(message), options);
   }
 
   async start() {

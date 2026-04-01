@@ -7,7 +7,7 @@ export interface IListenerConnector {
 }
 
 export interface IPublisherConnector {
-  publish(name: string, message: string): Promise<void>
+  publish(name: string, message: string, options?: { orderingKey?: string }): Promise<void>
   status: "STARTED" | "STOPPED"
   start(): Promise<void>
   stop(): Promise<void>
