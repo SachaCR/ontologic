@@ -193,7 +193,10 @@ import { InMemoryConnectors } from "ontologic";
 const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
 
 const publisher = new DomainEventBusPublisher<OrderEvents>({ publisherConnector });
-const listener = new DomainEventBusListener<OrderEvents>({ listenerConnector });
+const listener = new DomainEventBusListener<OrderEvents>({
+  listenerConnector,
+  options: { validator: parseOrderEvents },
+});
 ```
 
 The two connectors share an internal `EventEmitter`. Publishing an event immediately delivers it to any registered listener in the same process.
@@ -209,7 +212,10 @@ test("listener receives published events", async () => {
   const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
 
   const publisher = new DomainEventBusPublisher<OrderEvents>({ publisherConnector });
-  const listener = new DomainEventBusListener<OrderEvents>({ listenerConnector });
+  const listener = new DomainEventBusListener<OrderEvents>({
+    listenerConnector,
+    options: { validator: parseOrderEvents },
+  });
 
   const received: OrderPlaced[] = [];
 
@@ -239,23 +245,41 @@ Each test gets its own `InMemoryConnectors.create()` call, so there is no shared
 
 ## Validating event shape
 
-By default, the event bus validates metadata but not the event payload itself. If you want to validate that incoming messages conform to your expected types — useful when consuming events from external services or when adding strict runtime checks — pass a `validator` option:
+A validator is **required** on the listener.
+
+Events travel over the wire as JSON. When the listener receives a message and deserializes it, the result is a plain JavaScript object — not an instance of your `DomainEvent` class. Without a validator, your handler receives a structurally correct object but one that is missing the class identity: `instanceof` checks fail, prototype methods are absent, and any class-level invariants you rely on are silently bypassed.
+
+The validator is the step that reconstructs a real event instance from the raw wire payload:
 
 ```typescript
-function validateOrderEvent(event: unknown): OrderEvents {
-  // parse and throw if invalid, return typed event if valid
-  // use zod, io-ts, or any other schema library
-}
+import { DomainEvent } from "ontologic";
 
+// with a schema library like Zod
+const OrderPlacedSchema = z.object({
+  entityId: z.string().min(1),
+  name: z.literal("ORDER_PLACED"),
+  version: z.literal(1),
+  payload: z.object({ orderId: z.string(), total: z.number() }),
+});
+
+function parseOrderPlaced(raw: unknown): OrderPlaced {
+  const data = OrderPlacedSchema.parse(raw);
+  return new OrderPlaced(data.entityId, data.payload);
+}
+```
+
+Pass the validator when constructing the listener:
+
+```typescript
 const listener = new DomainEventBusListener<OrderEvents>({
   listenerConnector: myConnector,
   options: {
-    validator: validateOrderEvent,
+    validator: parseOrderPlaced,
   },
 });
 ```
 
-The validator runs after deserialization and before your handler is called. If it throws, the message is nack'd.
+The validator runs after deserialization and before your handler is called. If it throws, the message is nack'd and your handler is never invoked.
 
 ---
 
