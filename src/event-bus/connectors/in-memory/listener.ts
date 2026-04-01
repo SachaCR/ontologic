@@ -46,7 +46,8 @@ export class InMemoryListenerConnector implements IListenerConnector {
   }
 
   stop(){
-    this.#status = "STOPPED"
+    this.#status = "STOPPED";
+    this.#eventEmitter.removeAllListeners("message");
     return Promise.resolve();
   }
 
