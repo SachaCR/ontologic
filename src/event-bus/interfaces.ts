@@ -4,7 +4,7 @@ import { EventMetadata } from "../repository";
 export interface IDomainEventBusPublisher<Event extends DomainEventInterface> {
   start(): void | Promise<void>
   stop(): void | Promise<void>
-  publish(event:Extract<Event, { name: Event["name"] }>, metadata: EventMetadata): Promise<void>
+  publish(event: Event, metadata: EventMetadata): Promise<void>
 }
 
 export interface IDomainEventBusListener<Event extends DomainEventInterface> {

@@ -7,7 +7,7 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
   implements IDomainEventBusPublisher<Event>
 {
   #publisherConnector: IPublisherConnector;
-  #validator?:  (event: unknown) => Event | undefined;
+  #validator?:  (event: unknown) => Event;
 
   constructor(params: {
     publisherConnector: IPublisherConnector;
@@ -28,7 +28,7 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
     }
   }
 
-  async publish(event: Extract<Event, { name: Event["name"] }>, metadata: {
+  async publish(event: Event, metadata: {
     id:string;
     offset?: number;
     createdAt: string;
@@ -38,12 +38,14 @@ export class DomainEventBusPublisher<Event extends DomainEventInterface>
 
     const validatedMetadata = validateMetadata(metadata);
 
+    let eventToPublish = event;
+    
     if(this.#validator) {
-      this.#validator(event)
+      eventToPublish = this.#validator(event)
     }
 
     const message = {
-      event,
+      event: eventToPublish,
       metadata: validatedMetadata,
     }
 

@@ -9,11 +9,11 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
   #listenerConnector: IListenerConnector
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
   #eventEmitter: EventEmitter;
-  #validator?:  (event: unknown) => Event | undefined;
+  #validator:  (event: unknown) => Event;
 
   constructor(params: {
     listenerConnector: IListenerConnector;
-    options?: { validator?: (event: unknown) => Event; }
+    options: { validator: (event: unknown) => Event; }
   }) {
     const { listenerConnector, options } = params;
 
@@ -29,9 +29,7 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
       captureRejections: true
     })
 
-    if(options?.validator){
-      this.#validator = options.validator
-    }
+    this.#validator = options.validator
   }
 
   listenTo<EventName extends Event["name"]>(eventName:EventName | '*', handler: EventHandler<Extract<Event, { name: EventName }>>): void {
@@ -50,20 +48,21 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
       if (!eventHandler) {
         this.#eventEmitter.emit("error", new Error("[DomainEventBusListener]: No event handler found"));
+        await message.nack();
         return
       }
 
       const parsedMessage = JSON.parse(message.content);
       const { event, metadata } = parsedMessage;
 
-      if(this.#validator) {
-        this.#validator(event)
-      }
+      let eventToHandle = event;
+
+        eventToHandle = this.#validator(event);
 
       const validatedMetadata = validateMetadata(metadata)
 
       try {
-        await eventHandler(event, validatedMetadata);
+        await eventHandler(eventToHandle, validatedMetadata);
         await message.ack();
       } catch {
         await message.nack();

@@ -54,6 +54,7 @@ describe("DomainEventBusPublisher", () => {
 
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     })
 
     listener.listenTo('TestEvent', async (event: TestEvent, metadata: EventMetadata) => {
@@ -74,12 +75,12 @@ describe("DomainEventBusPublisher", () => {
 
     expect(received).toHaveLength(1);
 
-    expect(received[0]?.event).toEqual({
-      entityId: event.entityId,
-      name: "TestEvent",
-      version: 1,
-      payload: { foo: "bar" },
-    });
+    const receivedEvent = received[0]?.event;
+    expect(receivedEvent).toBeInstanceOf(DomainEvent);
+    expect(receivedEvent?.entityId).toBe(event.entityId);
+    expect(receivedEvent?.name).toBe("TestEvent");
+    expect(receivedEvent?.version).toBe(1);
+    expect(receivedEvent?.payload).toEqual({ foo: "bar" });
 
     expect(received[0]?.metadata).toEqual(metadata);
   });
@@ -97,6 +98,9 @@ describe("DomainEventBusListener", () => {
       () =>
         new DomainEventBusListener<TestEvent>({
           listenerConnector: undefined as never,
+          options: {
+            validator: parseTestEvent
+          }
         }),
     ).toThrow("[DomainEventBusListener] Must have a listener connector");
   });
@@ -104,6 +108,7 @@ describe("DomainEventBusListener", () => {
   it("throws when start() is called with no handlers registered", async () => {
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     });
 
     await expect(listener.start()).rejects.toThrow(
@@ -115,6 +120,7 @@ describe("DomainEventBusListener", () => {
     const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     });
 
     listener.listenTo("TestEvent", handler);
@@ -132,12 +138,12 @@ describe("DomainEventBusListener", () => {
 
     expect(handler).toHaveBeenCalledTimes(1);
 
-    expect(handler.mock.calls[0]?.[0]).toEqual({
-      entityId: event.entityId,
-      name: "TestEvent",
-      version: 1,
-      payload: { foo: "baz" },
-    });
+    const receivedEvent = handler.mock.calls[0]?.[0];
+    expect(receivedEvent).toBeInstanceOf(DomainEvent);
+    expect(receivedEvent?.entityId).toBe(event.entityId);
+    expect(receivedEvent?.name).toBe("TestEvent");
+    expect(receivedEvent?.version).toBe(1);
+    expect(receivedEvent?.payload).toEqual({ foo: "baz" });
 
     expect(handler.mock.calls[0]?.[1]).toEqual(metadata);
   });
@@ -146,6 +152,7 @@ describe("DomainEventBusListener", () => {
     const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     });
 
     listener.listenTo("*", handler);
@@ -168,6 +175,7 @@ describe("DomainEventBusListener", () => {
     const onError = vi.fn<(error: unknown) => void>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     });
 
     listener.listenTo("TestEvent", async () => {});
@@ -183,25 +191,6 @@ describe("DomainEventBusListener", () => {
     expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain("No event handler found");
   });
 
-  it("invokes the handler with a null event when the envelope has event: null (listener does not validate event shape)", async () => {
-    const handler = vi.fn<(event: TestEvent | null, metadata: EventMetadata) => Promise<void>>();
-    const listener = new DomainEventBusListener<TestEvent>({
-      listenerConnector: connectors.listener,
-    });
-
-    listener.listenTo("TestEvent", handler);
-
-    await listener.start();
-
-    connectors.publisher.publish(
-      "TestEvent",
-      JSON.stringify({ event: null, metadata: makeMetadata() }),
-    );
-
-    expect(handler).toHaveBeenCalledTimes(1);
-    expect(handler.mock.calls[0]?.[0]).toBeNull();
-    expect(handler.mock.calls[0]?.[1]).toEqual(makeMetadata());
-  });
 });
 
 describe("event validator option", () => {
@@ -305,6 +294,7 @@ describe("event validator option", () => {
     });
 
     const event = makeEvent({ payload: { foo: "accepted" } });
+
     const metadata = makeMetadata({ id: "m-ok" });
 
     await publisher.publish(event, metadata);
@@ -325,12 +315,12 @@ describe("event validator option", () => {
       payload: { foo: "accepted" },
     });
 
-    expect(received[0]?.event).toEqual({
-      entityId: event.entityId,
-      name: "TestEvent",
-      version: 1,
-      payload: { foo: "accepted" },
-    });
+    const receivedEvent = received[0]?.event;
+    expect(receivedEvent).toBeInstanceOf(DomainEvent);
+    expect(receivedEvent?.entityId).toBe(event.entityId);
+    expect(receivedEvent?.name).toBe("TestEvent");
+    expect(receivedEvent?.version).toBe(1);
+    expect(receivedEvent?.payload).toEqual({ foo: "accepted" });
 
     expect(received[0]?.metadata).toEqual(metadata);
 
@@ -352,6 +342,7 @@ describe("DomainEventBusListener + DomainEventBusPublisher (in-memory)", () => {
 
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
+      options: { validator: parseTestEvent },
     });
 
     listener.listenTo("TestEvent", async (event, metadata) => {
@@ -373,12 +364,12 @@ describe("DomainEventBusListener + DomainEventBusPublisher (in-memory)", () => {
 
     expect(received).toHaveLength(1);
 
-    expect(received[0]?.event).toEqual({
-      entityId: event.entityId,
-      name: "TestEvent",
-      version: 1,
-      payload: { foo: "bar" },
-    });
+    const receivedEvent = received[0]?.event;
+    expect(receivedEvent).toBeInstanceOf(DomainEvent);
+    expect(receivedEvent?.entityId).toBe(event.entityId);
+    expect(receivedEvent?.name).toBe("TestEvent");
+    expect(receivedEvent?.version).toBe(1);
+    expect(receivedEvent?.payload).toEqual({ foo: "bar" });
 
     expect(received[0]?.metadata).toEqual(metadata);
   });
