@@ -276,6 +276,35 @@ const repository = new BankAccountRepository();
 // Entity state and event saved atomically
 await repository.saveWithEvents(account, result.value);`,
   },
+  {
+    tag: 'Event Bus',
+    accent: '#8b5cf6',
+    title: 'Deliver events to your system',
+    description: (
+      <>
+        <p>The Event Bus handles delivery of domain events to the rest of your system. A pluggable connector interface keeps the publisher and listener logic independent of any specific broker.</p>
+        <p>Swap the connector to target SQS, Kafka, RabbitMQ, Redis, or any other broker. In-memory connectors are included for tests and local prototyping.</p>
+      </>
+    ),
+    link: '/docs/event-bus',
+    linkLabel: 'Learn about the Event Bus',
+    codeTitle: 'order-events.listener.ts',
+    code: `const listener = new DomainEventBusListener<OrderEvents>({
+  listenerConnector: myConnector,
+  options: { validator: parseOrderEvents },
+});
+
+listener.listenTo("ORDER_PLACED", async (event, metadata) => {
+  // event is a real OrderPlaced instance
+  await notifyWarehouse(event.payload.orderId);
+});
+
+listener.listenTo("PAYMENT_RECEIVED", async (event, metadata) => {
+  await generateInvoice(event.payload);
+});
+
+await listener.start();`,
+  },
 ];
 
 export default function Home(): ReactNode {
