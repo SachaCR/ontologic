@@ -50,15 +50,22 @@ describe("DomainEventBusPublisher", () => {
   });
 
   it("publish sends JSON envelope with event name as routing key", async () => {
-    const received: { name: string; content: string }[] = [];
-    connectors.listener.onMessage(async (message) => {
-      received.push({ name: message.name, content: message.content });
+    const received: { event: TestEvent, metadata: EventMetadata }[] = [];
+
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: connectors.listener,
+    })
+
+    listener.listenTo('TestEvent', async (event: TestEvent, metadata: EventMetadata) => {
+      received.push({ event, metadata });
     });
-    await connectors.listener.start();
 
     const publisher = new DomainEventBusPublisher<TestEvent>({
       publisherConnector: connectors.publisher,
     });
+
+    await listener.start();
+    await publisher.start();
 
     const event = makeEvent();
     const metadata = makeMetadata();
@@ -66,18 +73,15 @@ describe("DomainEventBusPublisher", () => {
     await publisher.publish(event, metadata);
 
     expect(received).toHaveLength(1);
-    expect(received[0]?.name).toBe("TestEvent");
-    const parsed = JSON.parse(received[0]?.content ?? "{}") as {
-      event: unknown;
-      metadata: unknown;
-    };
-    expect(parsed.event).toEqual({
+
+    expect(received[0]?.event).toEqual({
       entityId: event.entityId,
       name: "TestEvent",
       version: 1,
       payload: { foo: "bar" },
     });
-    expect(parsed.metadata).toEqual(metadata);
+
+    expect(received[0]?.metadata).toEqual(metadata);
   });
 });
 
@@ -126,7 +130,7 @@ describe("DomainEventBusListener", () => {
 
     await publisher.publish(event, metadata);
 
-    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+    expect(handler).toHaveBeenCalledTimes(1);
 
     expect(handler.mock.calls[0]?.[0]).toEqual({
       entityId: event.entityId,
@@ -134,6 +138,7 @@ describe("DomainEventBusListener", () => {
       version: 1,
       payload: { foo: "baz" },
     });
+
     expect(handler.mock.calls[0]?.[1]).toEqual(metadata);
   });
 
@@ -156,7 +161,7 @@ describe("DomainEventBusListener", () => {
 
     await publisher.publish(event, metadata);
 
-    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+    expect(handler).toHaveBeenCalledTimes(1);
   });
 
   it("notifies onError when no handler matches the message name", async () => {
@@ -172,7 +177,7 @@ describe("DomainEventBusListener", () => {
 
     await connectors.publisher.publish("OtherEvent", "{}");
 
-    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
+    expect(onError).toHaveBeenCalled();
 
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
     expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain("No event handler found");
@@ -193,7 +198,7 @@ describe("DomainEventBusListener", () => {
       JSON.stringify({ event: null, metadata: makeMetadata() }),
     );
 
-    await vi.waitFor(() => expect(handler).toHaveBeenCalledTimes(1));
+    expect(handler).toHaveBeenCalledTimes(1);
     expect(handler.mock.calls[0]?.[0]).toBeNull();
     expect(handler.mock.calls[0]?.[1]).toEqual(makeMetadata());
   });
@@ -304,13 +309,15 @@ describe("event validator option", () => {
 
     await publisher.publish(event, metadata);
 
-    await vi.waitFor(() => expect(received).toHaveLength(1));
+    expect(received).toHaveLength(1);
 
     expect(publisherValidator).toHaveBeenCalledTimes(1);
     expect(publisherValidator).toHaveBeenCalledWith(event);
 
     expect(listenerValidator).toHaveBeenCalledTimes(1);
+
     const wirePayload = listenerValidator.mock.calls[0]?.[0];
+
     expect(wirePayload).toEqual({
       entityId: event.entityId,
       name: "TestEvent",
@@ -324,9 +331,11 @@ describe("event validator option", () => {
       version: 1,
       payload: { foo: "accepted" },
     });
+
     expect(received[0]?.metadata).toEqual(metadata);
 
     const parsedEvent = listenerValidator.mock.results[0]?.value;
+
     expect(parsedEvent).toBeInstanceOf(DomainEvent);
   });
 });
@@ -362,7 +371,7 @@ describe("DomainEventBusListener + DomainEventBusPublisher (in-memory)", () => {
 
     await publisher.publish(event, metadata);
 
-    await vi.waitFor(() => expect(received).toHaveLength(1));
+    expect(received).toHaveLength(1);
 
     expect(received[0]?.event).toEqual({
       entityId: event.entityId,
@@ -370,6 +379,7 @@ describe("DomainEventBusListener + DomainEventBusPublisher (in-memory)", () => {
       version: 1,
       payload: { foo: "bar" },
     });
+
     expect(received[0]?.metadata).toEqual(metadata);
   });
 });
