@@ -38,6 +38,10 @@ An invariant is a rule that must always be true about an entity — not just aft
 
 The repository is the interface between your domain and your persistence layer. It hides all database details behind a clean, domain-friendly API and ensures that entity state and domain events are always saved together in a single transaction.
 
+### [Event Bus](./event-bus.md)
+
+The event bus delivers domain events to the rest of your system. A pluggable connector interface lets you use any broker — SQS, Kafka, RabbitMQ, Redis, or others — while the publisher and listener logic stays the same across all environments. In-memory connectors are included for tests and local prototyping.
+
 ---
 
 ## Who is this for?

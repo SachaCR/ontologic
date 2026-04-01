@@ -175,6 +175,8 @@ This separates two concerns that should never be coupled:
 
 The use case stays simple. The delivery guarantee is handled by infrastructure, not by application code.
 
+`ontologic` provides an [Event Bus](./event-bus.md) with a pluggable connector interface to handle the delivery side of this pattern.
+
 ---
 
 ## Not every state change needs an event
