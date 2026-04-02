@@ -6,7 +6,12 @@ import { placeOrderUseCase } from "../placeOrder.use-case";
 import { payOrderUseCase } from "../payOrder.use-case";
 import { OrderItem } from "../../entities/order/order.entity";
 
-const firstItem: OrderItem = { id: "item-1", name: "Widget", price: 9.99, quantity: 1 };
+const firstItem: OrderItem = {
+  id: "item-1",
+  name: "Widget",
+  price: 9.99,
+  quantity: 1,
+};
 
 describe("payOrderUseCase", () => {
   let repository: OrderRepository;
@@ -55,7 +60,10 @@ describe("payOrderUseCase", () => {
 
     expect(paidEvent).toBeDefined();
     expect(paidEvent?.event.entityId).toBe(orderId);
-    expect(paidEvent?.event.payload).toMatchObject({ status: "PAID", invoiceId: "invoice-123" });
+    expect(paidEvent?.event.payload).toMatchObject({
+      status: "PAID",
+      invoiceId: "invoice-123",
+    });
   });
 
   it("accumulates events: ORDER_CREATED, ORDER_PLACED, then ORDER_PAID", async () => {
@@ -71,7 +79,11 @@ describe("payOrderUseCase", () => {
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {
-    const result = await payOrderUseCase(repository, "unknown-id", "invoice-123");
+    const result = await payOrderUseCase(
+      repository,
+      "unknown-id",
+      "invoice-123",
+    );
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {

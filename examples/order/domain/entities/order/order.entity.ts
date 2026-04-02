@@ -1,11 +1,6 @@
 import { randomUUID } from "crypto";
 
-import {
-  Result,
-  err,
-  ok,
-  DomainEntity,
-} from "../../../../../src";
+import { Result, err, ok, DomainEntity } from "../../../../../src";
 
 import { OrderMustHaveAtLeastOneItem } from "./errors/orderMustHaveAtLeastOneItem.error";
 import { VoucherAlreadyApplied } from "./errors/voucherAlreadyApplied.error";
@@ -76,7 +71,9 @@ export class Order extends DomainEntity<OrderState> {
     return { order, creationEvent };
   }
 
-  addItem(params: { item: OrderItem }): Result<OrderItemAdded, InvalidStatusTransition> {
+  addItem(params: {
+    item: OrderItem;
+  }): Result<OrderItemAdded, InvalidStatusTransition> {
     if (this.state.status !== "DRAFT") {
       return err(
         new InvalidStatusTransition(
@@ -91,7 +88,9 @@ export class Order extends DomainEntity<OrderState> {
     return ok(new OrderItemAdded(this.id(), { item: params.item }));
   }
 
-  removeItem(params: { itemId: string }): Result<
+  removeItem(params: {
+    itemId: string;
+  }): Result<
     OrderItemRemoved,
     OrderMustHaveAtLeastOneItem | InvalidStatusTransition
   > {
@@ -119,10 +118,9 @@ export class Order extends DomainEntity<OrderState> {
     return ok(new OrderItemRemoved(this.id(), { itemId: params.itemId }));
   }
 
-  applyVoucher(params: { voucherId: string }): Result<
-    VoucherApplied,
-    VoucherAlreadyApplied | InvalidStatusTransition
-  > {
+  applyVoucher(params: {
+    voucherId: string;
+  }): Result<VoucherApplied, VoucherAlreadyApplied | InvalidStatusTransition> {
     if (this.state.status !== "DRAFT") {
       return err(
         new InvalidStatusTransition(
@@ -161,7 +159,9 @@ export class Order extends DomainEntity<OrderState> {
     return ok(new OrderPlaced(this.id(), { status: "PLACED" }));
   }
 
-  pay(params: { invoiceId: string }): Result<OrderPaid, InvalidStatusTransition> {
+  pay(params: {
+    invoiceId: string;
+  }): Result<OrderPaid, InvalidStatusTransition> {
     if (this.state.status !== "PLACED") {
       return err(
         new InvalidStatusTransition(
@@ -174,6 +174,8 @@ export class Order extends DomainEntity<OrderState> {
     this.state.status = "PAID";
     this.state.invoiceId = params.invoiceId;
 
-    return ok(new OrderPaid(this.id(), { status: "PAID", invoiceId: params.invoiceId }));
+    return ok(
+      new OrderPaid(this.id(), { status: "PAID", invoiceId: params.invoiceId }),
+    );
   }
 }

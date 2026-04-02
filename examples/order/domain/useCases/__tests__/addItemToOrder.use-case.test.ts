@@ -5,8 +5,18 @@ import { createOrderUseCase } from "../createOrder.use-case";
 import { addItemToOrderUseCase } from "../addItemToOrder.use-case";
 import { OrderItem } from "../../entities/order/order.entity";
 
-const firstItem: OrderItem = { id: "item-1", name: "Widget", price: 9.99, quantity: 1 };
-const secondItem: OrderItem = { id: "item-2", name: "Gadget", price: 19.99, quantity: 2 };
+const firstItem: OrderItem = {
+  id: "item-1",
+  name: "Widget",
+  price: 9.99,
+  quantity: 1,
+};
+const secondItem: OrderItem = {
+  id: "item-2",
+  name: "Gadget",
+  price: 19.99,
+  quantity: 2,
+};
 
 describe("addItemToOrderUseCase", () => {
   let repository: OrderRepository;
@@ -21,7 +31,11 @@ describe("addItemToOrderUseCase", () => {
       firstItem,
     });
 
-    const result = await addItemToOrderUseCase(repository, created.id, secondItem);
+    const result = await addItemToOrderUseCase(
+      repository,
+      created.id,
+      secondItem,
+    );
 
     expect(result.isOk()).toBe(true);
     const state = result._unsafeUnwrap();
@@ -59,7 +73,11 @@ describe("addItemToOrderUseCase", () => {
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {
-    const result = await addItemToOrderUseCase(repository, "unknown-id", secondItem);
+    const result = await addItemToOrderUseCase(
+      repository,
+      "unknown-id",
+      secondItem,
+    );
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {
@@ -78,7 +96,11 @@ describe("addItemToOrderUseCase", () => {
       await repository.save(order);
     });
 
-    const result = await addItemToOrderUseCase(repository, created.id, secondItem);
+    const result = await addItemToOrderUseCase(
+      repository,
+      created.id,
+      secondItem,
+    );
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {

@@ -7,10 +7,11 @@ import { randomUUID } from "node:crypto";
 
 export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
-> implements Repository<Entity> {
+  Event extends DomainEventInterface,
+> implements Repository<Entity, Event> {
   #mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity;
   #emitter = new EventEmitter({
-    captureRejections: true
+    captureRejections: true,
   });
 
   constructor(
@@ -20,7 +21,7 @@ export class InMemoryRepository<
   }
 
   protected readonly store = new Map<string, ReturnType<Entity["readState"]>>();
-  protected readonly eventStore = new Map<string, EventWithMetadata[]>();
+  protected readonly eventStore = new Map<string, EventWithMetadata<Event>[]>();
 
   async save(entity: Entity): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState());
@@ -29,30 +30,28 @@ export class InMemoryRepository<
 
   async saveWithEvents(
     entity: Entity,
-    domainEvents: DomainEventInterface | DomainEventInterface[],
+    domainEvents: Event | Event[],
   ): Promise<Result<void, Error>> {
     this.store.set(entity.id(), entity.readState());
 
     const events = this.eventStore.get(entity.id()) || [];
 
-    if(!Array.isArray(domainEvents)) {
-      domainEvents =[domainEvents] 
+    if (!Array.isArray(domainEvents)) {
+      domainEvents = [domainEvents];
     }
 
     const eventsWithMetadata = domainEvents.map((event, index) => {
       return {
         event,
         metadata: {
-          id: randomUUID(),
+          id: randomUUID() as string,
           createdAt: new Date().toISOString(),
           offset: events.length + index,
-        }
-      }
-    })
+        },
+      };
+    });
 
-    events.push(
-      ...eventsWithMetadata
-    );
+    events.push(...eventsWithMetadata);
 
     this.eventStore.set(entity.id(), events);
 
@@ -100,7 +99,7 @@ export class InMemoryRepository<
   getEvents(
     entityId: string,
     options?: { limit: number; offset: number },
-  ): Promise<Result<EventWithMetadata[], Error>> {
+  ): Promise<Result<EventWithMetadata<Event>[], Error>> {
     const paginationOptions = options || { limit: 100, offset: 0 };
 
     const events = this.eventStore.get(entityId) || [];
@@ -116,14 +115,15 @@ export class InMemoryRepository<
   getEventsAfter(
     entityId: string,
     eventId: string,
-    limit: number = 50
-  ): Promise<Result<EventWithMetadata[], Error>> {
-
+    limit: number = 50,
+  ): Promise<Result<EventWithMetadata<Event>[], Error>> {
     const events = this.eventStore.get(entityId) || [];
 
-    const foundPrecedingEventIndex = events.findIndex(event => event.metadata.id === eventId)
+    const foundPrecedingEventIndex = events.findIndex(
+      (event) => event.metadata.id === eventId,
+    );
 
-    if(foundPrecedingEventIndex === -1) { 
+    if (foundPrecedingEventIndex === -1) {
       throw new Error("Unknown event id");
     }
 
@@ -134,7 +134,8 @@ export class InMemoryRepository<
 
     return Promise.resolve(ok(paginatedEvents));
   }
-  on(handler: (entityId: string) => void): void {
+
+  onChanges(handler: (entityId: string) => void): void {
     this.#emitter.on("domainEventsSaved", handler);
   }
 }

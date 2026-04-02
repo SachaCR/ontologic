@@ -8,12 +8,12 @@ interface Order {
 
 const hasAtLeastOneItem = new BaseDomainInvariant<Order>(
   "Order must have at least one item",
-  (order) => order.items.length >= 1
+  (order) => order.items.length >= 1,
 );
 
 const hasAtMostOneVoucher = new BaseDomainInvariant<Order>(
   "Order cannot have more than one voucher",
-  (order) => order.vouchers.length <= 1
+  (order) => order.vouchers.length <= 1,
 );
 
 const invariant = hasAtLeastOneItem.and(hasAtMostOneVoucher);
@@ -43,8 +43,7 @@ describe("and", () => {
     const order: Order = { items: ["Widget"], vouchers: ["SAVE10"] };
     const result = invariant.complyWith(order);
     expect(result.description).toBe(
-      "Order must have at least one item AND (Order cannot have more than one voucher)"
+      "Order must have at least one item AND (Order cannot have more than one voucher)",
     );
   });
-
 });

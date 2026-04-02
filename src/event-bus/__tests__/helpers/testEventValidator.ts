@@ -2,7 +2,9 @@ import { DomainEvent } from "../../../domainEvent";
 
 export type TestEvent = DomainEvent<"TestEvent", 1, { foo: string }>;
 
-export function makeEvent(overrides?: Partial<{ entityId: string; payload: { foo: string } }>): TestEvent {
+export function makeEvent(
+  overrides?: Partial<{ entityId: string; payload: { foo: string } }>,
+): TestEvent {
   return new DomainEvent({
     entityId: overrides?.entityId ?? "entity-1",
     name: "TestEvent",

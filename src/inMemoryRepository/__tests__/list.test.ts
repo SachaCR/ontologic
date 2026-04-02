@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 import { InMemoryRepository } from "../../inMemoryRepository";
 import { User, makeUser } from "./helpers";
+import { DomainEventInterface } from "../../domainEvent";
 
 describe("InMemoryRepository.list", () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<User, DomainEventInterface>;
 
   beforeEach(async () => {
-    repo = new InMemoryRepository<User>(User.fromState);
+    repo = new InMemoryRepository<User, DomainEventInterface>(User.fromState);
     await repo.save(makeUser("1", "A"));
     await repo.save(makeUser("2", "B"));
     await repo.save(makeUser("3", "C"));
@@ -48,7 +49,9 @@ describe("InMemoryRepository.list", () => {
   });
 
   it("returns empty data when repository is empty", async () => {
-    const emptyRepo = new InMemoryRepository<User>(User.fromState);
+    const emptyRepo = new InMemoryRepository<User, DomainEventInterface>(
+      User.fromState,
+    );
     const result = await emptyRepo.list({ limit: 10, offset: 0 });
     expect(result._unsafeUnwrap().data).toHaveLength(0);
   });

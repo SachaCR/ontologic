@@ -4,7 +4,12 @@ import { OrderRepository } from "../../../order.repository";
 import { createOrderUseCase } from "../createOrder.use-case";
 import { OrderItem } from "../../entities/order/order.entity";
 
-const firstItem: OrderItem = { id: "item-1", name: "Widget", price: 9.99, quantity: 1 };
+const firstItem: OrderItem = {
+  id: "item-1",
+  name: "Widget",
+  price: 9.99,
+  quantity: 1,
+};
 
 describe("createOrderUseCase", () => {
   let repository: OrderRepository;
@@ -49,9 +54,9 @@ describe("createOrderUseCase", () => {
     const events = eventsResult._unsafeUnwrap();
 
     expect(events).toHaveLength(1);
-    const event = events[0]
-    if(!event) {
-      throw new Error('oups')
+    const event = events[0];
+    if (!event) {
+      throw new Error("oups");
     }
 
     expect(event.event.name).toBe("ORDER_CREATED");

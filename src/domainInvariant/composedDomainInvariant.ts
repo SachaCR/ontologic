@@ -1,14 +1,13 @@
-
 import { DomainInvariant, InvariantCheckResult } from "./interfaces";
-import { and } from './operators/and';
-import { or } from './operators/or';
-import { not } from './operators/not';
-import { xor } from './operators/xor';
-import { andNot } from './operators/andNot';
+import { and } from "./operators/and";
+import { or } from "./operators/or";
+import { not } from "./operators/not";
+import { xor } from "./operators/xor";
+import { andNot } from "./operators/andNot";
 
 export class ComposedDomainInvariant<State> implements DomainInvariant<State> {
-  #validator: (state: State) => InvariantCheckResult ;
- 
+  #validator: (state: State) => InvariantCheckResult;
+
   constructor(complyWith: (state: State) => InvariantCheckResult) {
     this.#validator = complyWith;
   }

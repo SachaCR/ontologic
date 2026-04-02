@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 import { InMemoryRepository } from "../../inMemoryRepository";
 import { User, makeUser, makeEvent } from "./helpers";
+import { DomainEventInterface } from "../../domainEvent";
 
 describe("InMemoryRepository.saveWithEvents", () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<User, DomainEventInterface>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>(User.fromState);
+    repo = new InMemoryRepository<User, DomainEventInterface>(User.fromState);
   });
 
   it("returns ok", async () => {

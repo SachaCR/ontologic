@@ -7,7 +7,7 @@ interface Order {
 
 const isOrderedBySalesAdmin = new BaseDomainInvariant<Order>(
   "Order is placed by a sales-admin",
-  (order) => order.orderedBy === "sales-admin"
+  (order) => order.orderedBy === "sales-admin",
 );
 
 const invariant = isOrderedBySalesAdmin.not();
@@ -28,5 +28,4 @@ describe("not", () => {
     const result = invariant.complyWith(order);
     expect(result.description).toBe("NOT (Order is placed by a sales-admin)");
   });
-
 });

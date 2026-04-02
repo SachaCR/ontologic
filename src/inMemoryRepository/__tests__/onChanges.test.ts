@@ -2,17 +2,18 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import { InMemoryRepository } from "../../inMemoryRepository";
 import { User, makeUser, makeEvent } from "./helpers";
+import { DomainEventInterface } from "../../domainEvent";
 
 describe("InMemoryRepository.on", () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<User, DomainEventInterface>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>(User.fromState);
+    repo = new InMemoryRepository<User, DomainEventInterface>(User.fromState);
   });
 
   it("calls the handler with the entity id when saveWithEvents is called", async () => {
     const handler = vi.fn();
-    repo.on(handler);
+    repo.onChanges(handler);
 
     await repo.saveWithEvents(makeUser("1"), [makeEvent("1")]);
 
@@ -22,7 +23,7 @@ describe("InMemoryRepository.on", () => {
 
   it("calls the handler once per saveWithEvents call", async () => {
     const handler = vi.fn();
-    repo.on(handler);
+    repo.onChanges(handler);
 
     await repo.saveWithEvents(makeUser("1"), [makeEvent("1")]);
     await repo.saveWithEvents(makeUser("1"), [makeEvent("1")]);
@@ -32,7 +33,7 @@ describe("InMemoryRepository.on", () => {
 
   it("does not call the handler when save is called", async () => {
     const handler = vi.fn();
-    repo.on(handler);
+    repo.onChanges(handler);
 
     await repo.save(makeUser("1"));
 
@@ -42,8 +43,8 @@ describe("InMemoryRepository.on", () => {
   it("supports multiple handlers", async () => {
     const handler1 = vi.fn();
     const handler2 = vi.fn();
-    repo.on(handler1);
-    repo.on(handler2);
+    repo.onChanges(handler1);
+    repo.onChanges(handler2);
 
     await repo.saveWithEvents(makeUser("1"), [makeEvent("1")]);
 

@@ -1,13 +1,17 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
-import { InMemoryRepository, DomainEventInterface, EventWithMetadata} from "../../";
+import {
+  InMemoryRepository,
+  DomainEventInterface,
+  EventWithMetadata,
+} from "../../";
 import { User, makeUser, makeEvent } from "./helpers";
 
 describe("InMemoryRepository.getEvents", () => {
-  let repo: InMemoryRepository<User>;
+  let repo: InMemoryRepository<User, DomainEventInterface>;
 
   beforeEach(() => {
-    repo = new InMemoryRepository<User>(User.fromState);
+    repo = new InMemoryRepository<User, DomainEventInterface>(User.fromState);
   });
 
   it("returns ok with an empty array when no events have been saved", async () => {
@@ -19,7 +23,10 @@ describe("InMemoryRepository.getEvents", () => {
   it("assigns sequential offsets with no gaps across multiple saveWithEvents calls", async () => {
     const user = makeUser("1");
     await repo.saveWithEvents(user, [makeEvent("1", "Created")]);
-    await repo.saveWithEvents(user, [makeEvent("1", "Updated"), makeEvent("1", "Tagged")]);
+    await repo.saveWithEvents(user, [
+      makeEvent("1", "Updated"),
+      makeEvent("1", "Tagged"),
+    ]);
     await repo.saveWithEvents(user, [makeEvent("1", "Deleted")]);
 
     const events = (await repo.getEvents("1"))._unsafeUnwrap();
@@ -44,7 +51,7 @@ describe("InMemoryRepository.getEvents", () => {
     let event1: DomainEventInterface;
     let event2: DomainEventInterface;
     let event3: DomainEventInterface;
-    let integrationEvents: EventWithMetadata[];
+    let integrationEvents: EventWithMetadata<DomainEventInterface>[];
 
     beforeEach(async () => {
       event1 = makeEvent("1", "Created");

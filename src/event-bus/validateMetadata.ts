@@ -1,17 +1,17 @@
 import { EventMetadata } from "../repository";
 
 export function validateMetadata(metadata: unknown): EventMetadata {
-  if(!metadata) {
+  if (!metadata) {
     throw new Error("Null or undefined event metadata");
   }
 
-  if(typeof metadata !== 'object') {
+  if (typeof metadata !== "object") {
     throw new Error("Invalid Metadata");
   }
 
   const typedMetadata = metadata as EventMetadata;
 
-  if (typeof typedMetadata.id !== 'string') {
+  if (typeof typedMetadata.id !== "string") {
     throw new Error("Invalid Metadata: id is not a string");
   }
 
@@ -24,12 +24,16 @@ export function validateMetadata(metadata: unknown): EventMetadata {
   }
 
   if (!isExactISODateTime(typedMetadata.createdAt)) {
-    throw new Error("Invalid Metadata: createdAt is not a valid ISO date time string");
+    throw new Error(
+      "Invalid Metadata: createdAt is not a valid ISO date time string",
+    );
   }
 
   if (typedMetadata.offset !== undefined) {
     if (typeof typedMetadata.offset !== "number") {
-      throw new Error("Invalid Metadata: offset is neither a number or undefined");
+      throw new Error(
+        "Invalid Metadata: offset is neither a number or undefined",
+      );
     }
     if (!Number.isFinite(typedMetadata.offset)) {
       throw new Error("Invalid Metadata: offset must be a finite number");
@@ -39,10 +43,9 @@ export function validateMetadata(metadata: unknown): EventMetadata {
   return typedMetadata;
 }
 
-
 function isExactISODateTime(value: string): boolean {
   const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|([+-]\d{2}:\d{2}))$/
+    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|([+-]\d{2}:\d{2}))$/,
   );
   if (!match) return false;
 

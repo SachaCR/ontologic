@@ -9,7 +9,9 @@ const makeItem = (id: string): OrderItem => ({
   quantity: 1,
 });
 
-const makeOrderState = (overrides: Partial<Parameters<typeof Order.fromState>[1]> = {}) => ({
+const makeOrderState = (
+  overrides: Partial<Parameters<typeof Order.fromState>[1]> = {},
+) => ({
   id: "order-1",
   customerId: "customer-1",
   status: "DRAFT" as const,

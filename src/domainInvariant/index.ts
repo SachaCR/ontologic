@@ -1,17 +1,16 @@
-import {InvariantCheckResult, DomainInvariant} from './interfaces';
+import { InvariantCheckResult, DomainInvariant } from "./interfaces";
 
-import {and} from './operators/and';
-import {or} from './operators/or';
-import {not} from './operators/not';
-import {xor} from './operators/xor';
-import {andNot} from './operators/andNot';
+import { and } from "./operators/and";
+import { or } from "./operators/or";
+import { not } from "./operators/not";
+import { xor } from "./operators/xor";
+import { andNot } from "./operators/andNot";
 
-export class BaseDomainInvariant<State> implements DomainInvariant<State>{
-  #validator: (state: State) => InvariantCheckResult ;
-  
+export class BaseDomainInvariant<State> implements DomainInvariant<State> {
+  #validator: (state: State) => InvariantCheckResult;
+
   constructor(description: string, complyWith: (state: State) => boolean) {
     this.#validator = (state: State) => {
-
       const isCompliant = complyWith(state);
 
       return {
@@ -45,4 +44,3 @@ export class BaseDomainInvariant<State> implements DomainInvariant<State>{
     return andNot(this, invariant);
   }
 }
-

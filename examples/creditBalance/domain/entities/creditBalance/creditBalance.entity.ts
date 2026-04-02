@@ -101,7 +101,9 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
     return ok(new CreditLocked(this.id(), { amount }));
   }
 
-  debit(params: { amount: number }): Result<DomainEventInterface, NotEnoughFunds> {
+  debit(params: {
+    amount: number;
+  }): Result<DomainEventInterface, NotEnoughFunds> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < amount) {

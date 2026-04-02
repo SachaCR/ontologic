@@ -10,8 +10,10 @@ export class InMemoryConnectors {
   listener: IListenerConnector;
   publisher: IPublisherConnector;
 
-  constructor( ) {
-    const eventEmitter: EventEmitter = new EventEmitter({ captureRejections: true });
+  constructor() {
+    const eventEmitter: EventEmitter = new EventEmitter({
+      captureRejections: true,
+    });
     this.listener = new InMemoryListenerConnector(eventEmitter);
     this.publisher = new InMemoryPublisherConnector(eventEmitter);
   }

@@ -5,13 +5,22 @@ export interface DomainEventInterface {
   payload: unknown;
 }
 
-export class DomainEvent<Name extends string, Version extends number, Payload> implements DomainEventInterface {
+export class DomainEvent<
+  Name extends string,
+  Version extends number,
+  Payload,
+> implements DomainEventInterface {
   #entityId: string;
   #name: Name;
   #version: Version;
   #payload: Payload;
 
-  constructor(params: { entityId: string, name: Name, version: Version, payload: Payload }) {
+  constructor(params: {
+    entityId: string;
+    name: Name;
+    version: Version;
+    payload: Payload;
+  }) {
     const { name, version, payload, entityId } = params;
     this.#entityId = entityId;
     this.#name = name;
@@ -35,7 +44,12 @@ export class DomainEvent<Name extends string, Version extends number, Payload> i
     return structuredClone(this.#payload);
   }
 
-  toJSON(): { entityId: string; name: Name; version: Version; payload: Payload } {
+  toJSON(): {
+    entityId: string;
+    name: Name;
+    version: Version;
+    payload: Payload;
+  } {
     return {
       entityId: this.#entityId,
       name: this.#name,

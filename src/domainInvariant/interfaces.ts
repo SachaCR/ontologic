@@ -1,5 +1,5 @@
 export interface DomainInvariant<State> {
-  complyWith(state: State): InvariantCheckResult
+  complyWith(state: State): InvariantCheckResult;
   and(invariant: DomainInvariant<State>): DomainInvariant<State>;
   or(invariant: DomainInvariant<State>): DomainInvariant<State>;
   not(): DomainInvariant<State>;

@@ -5,7 +5,12 @@ import { createOrderUseCase } from "../createOrder.use-case";
 import { placeOrderUseCase } from "../placeOrder.use-case";
 import { OrderItem } from "../../entities/order/order.entity";
 
-const firstItem: OrderItem = { id: "item-1", name: "Widget", price: 9.99, quantity: 1 };
+const firstItem: OrderItem = {
+  id: "item-1",
+  name: "Widget",
+  price: 9.99,
+  quantity: 1,
+};
 
 describe("placeOrderUseCase", () => {
   let repository: OrderRepository;

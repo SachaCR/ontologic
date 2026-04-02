@@ -1,19 +1,20 @@
-import {IListenerConnector, ReceivedMessage} from "./connectors/interfaces";
+import { IListenerConnector, ReceivedMessage } from "./connectors/interfaces";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { EventEmitter } from "node:events";
 import { validateMetadata } from "./validateMetadata";
 
-export class DomainEventBusListener<Event extends DomainEventInterface>
-  implements IDomainEventBusListener<Event> {
-  #listenerConnector: IListenerConnector
+export class DomainEventBusListener<
+  Event extends DomainEventInterface,
+> implements IDomainEventBusListener<Event> {
+  #listenerConnector: IListenerConnector;
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
   #eventEmitter: EventEmitter;
-  #validator:  (event: unknown) => Event;
+  #validator: (event: unknown) => Event;
 
   constructor(params: {
     listenerConnector: IListenerConnector;
-    options: { validator: (event: unknown) => Event; }
+    options: { validator: (event: unknown) => Event };
   }) {
     const { listenerConnector, options } = params;
 
@@ -24,32 +25,43 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
     }
 
     this.#listenerConnector = listenerConnector;
-    this.#eventHandlersMap = new Map<Event["name"] | "*", EventHandler<Event>>()
+    this.#eventHandlersMap = new Map<
+      Event["name"] | "*",
+      EventHandler<Event>
+    >();
     this.#eventEmitter = new EventEmitter({
-      captureRejections: true
-    })
+      captureRejections: true,
+    });
 
-    this.#validator = options.validator
+    this.#validator = options.validator;
   }
 
-  listenTo<EventName extends Event["name"]>(eventName:EventName | '*', handler: EventHandler<Extract<Event, { name: EventName }>>): void {
+  listenTo<EventName extends Event["name"]>(
+    eventName: EventName | "*",
+    handler: EventHandler<Extract<Event, { name: EventName }>>,
+  ): void {
     this.#eventHandlersMap.set(eventName, handler as EventHandler<Event>);
   }
 
   async start() {
-    if(this.#eventHandlersMap.size === 0) {
-      throw new Error("[DomainEventBusListener]: Cannot start the listener if you have no listener registered. Use listenTo() before start()")
+    if (this.#eventHandlersMap.size === 0) {
+      throw new Error(
+        "[DomainEventBusListener]: Cannot start the listener if you have no listener registered. Use listenTo() before start()",
+      );
     }
 
-    this.#listenerConnector.onMessage(async (message: ReceivedMessage)=> {
+    this.#listenerConnector.onMessage(async (message: ReceivedMessage) => {
       const eventHandler =
         this.#eventHandlersMap.get(message.name) ??
         this.#eventHandlersMap.get("*");
 
       if (!eventHandler) {
-        this.#eventEmitter.emit("error", new Error("[DomainEventBusListener]: No event handler found"));
+        this.#eventEmitter.emit(
+          "error",
+          new Error("[DomainEventBusListener]: No event handler found"),
+        );
         await message.nack();
-        return
+        return;
       }
 
       const parsedMessage = JSON.parse(message.content);
@@ -57,9 +69,9 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
       let eventToHandle = event;
 
-        eventToHandle = this.#validator(event);
+      eventToHandle = this.#validator(event);
 
-      const validatedMetadata = validateMetadata(metadata)
+      const validatedMetadata = validateMetadata(metadata);
 
       try {
         await eventHandler(eventToHandle, validatedMetadata);
@@ -82,6 +94,6 @@ export class DomainEventBusListener<Event extends DomainEventInterface>
 
   onError(handler: (error: unknown) => void): void {
     this.#listenerConnector.onError(handler);
-    this.#eventEmitter.on("error", handler)
+    this.#eventEmitter.on("error", handler);
   }
 }

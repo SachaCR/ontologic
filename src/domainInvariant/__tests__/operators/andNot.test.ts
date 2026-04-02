@@ -8,12 +8,12 @@ interface Order {
 
 const hasAtLeastOneItem = new BaseDomainInvariant<Order>(
   "Order must have at least one item",
-  (order) => order.items.length >= 1
+  (order) => order.items.length >= 1,
 );
 
 const isOrderedBySalesAdmin = new BaseDomainInvariant<Order>(
   "Order is placed by a sales-admin",
-  (order) => order.orderedBy === "sales-admin"
+  (order) => order.orderedBy === "sales-admin",
 );
 
 const invariant = hasAtLeastOneItem.andNot(isOrderedBySalesAdmin);
@@ -43,8 +43,7 @@ describe("andNot", () => {
     const order: Order = { items: ["Widget"], orderedBy: "customer" };
     const result = invariant.complyWith(order);
     expect(result.description).toBe(
-      "Order must have at least one item AND NOT (Order is placed by a sales-admin)"
+      "Order must have at least one item AND NOT (Order is placed by a sales-admin)",
     );
   });
-
 });

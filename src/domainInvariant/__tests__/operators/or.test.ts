@@ -8,12 +8,12 @@ interface Order {
 
 const hasVoucher = new BaseDomainInvariant<Order>(
   "Order has a voucher",
-  (order) => order.vouchers.length >= 1
+  (order) => order.vouchers.length >= 1,
 );
 
 const isOrderedBySalesAdmin = new BaseDomainInvariant<Order>(
   "Order is placed by a sales-admin",
-  (order) => order.orderedBy === "sales-admin"
+  (order) => order.orderedBy === "sales-admin",
 );
 
 const invariant = hasVoucher.or(isOrderedBySalesAdmin);
@@ -43,8 +43,7 @@ describe("or", () => {
     const order: Order = { vouchers: ["SAVE10"], orderedBy: "customer" };
     const result = invariant.complyWith(order);
     expect(result.description).toBe(
-      "Order has a voucher OR (Order is placed by a sales-admin)"
+      "Order has a voucher OR (Order is placed by a sales-admin)",
     );
   });
-
 });

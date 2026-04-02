@@ -50,16 +50,19 @@ describe("DomainEventBusPublisher", () => {
   });
 
   it("publish sends JSON envelope with event name as routing key", async () => {
-    const received: { event: TestEvent, metadata: EventMetadata }[] = [];
+    const received: { event: TestEvent; metadata: EventMetadata }[] = [];
 
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
       options: { validator: parseTestEvent },
-    })
-
-    listener.listenTo('TestEvent', async (event: TestEvent, metadata: EventMetadata) => {
-      received.push({ event, metadata });
     });
+
+    listener.listenTo(
+      "TestEvent",
+      async (event: TestEvent, metadata: EventMetadata) => {
+        received.push({ event, metadata });
+      },
+    );
 
     const publisher = new DomainEventBusPublisher<TestEvent>({
       publisherConnector: connectors.publisher,
@@ -99,8 +102,8 @@ describe("DomainEventBusListener", () => {
         new DomainEventBusListener<TestEvent>({
           listenerConnector: undefined as never,
           options: {
-            validator: parseTestEvent
-          }
+            validator: parseTestEvent,
+          },
         }),
     ).toThrow("[DomainEventBusListener] Must have a listener connector");
   });
@@ -117,7 +120,8 @@ describe("DomainEventBusListener", () => {
   });
 
   it("invokes the handler for the matching event name", async () => {
-    const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
       options: { validator: parseTestEvent },
@@ -149,7 +153,8 @@ describe("DomainEventBusListener", () => {
   });
 
   it("falls back to the wildcard handler when no specific handler exists", async () => {
-    const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const listener = new DomainEventBusListener<TestEvent>({
       listenerConnector: connectors.listener,
       options: { validator: parseTestEvent },
@@ -188,9 +193,10 @@ describe("DomainEventBusListener", () => {
     expect(onError).toHaveBeenCalled();
 
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-    expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain("No event handler found");
+    expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain(
+      "No event handler found",
+    );
   });
-
 });
 
 describe("event validator option", () => {
@@ -244,7 +250,8 @@ describe("event validator option", () => {
   it("DomainEventBusListener calls parseTestEvent and does not run the handler when the event is invalid", async () => {
     const validator = vi.fn(parseTestEvent);
 
-    const handler = vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const onError = vi.fn<(error: unknown) => void>();
 
     const listener = new DomainEventBusListener<TestEvent>({
@@ -268,7 +275,9 @@ describe("event validator option", () => {
     expect(validator).toHaveBeenCalledWith(null);
     expect(handler).not.toHaveBeenCalled();
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-    expect((onError.mock.calls[0]?.[0] as Error).message).toBe("TestEvent: expected an object");
+    expect((onError.mock.calls[0]?.[0] as Error).message).toBe(
+      "TestEvent: expected an object",
+    );
   });
 
   it("publishes and delivers the event when parseTestEvent accepts the wire payload", async () => {

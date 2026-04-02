@@ -1,6 +1,9 @@
 import { switchGuard, ok, err, Result } from "../../../../src";
 
-import { OrderState, InvalidStatusTransition } from "../entities/order/order.entity";
+import {
+  OrderState,
+  InvalidStatusTransition,
+} from "../entities/order/order.entity";
 import { OrderRepository } from "../../order.repository";
 import { EntityNotFound } from "./errors/entityNotFound.error";
 
@@ -17,7 +20,9 @@ export async function placeOrderUseCase(
   const order = resultGetById.value;
 
   if (order === undefined) {
-    return err(new EntityNotFound("This order does not exist", { entityId: id }));
+    return err(
+      new EntityNotFound("This order does not exist", { entityId: id }),
+    );
   }
 
   const result = order.place();

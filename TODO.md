@@ -12,10 +12,11 @@
 - [x] Deploy the website on github pages
 - [x] Get a domain name
 - [x] make the repository public
-- [ ] Implement event metadata in the repository
-- [ ] Implement an event emitter in the repository when new events are saved
-- [ ] Implement an event publisher
-- [ ] Implement an event bus interface used by the publisher
-- [ ] Implement an in-memory implementation of the event bus
+- [x] Implement event metadata in the repository
+- [x] Implement an event emitter in the repository when new events are saved
+- [x] Implement an event publisher
+- [x] Implement an event bus interface used by the publisher
+- [x] Implement an in-memory implementation of the event bus
+- [ ] Move examples into src/ and exclude them from release build
 - [ ] Implement a Redis implementation of the event bus
 - [ ] Finish my app about the library domain example

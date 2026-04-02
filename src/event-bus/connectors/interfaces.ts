@@ -1,17 +1,21 @@
 export interface IListenerConnector {
-  onMessage(handler: (message: ReceivedMessage) => Promise<void>): void
-  status: "STARTED" | "STOPPED"
-  start(): Promise<void>
-  stop(): Promise<void>
-  onError(handler: (error:unknown) => void): void
+  onMessage(handler: (message: ReceivedMessage) => Promise<void>): void;
+  status: "STARTED" | "STOPPED";
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  onError(handler: (error: unknown) => void): void;
 }
 
 export interface IPublisherConnector {
-  publish(name: string, message: string, options?: { orderingKey?: string }): Promise<void>
-  status: "STARTED" | "STOPPED"
-  start(): Promise<void>
-  stop(): Promise<void>
-  onError(handler: (error:unknown) => void): void 
+  publish(
+    name: string,
+    message: string,
+    options?: { orderingKey?: string },
+  ): Promise<void>;
+  status: "STARTED" | "STOPPED";
+  start(): Promise<void>;
+  stop(): Promise<void>;
+  onError(handler: (error: unknown) => void): void;
 }
 
 export interface ReceivedMessage {

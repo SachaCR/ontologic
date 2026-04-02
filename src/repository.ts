@@ -3,9 +3,9 @@ import { Result } from "./result/index";
 import { DomainEntity } from "./domainEntity";
 import { DomainEventInterface } from "./domainEvent";
 
-export interface EventWithMetadata {
-  event: DomainEventInterface;
-  metadata: EventMetadata
+export interface EventWithMetadata<Event extends DomainEventInterface> {
+  event: Event;
+  metadata: EventMetadata;
 }
 
 export interface EventMetadata {
@@ -15,6 +15,7 @@ export interface EventMetadata {
 }
 export interface Repository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
+  Event extends DomainEventInterface,
 > {
   save(entity: Entity): Promise<Result<void, Error>>;
 
@@ -33,9 +34,13 @@ export interface Repository<
   getEvents(
     entityId: string,
     options?: { limit: number; offset: number },
-  ): Promise<Result<EventWithMetadata[], Error>>;
+  ): Promise<Result<EventWithMetadata<Event>[], Error>>;
 
-  getEventsAfter(entityId: string, eventId: string, limit: number): Promise<Result<EventWithMetadata[],Error>>;
+  getEventsAfter(
+    entityId: string,
+    eventId: string,
+    limit: number,
+  ): Promise<Result<EventWithMetadata<Event>[], Error>>;
 
-  on(handler: (entityId: string) => void): void;
+  onChanges(handler: (entityId: string) => void): void;
 }

@@ -22,6 +22,7 @@ npm install ontologic
 - **Domain Events** — Immutable, versioned facts about what happened in your domain
 - **Result Pattern** — Typed domain failures as return values, not hidden exceptions
 - **Repository** — Persistence interface that saves entity state and events atomically
+- **Event Bus** — Types event bus that allows to publish and listen to your domain events
 
 ## Examples
 
