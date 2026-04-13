@@ -114,17 +114,17 @@ export class InMemoryRepository<
 
   getEventsAfter(
     entityId: string,
-    eventId: string,
+    eventId: string | undefined,
     limit: number = 50,
   ): Promise<Result<EventWithMetadata<Event>[], Error>> {
     const events = this.eventStore.get(entityId) || [];
 
-    const foundPrecedingEventIndex = events.findIndex(
+    let foundPrecedingEventIndex = events.findIndex(
       (event) => event.metadata.id === eventId,
     );
 
     if (foundPrecedingEventIndex === -1) {
-      throw new Error("Unknown event id");
+      foundPrecedingEventIndex = 0;
     }
 
     const paginatedEvents = events.slice(

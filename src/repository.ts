@@ -38,8 +38,8 @@ export interface Repository<
 
   getEventsAfter(
     entityId: string,
-    eventId: string,
-    limit: number,
+    eventId: string | undefined,
+    limit?: number,
   ): Promise<Result<EventWithMetadata<Event>[], Error>>;
 
   onChanges(handler: (entityId: string) => void): void;

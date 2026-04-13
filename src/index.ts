@@ -5,6 +5,6 @@ export * from "./repository";
 export * from "./result";
 export * from "./domainInvariant";
 export * from "./event-bus";
-
+export * from "./messageRelay";
 export * from "./inMemoryRepository";
 export * from "./switchGuard";

@@ -14,6 +14,23 @@
   --ifm-color-primary-lightest: #a5b4fc;
   --ifm-code-font-size: 95%;
   --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+
+}
+
+/* Light theme — soft blue-gray background instead of stark white */
+[data-theme='light'] {
+  --ifm-background-color: #d8dced;
+  --ifm-background-surface-color: #cdd2e8;
+  --ifm-toc-border-color: #b0b8d8;
+  --ifm-font-color-base: #1a1c2e;
+  --ifm-color-content-secondary: #2e3352;
+  --ifm-menu-color: #1a1c2e;
+  --ifm-menu-color-active: #4f46e5;
+}
+
+[data-theme='light'] html,
+[data-theme='light'] body {
+  background-color: #d8dced;
 }
 
 /* Code block contrast fix for light mode.
