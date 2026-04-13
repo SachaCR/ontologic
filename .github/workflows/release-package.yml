@@ -1,4 +1,4 @@
-name: Release
+name: Release package
 
 on:
   workflow_dispatch:
@@ -16,7 +16,7 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # required to push the version commit and tag
+      contents: write # required to push the version commit and tag
 
     steps:
       - uses: actions/checkout@v4
