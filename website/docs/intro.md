@@ -6,17 +6,17 @@ sidebar_position: 1
 
 Software has a tendency to drift away from the business it was built to serve.
 
-It starts small: a rule that should belong to the domain ends up in a controller. A concept that has a precise name in the business is called something vague in the code. A constraint that everyone agrees on lives in three different places — or none. Over time, the code and the business speak different languages, and every change becomes a translation exercise.
+It starts small: a rule that should belong to the domain ends up in a controller. A concept that has a precise name in the business is called something vague in the code. A constraint that everyone agrees on lives in three different places or none. Over time, the code and the business speak different languages, and every change becomes a translation exercise.
 
-**Domain-Driven Design** (DDD) is a set of principles and patterns that fights this drift. The core idea is simple: let the business domain — its vocabulary, its rules, its logic — drive the structure of your code. When your code reflects the real world it models, it becomes easier to understand, easier to change, and harder to get wrong.
+**Domain-Driven Design** (DDD) is a set of principles and patterns that fights this drift. The core idea is simple: let the business domain its vocabulary, its rules, its logic drive the structure of your code. When your code reflects the real world it models, it becomes easier to understand, easier to change, and harder to get wrong.
 
-`ontologic` is a TypeScript library that gives you the building blocks to do this in practice. It provides a small set of well-defined primitives that encode DDD concepts directly into your type system — so you spend less time enforcing patterns manually and more time thinking about your domain.
+`ontologic` is a TypeScript library that gives you the building blocks to do this in practice. It provides a small set of well-defined primitives that encode DDD concepts directly into your type system so you spend less time enforcing patterns manually and more time thinking about your domain.
 
 ---
 
 ## Core concepts
 
-`ontologic` is organized around a few key ideas. Each one has its own page — read them in order if you're new to DDD, or jump to what you need.
+`ontologic` is organized around a few key ideas. Each one has its own page read them in order if you're new to DDD, or jump to what you need.
 
 ### [Domain Entity](./domain-entity.md)
 
@@ -24,7 +24,7 @@ An entity is a domain object with a unique identity and a lifecycle. It owns its
 
 ### [Domain Events](./domain-events.md)
 
-A domain event is a record that something meaningful happened — past tense, immutable, and named after a business fact. Events are the mechanism by which different parts of your system stay in sync without becoming tightly coupled.
+A domain event is a record that something meaningful happened past tense, immutable, and named after a business fact. Events are the mechanism by which different parts of your system stay in sync without becoming tightly coupled.
 
 ### [The Result Pattern](./result-pattern.md)
 
@@ -32,7 +32,7 @@ Some failures are not bugs — they are valid branches of the business logic. Th
 
 ### [Invariants](./invariants.md)
 
-An invariant is a rule that must always be true about an entity — not just after certain operations, but at all times. `ontologic` checks invariants on every state read, catching corrupted data the moment it enters the system.
+An invariant is a rule that must always be true about an entity not just after certain operations, but at all times. `ontologic` checks invariants on every state read, catching corrupted data the moment it enters the system.
 
 ### [Repository](./repository.md)
 
@@ -40,7 +40,11 @@ The repository is the interface between your domain and your persistence layer. 
 
 ### [Event Bus](./event-bus.md)
 
-The event bus delivers domain events to the rest of your system. A pluggable connector interface lets you use any broker — SQS, Kafka, RabbitMQ, Redis, or others — while the publisher and listener logic stays the same across all environments. In-memory connectors are included for tests and local prototyping.
+The event bus delivers domain events to the rest of your system. A pluggable connector interface lets you use any broker SQS, Kafka, RabbitMQ, Redis, or others. While the publisher and listener logic stays the same across all environments. In-memory connectors are included for tests and local prototyping.
+
+### [Message Relay](./message-relay.md)
+
+The message relay is the bridge between the outbox table and the event bus. It reads events that were persisted by the repository and forwards them to the broker, tracking exactly what has been published so the system can recover from failures without skipping or restarting from scratch.
 
 ---
 
@@ -48,7 +52,7 @@ The event bus delivers domain events to the rest of your system. A pluggable con
 
 `ontologic` is for TypeScript developers who want to apply DDD patterns without writing a lot of boilerplate, and without committing to a heavy framework.
 
-You don't need prior DDD experience — the documentation explains concepts from first principles. But if you're already familiar with DDD, you'll find the primitives familiar and the TypeScript integration straightforward.
+You don't need prior DDD experience the documentation explains concepts from first principles. But if you're already familiar with DDD, you'll find the primitives familiar and the TypeScript integration straightforward.
 
 ---
 

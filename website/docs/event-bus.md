@@ -4,7 +4,7 @@ sidebar_position: 4
 
 # Event Bus
 
-Once domain events are persisted via the [Outbox pattern](./domain-events.md#publishing-with-the-outbox-pattern), something needs to read them from the database and deliver them to the rest of your system. The event bus implement the delivery part. You'll still need to implement the message relay component that reads event from the database and then triggers the event-bus. There will maybe a message relay in Ontologic one day but not for now.
+Once domain events are persisted via the [Outbox pattern](./domain-events.md#publishing-with-the-outbox-pattern), a message relay needs to read them from the database and then use an event bus to deliver events to the rest of your system.
 
 `ontologic` ships a typed event bus with a **publisher** and a **listener**, each backed by a pluggable **connector**. The connector is the only piece you swap out between environments: the publisher/listener logic stays the same whether you're running tests locally or processing millions of messages in production.
 
@@ -33,13 +33,21 @@ Start by defining the union of all domain events your service produces or consum
 ```typescript
 import { DomainEvent } from "ontologic";
 
-class OrderPlaced extends DomainEvent<"ORDER_PLACED", 1, { orderId: string; total: number }> {
+class OrderPlaced extends DomainEvent<
+  "ORDER_PLACED",
+  1,
+  { orderId: string; total: number }
+> {
   constructor(entityId: string, payload: { orderId: string; total: number }) {
     super({ name: "ORDER_PLACED", version: 1, entityId, payload });
   }
 }
 
-class PaymentReceived extends DomainEvent<"PAYMENT_RECEIVED", 1, { amount: number; currency: string }> {
+class PaymentReceived extends DomainEvent<
+  "PAYMENT_RECEIVED",
+  1,
+  { amount: number; currency: string }
+> {
   constructor(entityId: string, payload: { amount: number; currency: string }) {
     super({ name: "PAYMENT_RECEIVED", version: 1, entityId, payload });
   }
@@ -66,7 +74,7 @@ await publisher.publish(
   {
     id: "evt-abc",
     createdAt: new Date().toISOString(),
-  }
+  },
 );
 
 await publisher.stop();
@@ -78,11 +86,11 @@ The `publish` method validates the metadata before forwarding. An invalid `id` o
 
 Every published event carries metadata alongside the event payload:
 
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `id` | `string` | Yes | Unique identifier for this event occurrence |
-| `createdAt` | `string` | Yes | ISO 8601 datetime with timezone (e.g. `2024-01-15T10:30:00.000Z`) |
-| `offset` | `number` | No | Position in the event stream, if tracked |
+| Field       | Type     | Required | Description                                                       |
+| ----------- | -------- | -------- | ----------------------------------------------------------------- |
+| `id`        | `string` | Yes      | Unique identifier for this event occurrence                       |
+| `createdAt` | `string` | Yes      | ISO 8601 datetime with timezone (e.g. `2024-01-15T10:30:00.000Z`) |
+| `offset`    | `number` | No       | Position in the event stream, if tracked                          |
 
 ---
 
@@ -160,8 +168,8 @@ interface IListenerConnector {
 
 ```typescript
 interface ReceivedMessage {
-  name: string;      // Event name, used to route to the right handler
-  content: string;   // JSON-serialized { event, metadata } envelope
+  name: string; // Event name, used to route to the right handler
+  content: string; // JSON-serialized { event, metadata } envelope
   ack(): Promise<void>;
   nack(): Promise<void>;
 }
@@ -173,13 +181,13 @@ That's the full contract. The listener calls `ack()` after your handler resolves
 
 The connector interfaces are intentionally thin. Any broker that can route named messages and support acknowledgments fits the model:
 
-| Broker | Notes |
-|---|---|
-| **AWS SQS** | One queue per event name, or a single queue with message attributes for routing |
-| **Apache Kafka** | Topic per event name, or a single topic with the event name in the key |
-| **Google Pub/Sub** | One topic per event, subscription per listener |
-| **RabbitMQ** | Topic exchanges with the event name as the routing key |
-| **Redis Streams** | Stream per event name, consumer groups for competing consumers |
+| Broker             | Notes                                                                           |
+| ------------------ | ------------------------------------------------------------------------------- |
+| **AWS SQS**        | One queue per event name, or a single queue with message attributes for routing |
+| **Apache Kafka**   | Topic per event name, or a single topic with the event name in the key          |
+| **Google Pub/Sub** | One topic per event, subscription per listener                                  |
+| **RabbitMQ**       | Topic exchanges with the event name as the routing key                          |
+| **Redis Streams**  | Stream per event name, consumer groups for competing consumers                  |
 
 ---
 
@@ -192,7 +200,9 @@ import { InMemoryConnectors } from "ontologic";
 
 const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
 
-const publisher = new DomainEventBusPublisher<OrderEvents>({ publisherConnector });
+const publisher = new DomainEventBusPublisher<OrderEvents>({
+  publisherConnector,
+});
 const listener = new DomainEventBusListener<OrderEvents>({
   listenerConnector,
   options: { validator: parseOrderEvents },
@@ -206,12 +216,18 @@ The two connectors share an internal `EventEmitter`. Publishing an event immedia
 ### Using in-memory connectors in tests
 
 ```typescript
-import { InMemoryConnectors, DomainEventBusPublisher, DomainEventBusListener } from "ontologic";
+import {
+  InMemoryConnectors,
+  DomainEventBusPublisher,
+  DomainEventBusListener,
+} from "ontologic";
 
 test("listener receives published events", async () => {
   const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
 
-  const publisher = new DomainEventBusPublisher<OrderEvents>({ publisherConnector });
+  const publisher = new DomainEventBusPublisher<OrderEvents>({
+    publisherConnector,
+  });
   const listener = new DomainEventBusListener<OrderEvents>({
     listenerConnector,
     options: { validator: parseOrderEvents },
@@ -228,7 +244,7 @@ test("listener receives published events", async () => {
 
   await publisher.publish(
     new OrderPlaced("order-1", { orderId: "order-1", total: 50 }),
-    { id: "evt-1", createdAt: new Date().toISOString() }
+    { id: "evt-1", createdAt: new Date().toISOString() },
   );
 
   expect(received).toHaveLength(1);

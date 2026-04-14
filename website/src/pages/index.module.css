@@ -135,6 +135,25 @@
   color: white;
 }
 
+/* ── Section divider ──────────────────────────────────────────────────────── */
+
+.sectionDivider {
+  padding: 2.5rem 0;
+  text-align: center;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%);
+  background-size: 24px 24px, 100% 100%;
+}
+
+.sectionDividerTitle {
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: #fff;
+  margin-bottom: 0;
+}
+
 /* ── Concept sections ─────────────────────────────────────────────────────── */
 
 .conceptSection {
@@ -142,7 +161,7 @@
   border-top: 1px solid var(--ifm-toc-border-color);
 }
 
-.conceptSection:nth-child(even) {
+.conceptSectionAlt {
   background: var(--ifm-background-surface-color);
 }
 

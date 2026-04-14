@@ -23,6 +23,7 @@ npm install ontologic
 - **Result Pattern** — Typed domain failures as return values, not hidden exceptions
 - **Repository** — Persistence interface that saves entity state and events atomically
 - **Event Bus** — Types event bus that allows to publish and listen to your domain events
+- **Message Relay** — Built-in Outbox Pattern with in-memory component for fast prototyping
 
 ## Examples
 

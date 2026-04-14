@@ -103,11 +103,23 @@ type ConceptSectionProps = {
   codeTitle: string;
   accent: string;
   reverse?: boolean;
+  outboxSection?: boolean;
+  hasBackground?: boolean;
 };
 
-function ConceptSection({tag, title, description, link, linkLabel, code, codeTitle, accent, reverse}: ConceptSectionProps) {
+function SectionDivider({title}: {title: string}) {
   return (
-    <section className={clsx(styles.conceptSection, reverse && styles.conceptSectionReverse)}>
+    <div className={styles.sectionDivider}>
+      <div className="container">
+        <Heading as="h2" className={styles.sectionDividerTitle}>{title}</Heading>
+      </div>
+    </div>
+  );
+}
+
+function ConceptSection({tag, title, description, link, linkLabel, code, codeTitle, accent, reverse, hasBackground}: ConceptSectionProps) {
+  return (
+    <section className={clsx(styles.conceptSection, hasBackground && styles.conceptSectionAlt)}>
       <div className="container">
         <div className={clsx(styles.conceptInner, reverse && styles.conceptInnerReverse)}>
           <div className={styles.conceptText}>
@@ -279,6 +291,7 @@ await repository.saveWithEvents(account, result.value);`,
   {
     tag: 'Event Bus',
     accent: '#8b5cf6',
+    outboxSection: true,
     title: 'Deliver events to your system',
     description: (
       <>
@@ -305,6 +318,33 @@ listener.listenTo("PAYMENT_RECEIVED", async (event, metadata) => {
 
 await listener.start();`,
   },
+  {
+    tag: 'Message Relay',
+    accent: '#06b6d4',
+    title: 'Deliver every event, survive every failure',
+    description: (
+      <>
+        <p>The Message Relay reads events from the outbox table and forwards them to the event bus. It tracks exactly what has been published, so after a crash it resumes precisely where it left off.</p>
+        <p>Each event is checkpointed individually. A failure mid-batch never causes events to be skipped or the relay to restart from scratch.</p>
+      </>
+    ),
+    link: '/docs/message-relay',
+    linkLabel: 'Learn about the Message Relay',
+    codeTitle: 'message-relay.ts',
+    code: `const relay = new MessageRelay(
+  repository,
+  new InMemoryMessageRelayStateRepository(),
+  "Order",
+  publisher,
+);
+
+relay.onError((error) => {
+  logger.error("relay error", { error });
+});
+
+// Trigger the relay whenever an entity is saved
+repository.onChanges(relay.handler);`,
+  },
 ];
 
 export default function Home(): ReactNode {
@@ -316,7 +356,10 @@ export default function Home(): ReactNode {
       <HomepageHeader />
       <main>
         {conceptSections.map((section, idx) => (
-          <ConceptSection key={idx} {...section} reverse={idx % 2 === 1} />
+          <>
+            {section.outboxSection && <SectionDivider key={`divider-${idx}`} title="Built-in Outbox Pattern" />}
+            <ConceptSection key={idx} {...section} reverse={idx % 2 === 1} hasBackground={idx % 2 === 1} />
+          </>
         ))}
       </main>
     </Layout>
