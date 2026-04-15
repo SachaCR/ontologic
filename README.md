@@ -27,7 +27,15 @@ npm install ontologic
 
 ## Examples
 
-A complete example (entity, invariants, events, use cases) is in the [`examples/`](https://github.com/SachaCR/ontologic/tree/main/examples) directory — a credit balance aggregate with creation, credit, debit, and error handling.
+### Library Management App
+
+A full-featured library management application built with NestJS, demonstrating all Ontologic features on a real-world use case:
+
+**[sachacr/library-examples](https://github.com/sachacr/library-examples)**
+
+### Smaller examples
+
+Focused examples (entity, invariants, events, use cases) are in the [`examples/`](https://github.com/SachaCR/ontologic/tree/main/examples) directory — a credit balance aggregate and an order lifecycle.
 
 ## License
 
