@@ -1,11 +1,12 @@
 ---
 sidebar_position: 3
 ---
+
 # Domain Events
 
 In Domain-Driven Design, a **Domain Event** is a record that something meaningful happened in your domain.
 
-Not a log line. Not a notification. A first-class object that says: *"this thing happened, it's a fact, and it matters to the business."*
+Not a log line. Not a notification. A first-class object that says: _"this thing happened, it's a fact, and it matters to the business."_
 
 A few examples of domain events:
 
@@ -14,7 +15,7 @@ A few examples of domain events:
 - `UserRegistered`
 - `InventoryReserved`
 
-Notice the naming pattern: **past tense**. That's intentional, and important. A domain event is not a command (*"PlaceOrder"*) and it is not a query (*"GetOrder"*). It is a **fact about the past**. It has already happened. It cannot be undone.
+Notice the naming pattern: **past tense**. That's intentional, and important. A domain event is not a command (_"PlaceOrder"_) and it is not a query (_"GetOrder"_). It is a **fact about the past**. It has already happened. It cannot be undone.
 
 ---
 
@@ -22,7 +23,7 @@ Notice the naming pattern: **past tense**. That's intentional, and important. A 
 
 This distinction shapes how you think about them.
 
-When you issue a command, it might fail. An order might be rejected. A payment might be declined. But once an event exists — once `OrderPlaced` has been emitted — it is a permanent record. The order *was* placed. That's the truth, and nothing can change it.
+When you issue a command, it might fail. An order might be rejected. A payment might be declined. But once an event exists — once `OrderPlaced` has been emitted — it is a permanent record. The order _was_ placed. That's the truth, and nothing can change it.
 
 This is why domain events use past tense: they record what already occurred, not what you hope will occur.
 
@@ -69,7 +70,11 @@ Think of it like a REST API endpoint: once it's in use, you own it. You can add 
 This is why `ontologic` includes a **version number** on every event:
 
 ```typescript
-class PaymentReceived extends DomainEvent<"PAYMENT_RECEIVED", 1, { amount: number; currency: string }> {
+class PaymentReceived extends DomainEvent<
+  "PAYMENT_RECEIVED",
+  1,
+  { amount: number; currency: string }
+> {
   constructor(entityId: string, payload: { amount: number; currency: string }) {
     super({ name: "PAYMENT_RECEIVED", version: 1, entityId, payload });
   }
@@ -80,8 +85,15 @@ When your domain evolves and you need to change the shape of an event, you creat
 
 ```typescript
 // New version with additional context
-class PaymentReceived extends DomainEvent<"PAYMENT_RECEIVED", 2, { amount: number; currency: string; paymentMethod: string }> {
-  constructor(entityId: string, payload: { amount: number; currency: string; paymentMethod: string }) {
+class PaymentReceived extends DomainEvent<
+  "PAYMENT_RECEIVED",
+  2,
+  { amount: number; currency: string; paymentMethod: string }
+> {
+  constructor(
+    entityId: string,
+    payload: { amount: number; currency: string; paymentMethod: string },
+  ) {
     super({ name: "PAYMENT_RECEIVED", version: 2, entityId, payload });
   }
 }
@@ -102,7 +114,11 @@ interface MoneyDepositedPayload {
   amount: number;
 }
 
-class MoneyDeposited extends DomainEvent<"MONEY_DEPOSITED", 1, MoneyDepositedPayload> {
+class MoneyDeposited extends DomainEvent<
+  "MONEY_DEPOSITED",
+  1,
+  MoneyDepositedPayload
+> {
   constructor(entityId: string, payload: MoneyDepositedPayload) {
     super({ name: "MONEY_DEPOSITED", version: 1, entityId, payload });
   }
@@ -126,7 +142,12 @@ Or, when the operation can fail, using `Result`:
 class BankAccount extends DomainEntity<BankAccountState> {
   withdraw(amount: number): Result<MoneyWithdrawn, InsufficientFunds> {
     if (this.state.balance < amount) {
-      return err(new InsufficientFunds({ available: this.state.balance, requested: amount }));
+      return err(
+        new InsufficientFunds({
+          available: this.state.balance,
+          requested: amount,
+        }),
+      );
     }
 
     this.state.balance -= amount;
@@ -152,26 +173,16 @@ Saving the entity and its events in the same transaction is important. If you sa
 
 At this point the event is persisted, but nothing has been notified yet. You might be tempted to publish to a message bus immediately after the save — but that's a second operation that can fail independently of the first. Your database committed, but the broker was down for a second: the event is saved and will never be published.
 
-The solution is the **Outbox pattern**. Instead of publishing directly, a background process reads unpublished events from the database and forwards them to the message bus. Because it reads from the same database that was written to in the transaction, it is guaranteed to eventually publish every event that was saved — and only events that were saved.
+The solution is the **Outbox pattern**. Instead of publishing directly, a background process reads unpublished events from the database and forwards them to the message bus. Because it reads from the same database that was written to in the transaction, it is guaranteed to eventually publish every event that was saved.
 
-```mermaid
-flowchart LR
-  subgraph db["Your database (single transaction)"]
-    entities["entities"]
-    outbox["events (outbox)"]
-  end
-
-  bg["background process"]
-  bus["message bus"]
-
-  entities -. committed together .- outbox
-  outbox --> bg --> bus
-```
+<video controls width="90%">
+  <source src="/videos/MessageRelay.mp4" />
+</video>
 
 This separates two concerns that should never be coupled:
 
 - **Writing** — the use case saves state and records what happened, transactionally
-- **Publishing** — a reliable background process delivers events to the rest of the system
+- **Publishing** — a reliable background process, the [Message Relay](/docs/message-relay.mdx), delivers events to the rest of the system
 
 The use case stays simple. The delivery guarantee is handled by infrastructure, not by application code.
 
@@ -183,7 +194,7 @@ The use case stays simple. The delivery guarantee is handled by infrastructure, 
 
 Returning an event from a method is **optional**. Not every mutation needs to produce one.
 
-The question to ask is: *"Does something outside this entity care that this happened?"*
+The question to ask is: _"Does something outside this entity care that this happened?"_
 
 - If a withdrawal might trigger a low-balance notification, produce an event.
 - If you're just updating a display name that nobody else cares about, maybe you don't need one.
@@ -196,9 +207,9 @@ The more important something is to the business — the more other systems or pr
 
 Sometimes an event can only be produced at the **use case level**, because the entity alone doesn't have enough context.
 
-Consider a referral program: when someone signs up using a friend's referral link, their account is opened and they immediately receive $50. The `BankAccount` entity knows how to create itself and how to apply a deposit — but it has no idea *why* the money is there. That context only exists in the use case.
+Consider a referral program: when someone signs up using a friend's referral link, their account is opened and they immediately receive $50. The `BankAccount` entity knows how to create itself and how to apply a deposit — but it has no idea _why_ the money is there. That context only exists in the use case.
 
-Yet *"an account was opened via referral"* is exactly the kind of business fact worth capturing. The marketing team wants to know how many referrals are converting. The finance team wants to audit bonus payouts. Without an explicit event, that information is lost — buried in a generic deposit with no origin.
+Yet _"an account was opened via referral"_ is exactly the kind of business fact worth capturing. The marketing team wants to know how many referrals are converting. The finance team wants to audit bonus payouts. Without an explicit event, that information is lost — buried in a generic deposit with no origin.
 
 This is where the use case produces the event itself:
 
@@ -209,7 +220,11 @@ interface ReferralAccountOpenedPayload {
   bonusAmount: number;
 }
 
-class ReferralAccountOpened extends DomainEvent<"REFERRAL_ACCOUNT_OPENED", 1, ReferralAccountOpenedPayload> {
+class ReferralAccountOpened extends DomainEvent<
+  "REFERRAL_ACCOUNT_OPENED",
+  1,
+  ReferralAccountOpenedPayload
+> {
   constructor(entityId: string, payload: ReferralAccountOpenedPayload) {
     super({ name: "REFERRAL_ACCOUNT_OPENED", version: 1, entityId, payload });
   }
@@ -239,12 +254,12 @@ The rule of thumb: if the event can be produced with only the entity's internal 
 
 ## Summary
 
-| Property | What it means |
-|---|---|
-| **Past tense name** | Events record facts, not intentions — something that already happened |
-| **Immutable** | The payload is frozen at creation — you cannot rewrite history |
-| **Versioned** | Events are a shared contract; versioning lets the contract evolve safely |
-| **Optional** | Not every state change needs an event — only ones that matter outside the entity |
+| Property            | What it means                                                                    |
+| ------------------- | -------------------------------------------------------------------------------- |
+| **Past tense name** | Events record facts, not intentions — something that already happened            |
+| **Immutable**       | The payload is frozen at creation — you cannot rewrite history                   |
+| **Versioned**       | Events are a shared contract; versioning lets the contract evolve safely         |
+| **Optional**        | Not every state change needs an event — only ones that matter outside the entity |
 
 Domain events make your system's history explicit. Instead of inferring what happened from the current state of a database, you have a precise, typed record of every meaningful thing that occurred — who did it, when, and with what data.
 

@@ -42,7 +42,7 @@ The repository is the interface between your domain and your persistence layer. 
 
 The event bus delivers domain events to the rest of your system. A pluggable connector interface lets you use any broker SQS, Kafka, RabbitMQ, Redis, or others. While the publisher and listener logic stays the same across all environments. In-memory connectors are included for tests and local prototyping.
 
-### [Message Relay](./message-relay.md)
+### [Message Relay](./message-relay.mdx)
 
 The message relay is the bridge between the outbox table and the event bus. It reads events that were persisted by the repository and forwards them to the broker, tracking exactly what has been published so the system can recover from failures without skipping or restarting from scratch.
 

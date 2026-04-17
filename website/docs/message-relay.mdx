@@ -18,25 +18,9 @@ The naive approach consist to save the entity, then publish the event. But it ha
 
 The outbox pattern closes this gap by writing the event to the **same database transaction** as the entity state change. The event is stored in an "outbox" table first. Then a separate process (the Message Relay) reads from that table and forwards events to the broker. The two steps are decoupled, and each can be retried independently.
 
-```mermaid
-sequenceDiagram
-    participant App as Application
-    participant DB as Database (Entity + Outbox)
-    participant Relay as Message Relay
-    participant Bus as Event Bus
-
-    App->>DB: saveWithEvents(entity, events)<br/>single transaction
-    DB-->>App: committed
-
-    Relay->>DB: getEventsAfter(lastPublishedId)
-    DB-->>Relay: [event1, event2, ...]
-
-    loop For each event
-        Relay->>Bus: publish(event)
-        Bus-->>Relay: acknowledged
-        Relay->>DB: updateLastEventIdPublished(eventId)
-    end
-```
+<video controls width="90%">
+  <source src="/videos/MessageRelay.mp4" />
+</video>
 
 The key guarantee: if the relay crashes mid-batch, it restarts from the last checkpoint and re-publishes only the remaining events. The entity state in the database is never at risk.
 
@@ -51,8 +35,7 @@ When triggered for a given entity, the relay runs the following sequence:
 3. **Fetch** all events from the outbox that come after that checkpoint
 4. For each event, **publish** it via the event bus, then **update** the checkpoint
 5. **Unlock** the entity in all cases, even on failure
-
-Because the checkpoint is updated after each individual event, a failure mid-batch means the relay will re-attempt from the last successfully published event on the next run — not from the beginning.
+   Because the checkpoint is updated after each individual event, a failure mid-batch means the relay will re-attempt from the last successfully published event on the next run — not from the beginning.
 
 ---
 
