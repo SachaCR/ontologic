@@ -131,6 +131,7 @@ function HomepageHeader() {
 }
 
 type ConceptSectionProps = {
+  id: string;
   tag: string;
   title: string;
   description: ReactNode;
@@ -157,6 +158,7 @@ function SectionDivider({ title }: { title: string }) {
 }
 
 function ConceptSection({
+  id,
   tag,
   title,
   description,
@@ -189,7 +191,7 @@ function ConceptSection({
             >
               {tag}
             </span>
-            <Heading as="h2" className={styles.conceptTitle}>
+            <Heading as="h2" id={id} className={styles.conceptTitle}>
               {title}
             </Heading>
             <div className={styles.conceptDescription}>{description}</div>
@@ -210,6 +212,7 @@ function ConceptSection({
 
 const conceptSections: ConceptSectionProps[] = [
   {
+    id: "domain-entities",
     tag: "Domain Entity",
     accent: "#6366f1",
     title: "Entities that protect themselves",
@@ -250,6 +253,7 @@ const conceptSections: ConceptSectionProps[] = [
 }`,
   },
   {
+    id: "domain-events",
     tag: "Domain Events",
     accent: "#10b981",
     title: "History you can trust",
@@ -285,6 +289,7 @@ const event = new MoneyWithdrawn(account.id(), { amount: 200 });
 event.payload.amount = 0; // has no effect`,
   },
   {
+    id: "invariants",
     tag: "Invariants",
     accent: "#ec4899",
     title: "Rules that never sleep",
@@ -321,6 +326,7 @@ const validBalance =
   balanceIsPositive.and(balanceIsUnderLimit);`,
   },
   {
+    id: "result-pattern",
     tag: "Result Pattern",
     accent: "#f59e0b",
     title: "Failures with meaning",
@@ -358,6 +364,7 @@ if (result.isErr()) {
 await repository.saveWithEvents(account, [result.value]);`,
   },
   {
+    id: "repository",
     tag: "Repository",
     accent: "#3b82f6",
     title: "Persistence without compromise",
@@ -393,6 +400,7 @@ const repository = new BankAccountRepository();
 await repository.saveWithEvents(account, result.value);`,
   },
   {
+    id: "event-bus",
     tag: "Event Bus",
     accent: "#8b5cf6",
     outboxSection: true,
@@ -431,6 +439,7 @@ listener.listenTo("PAYMENT_RECEIVED", async (event, metadata) => {
 await listener.start();`,
   },
   {
+    id: "message-relay",
     tag: "Message Relay",
     accent: "#06b6d4",
     title: "Deliver every event, survive every failure",
@@ -481,7 +490,7 @@ export default function Home(): ReactNode {
               <div>
                 <div className={styles.videoSection}>
                   <div className="container">
-                    <Heading as="h2" className={styles.sectionDividerTitle}>
+                    <Heading as="h2" id="outbox-pattern" className={styles.sectionDividerTitle}>
                       Built-in Outbox Pattern
                     </Heading>
                     <div className={styles.videoWrapper}>
