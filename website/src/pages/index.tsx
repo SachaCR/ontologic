@@ -490,11 +490,15 @@ export default function Home(): ReactNode {
               <div>
                 <div className={styles.videoSection}>
                   <div className="container">
-                    <Heading as="h2" id="outbox-pattern" className={styles.sectionDividerTitle}>
+                    <Heading
+                      as="h2"
+                      id="outbox-pattern"
+                      className={styles.sectionDividerTitle}
+                    >
                       Built-in Outbox Pattern
                     </Heading>
                     <div className={styles.videoWrapper}>
-                      <video controls width="20%">
+                      <video controls width="30%" loop autoPlay>
                         <source src="/videos/MessageRelay.mp4" />
                       </video>
                     </div>
