@@ -96,9 +96,7 @@ function HomepageHeader() {
         <Heading as="h1" className={styles.heroTitle}>
           Ontologic
         </Heading>
-        <p className={styles.heroSubtitle}>
-          A toolkit for building software that speaks your domain's language.
-        </p>
+        <p className={styles.heroSubtitle}>Model What Matters</p>
         <div className={styles.buttons}>
           <Link
             className={clsx("button button--lg", styles.btnPrimary)}
@@ -124,6 +122,14 @@ function HomepageHeader() {
           >
             <NpmIcon />
           </Link>
+        </div>
+
+        <br />
+        <br />
+        <div className={styles.videoWrapper} style={{ maxWidth: "600px" }}>
+          <video controls autoPlay>
+            <source src="/videos/Introduction.mp4" />
+          </video>
         </div>
       </div>
     </header>
