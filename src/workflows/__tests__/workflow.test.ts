@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
+
 import { describe, test, expect } from "vitest";
-import { Workflow, WorkflowStep } from "../";
+import { WorkflowBuilder, WorkflowStep } from "../";
 
 describe("Workflow", () => {
   test("executes a chain of steps using the workflow input", async () => {
@@ -13,12 +15,15 @@ describe("Workflow", () => {
       handler: (sum) => Promise.resolve(`toto: ${sum}`),
     };
 
-    const workflow = new Workflow<number>({
+    const workflowBuilder = new WorkflowBuilder<number>({
+      id: randomUUID(),
       name: "workflow",
       input: 4,
     });
 
-    const result = await workflow.addStep(step1).addStep(step2).execute();
+    const workflow = workflowBuilder.addStep(step1).addStep(step2);
+
+    const result = await workflow.execute();
 
     expect(result).toBe("toto: 9");
     expect(
