@@ -1,4 +1,3 @@
-import { DomainEntity } from "../domainEntity";
 import { ComposableWorkflowStep, StepHandler } from "./composableWorkflowStep";
 
 export interface WorkflowState<Input> {
@@ -9,7 +8,9 @@ export interface WorkflowState<Input> {
   error: { step: string; error: string } | undefined;
 }
 
-export class WorkflowBuilder<Input> extends DomainEntity<WorkflowState<Input>> {
+export class WorkflowBuilder<Input> {
+  #state: WorkflowState<Input>;
+
   constructor(params: {
     id: string;
     name: string;
@@ -26,19 +27,7 @@ export class WorkflowBuilder<Input> extends DomainEntity<WorkflowState<Input>> {
       error: undefined,
     };
 
-    super(params.id, state);
-  }
-
-  static fromState<Input>(
-    id: string,
-    state: WorkflowState<Input>,
-  ): WorkflowBuilder<Input> {
-    return new WorkflowBuilder({
-      id,
-      name: state.name,
-      input: state.input,
-      stepResult: state.stepResults,
-    });
+    this.#state = state;
   }
 
   addStep<Output>(
@@ -47,48 +36,13 @@ export class WorkflowBuilder<Input> extends DomainEntity<WorkflowState<Input>> {
     return new ComposableWorkflowStep({
       name: step.name,
       handler: step.handler,
-      stepResults: this.state.stepResults,
-      previousStep: async () => await Promise.resolve(this.state.input),
-      success: async (step: string, output: unknown, isLast: boolean) => {
-        return await this.#stepSuccess(step, output, isLast);
-      },
-      failure: async (step: string, error: Error) => {
-        return await this.#stepFailure(step, error);
-      },
+      workflowState: this.#state,
+      previousStep: async () => await Promise.resolve(this.#state.input),
     });
   }
 
-  async #stepSuccess(
-    step: string,
-    output: unknown,
-    isLast: boolean,
-  ): Promise<void> {
-    this.state.stepResults.set(step, output);
-
-    if (isLast) {
-      // TODO: call repository to save state
-    }
-
-    return Promise.resolve();
-  }
-
-  async #stepFailure(step: string, error: Error): Promise<void> {
-    console.log(step, error);
-    this.state.error = {
-      step,
-      error: error.message,
-    };
-
-    // TODO: Call repository to save state and error
-    return Promise.resolve();
-  }
-
-  results(): Map<string, unknown> {
-    return this.state.stepResults;
-  }
-
   get name(): string {
-    return this.state.name;
+    return this.#state.name;
   }
 }
 
