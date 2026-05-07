@@ -4,19 +4,34 @@ export class ComposableWorkflowStep<Input, Output> {
   #previousStep: PreviousStepHandler<Input>;
   #stepResults: Map<string, unknown>;
   #isLast: boolean;
+  #success: (
+    stepName: string,
+    output: unknown,
+    isLast: boolean,
+  ) => Promise<void>;
+  #failure: (stepName: string, error: Error) => Promise<void>;
 
   constructor(params: {
     name: string;
     handler: StepHandler<Input, Output>;
     previousStep: PreviousStepHandler<Input>;
     stepResults: Map<string, unknown>;
+    success: (
+      stepName: string,
+      output: unknown,
+      isLast: boolean,
+    ) => Promise<void>;
+    failure: (stepName: string, error: Error) => Promise<void>;
   }) {
-    const { name, handler, previousStep, stepResults } = params;
+    const { name, handler, previousStep, stepResults, success, failure } =
+      params;
     this.#name = name;
     this.#handler = handler;
     this.#previousStep = previousStep;
     this.#stepResults = stepResults;
     this.#isLast = true;
+    this.#success = success;
+    this.#failure = failure;
   }
 
   addStep<NextOutput>(params: {
@@ -32,6 +47,8 @@ export class ComposableWorkflowStep<Input, Output> {
       handler,
       previousStep: () => this.execute(),
       stepResults: this.#stepResults,
+      success: this.#success,
+      failure: this.#failure,
     });
   }
 
@@ -46,17 +63,14 @@ export class ComposableWorkflowStep<Input, Output> {
 
     try {
       const output = await this.#handler(input);
+
       this.#stepResults.set(this.#name, output);
 
-      if (this.#isLast) {
-        // TODO SAVE RESULTS
-      }
+      await this.#success(this.#name, output, this.#isLast);
 
       return output;
     } catch (err: unknown) {
-      // TODO SAVE RESULTS
-
-      let message = "";
+      let message = "unknown error";
       let name = "Unknown Error";
 
       if (err instanceof Error) {
@@ -64,9 +78,16 @@ export class ComposableWorkflowStep<Input, Output> {
         name = err.name;
       }
 
-      throw new Error(`Step: ${this.#name} failed with: ${name} ${message}`, {
-        cause: err,
-      });
+      const error = new Error(
+        `Step: ${this.#name} failed with: ${name} ${message}`,
+        {
+          cause: err,
+        },
+      );
+
+      await this.#failure(this.#name, error);
+
+      throw error;
     }
   }
 

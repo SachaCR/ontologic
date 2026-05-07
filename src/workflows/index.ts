@@ -1,1 +1,1 @@
-export { Workflow, type WorkflowStep } from "./workflow";
+export { WorkflowBuilder, type WorkflowStep } from "./workflow";
