@@ -5,7 +5,8 @@ export interface WorkflowState<Input> {
   name: string;
   input: Input;
   stepResults: Map<string, unknown>;
-  error: { step: string; error: string } | undefined;
+  error: { step: string; error: string; name: string } | undefined;
+  status: "TODO" | "IN_PROGRESS" | "FAILED" | "DONE";
 }
 
 export class WorkflowBuilder<Input> {
@@ -18,6 +19,7 @@ export class WorkflowBuilder<Input> {
     stepResult?: Map<string, unknown>;
   }) {
     const state: WorkflowState<Input> = {
+      status: "TODO",
       name: params.name,
       id: params.id,
       input: params.input,
