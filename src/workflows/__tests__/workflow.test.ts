@@ -95,7 +95,7 @@ describe("Workflow", () => {
       handler: (count) => Promise.resolve(count + 5),
     });
 
-    await workflow.execute({ save, getById: async () => undefined });
+    await workflow.execute({ save });
 
     expect(save).toHaveBeenCalledTimes(2);
     expect(snapshots[0]).toStrictEqual({
@@ -104,6 +104,7 @@ describe("Workflow", () => {
       input: 4,
       stepResults: new Map(),
       error: undefined,
+      status: "IN_PROGRESS",
     });
     expect(snapshots[1]).toStrictEqual({
       id,
@@ -111,6 +112,7 @@ describe("Workflow", () => {
       input: 4,
       stepResults: new Map([["Step 1", 9]]),
       error: undefined,
+      status: "DONE",
     });
   });
 
@@ -130,9 +132,7 @@ describe("Workflow", () => {
       handler: () => Promise.reject(new Error("boom")),
     });
 
-    await expect(
-      workflow.execute({ save, getById: async () => undefined }),
-    ).rejects.toThrow(/Failing Step/);
+    await expect(workflow.execute({ save })).rejects.toThrow(/Failing Step/);
 
     expect(save).toHaveBeenCalledTimes(2);
     expect(snapshots[0]).toStrictEqual({
@@ -141,6 +141,7 @@ describe("Workflow", () => {
       input: 4,
       stepResults: new Map(),
       error: undefined,
+      status: "IN_PROGRESS",
     });
     expect(snapshots[1]).toStrictEqual({
       id,
@@ -150,7 +151,9 @@ describe("Workflow", () => {
       error: {
         step: "Failing Step",
         error: "Step: Failing Step failed with: Error boom",
+        name: "Error",
       },
+      status: "FAILED",
     });
   });
 });

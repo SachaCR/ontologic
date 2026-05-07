@@ -5,6 +5,7 @@ export class ComposableWorkflowStep<Input, Output> {
   #handler: StepHandler<Input, Output>;
   #previousStep: PreviousStepHandler<Input>;
   #workflowState: WorkflowState<unknown>;
+  #isLast: boolean;
 
   constructor(params: {
     name: string;
@@ -17,6 +18,7 @@ export class ComposableWorkflowStep<Input, Output> {
     this.#handler = handler;
     this.#previousStep = previousStep;
     this.#workflowState = workflowState;
+    this.#isLast = true;
   }
 
   addStep<NextOutput>(params: {
@@ -24,6 +26,8 @@ export class ComposableWorkflowStep<Input, Output> {
     handler: StepHandler<Output, NextOutput>;
   }): ComposableWorkflowStep<Output, NextOutput> {
     const { name, handler } = params;
+
+    this.#isLast = false;
 
     return new ComposableWorkflowStep({
       name,
@@ -33,7 +37,11 @@ export class ComposableWorkflowStep<Input, Output> {
     });
   }
 
-  async execute(repository?: WorkflowStateRepository): Promise<Output> {
+  async execute(
+    repository?: Pick<WorkflowStateRepository, "save">,
+  ): Promise<Output> {
+    this.#workflowState.status = "IN_PROGRESS";
+
     // Save initial state
     if (repository) {
       await repository.save(this.#workflowState);
@@ -51,6 +59,10 @@ export class ComposableWorkflowStep<Input, Output> {
       const output = await this.#handler(input);
 
       this.#workflowState.stepResults.set(this.#name, output);
+
+      if (this.#isLast) {
+        this.#workflowState.status = "DONE";
+      }
 
       return output;
     } catch (err: unknown) {
@@ -80,9 +92,12 @@ export class ComposableWorkflowStep<Input, Output> {
       },
     );
 
+    this.#workflowState.status = "FAILED";
+
     this.#workflowState.error = {
       step: this.#name,
       error: error.message,
+      name: error.name,
     };
 
     return error;
@@ -90,6 +105,10 @@ export class ComposableWorkflowStep<Input, Output> {
 
   results(): Map<string, unknown> {
     return this.#workflowState.stepResults;
+  }
+
+  status() {
+    return this.#workflowState.status;
   }
 
   get name(): string {

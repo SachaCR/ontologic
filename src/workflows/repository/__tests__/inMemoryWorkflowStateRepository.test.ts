@@ -13,6 +13,7 @@ function makeState(
     input: 4,
     stepResults: new Map<string, unknown>(),
     error: undefined,
+    status: "TODO",
     ...overrides,
   };
 }
