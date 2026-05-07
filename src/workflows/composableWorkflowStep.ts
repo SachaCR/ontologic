@@ -101,6 +101,7 @@ export type StepHandler<Input, Output> = (input: Input) => Promise<Output>;
 
 type PreviousStepHandler<Output> = () => Promise<Output>;
 
-interface WorkflowStateRepository {
+export interface WorkflowStateRepository {
   save: (state: WorkflowState<unknown>) => Promise<void>;
+  getById: (id: string) => Promise<WorkflowState<unknown> | undefined>;
 }
