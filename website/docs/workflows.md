@@ -131,7 +131,7 @@ When a step's handler throws, `ontologic`:
 1. Wraps the error with the step name and the original error as `cause`.
 2. Sets `state.error` to `{ step, error, name }` so the failure is visible in the persisted state.
 3. Marks `state.status` as `FAILED`.
-4. Saves the state once more before re-throwing, so a crash right after the failure still leaves a record.
+4. Saves the state before re-throwing, so a crash always leaves a record.
 
 The wrapped error rethrows out of `execute()`. Catch it at the boundary you care about:
 
@@ -146,7 +146,7 @@ try {
 
 For domain-meaningful cancellations (a balance too low, a receiver flagged as fraudulent), throw a `DomainError` from inside the handler rather than a plain `Error`. The same wrapping applies, and the structured context survives in `error.cause`.
 
-Then it's up to you to decide which error deserves to be retried or not.
+Then it's up to you to decide which error deserves to be retried or not as well as to define the retry policy.
 
 ---
 
