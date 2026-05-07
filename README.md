@@ -24,6 +24,7 @@ npm install ontologic
 - **Repository** — Persistence interface that saves entity state and events atomically
 - **Event Bus** — Types event bus that allows to publish and listen to your domain events
 - **Message Relay** — Built-in Outbox Pattern with in-memory component for fast prototyping
+- **Workflows** — Typed, resumable pipelines for multi-step business processes
 
 ## Examples
 

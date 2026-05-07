@@ -406,6 +406,41 @@ const repository = new BankAccountRepository();
 await repository.saveWithEvents(account, result.value);`,
   },
   {
+    id: "workflows",
+    tag: "Workflows",
+    accent: "#22c55e",
+    title: "Multi-step processes, type-checked end to end",
+    description: (
+      <>
+        <p>
+          A Workflow chains typed steps into a resumable pipeline. Each step's
+          output flows into the next step's input, and the type system enforces
+          the order reordering the chain is a compile error.
+        </p>
+        <p>
+          Plug in a repository and the state is persisted in any case. A crashed
+          run resumes exactly where it left off, with no re-execution of work
+          that already succeeded.
+        </p>
+      </>
+    ),
+    link: "/docs/workflows",
+    linkLabel: "Learn about Workflows",
+    codeTitle: "sepa-payment.workflow.ts",
+    code: `const workflow = new WorkflowBuilder<SepaPaymentRequest>({
+  id: randomUUID(),
+  name: "SEPA Payment",
+  input: { accountId, receiverIban, amount },
+})
+  .addStep(checkAccountBalance)
+  .addStep(checkReceiverIsValid)
+  .addStep(checkAmlRisk)
+  .addStep(createSepaTransfer);
+
+// Persist the state, resume after a crash
+const transfer = await workflow.execute(repository);`,
+  },
+  {
     id: "event-bus",
     tag: "Event Bus",
     accent: "#8b5cf6",
