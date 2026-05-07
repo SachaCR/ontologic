@@ -1,37 +1,22 @@
+import { WorkflowState } from "./workflow";
+
 export class ComposableWorkflowStep<Input, Output> {
   #name: string;
   #handler: StepHandler<Input, Output>;
   #previousStep: PreviousStepHandler<Input>;
-  #stepResults: Map<string, unknown>;
-  #isLast: boolean;
-  #success: (
-    stepName: string,
-    output: unknown,
-    isLast: boolean,
-  ) => Promise<void>;
-  #failure: (stepName: string, error: Error) => Promise<void>;
+  #workflowState: WorkflowState<unknown>;
 
   constructor(params: {
     name: string;
     handler: StepHandler<Input, Output>;
     previousStep: PreviousStepHandler<Input>;
-    stepResults: Map<string, unknown>;
-    success: (
-      stepName: string,
-      output: unknown,
-      isLast: boolean,
-    ) => Promise<void>;
-    failure: (stepName: string, error: Error) => Promise<void>;
+    workflowState: WorkflowState<unknown>;
   }) {
-    const { name, handler, previousStep, stepResults, success, failure } =
-      params;
+    const { name, handler, previousStep, workflowState } = params;
     this.#name = name;
     this.#handler = handler;
     this.#previousStep = previousStep;
-    this.#stepResults = stepResults;
-    this.#isLast = true;
-    this.#success = success;
-    this.#failure = failure;
+    this.#workflowState = workflowState;
   }
 
   addStep<NextOutput>(params: {
@@ -40,20 +25,21 @@ export class ComposableWorkflowStep<Input, Output> {
   }): ComposableWorkflowStep<Output, NextOutput> {
     const { name, handler } = params;
 
-    this.#isLast = false;
-
     return new ComposableWorkflowStep({
       name,
       handler,
       previousStep: () => this.execute(),
-      stepResults: this.#stepResults,
-      success: this.#success,
-      failure: this.#failure,
+      workflowState: this.#workflowState,
     });
   }
 
-  async execute(): Promise<Output> {
-    let result = this.#stepResults.get(this.#name);
+  async execute(repository?: WorkflowStateRepository): Promise<Output> {
+    // Save initial state
+    if (repository) {
+      await repository.save(this.#workflowState);
+    }
+
+    let result = this.#workflowState.stepResults.get(this.#name);
 
     if (result !== undefined) {
       return result as Output;
@@ -64,35 +50,46 @@ export class ComposableWorkflowStep<Input, Output> {
     try {
       const output = await this.#handler(input);
 
-      this.#stepResults.set(this.#name, output);
-
-      await this.#success(this.#name, output, this.#isLast);
+      this.#workflowState.stepResults.set(this.#name, output);
 
       return output;
     } catch (err: unknown) {
-      let message = "unknown error";
-      let name = "Unknown Error";
-
-      if (err instanceof Error) {
-        message = err.message;
-        name = err.name;
-      }
-
-      const error = new Error(
-        `Step: ${this.#name} failed with: ${name} ${message}`,
-        {
-          cause: err,
-        },
-      );
-
-      await this.#failure(this.#name, error);
-
+      const error = this.#handleError(err);
       throw error;
+    } finally {
+      // Save state from either a success or a failure
+      if (repository) {
+        await repository.save(this.#workflowState);
+      }
     }
   }
 
+  #handleError(err: unknown): Error {
+    let message = "unknown error";
+    let name = "Unknown Error";
+
+    if (err instanceof Error) {
+      message = err.message;
+      name = err.name;
+    }
+
+    const error = new Error(
+      `Step: ${this.#name} failed with: ${name} ${message}`,
+      {
+        cause: err,
+      },
+    );
+
+    this.#workflowState.error = {
+      step: this.#name,
+      error: error.message,
+    };
+
+    return error;
+  }
+
   results(): Map<string, unknown> {
-    return this.#stepResults;
+    return this.#workflowState.stepResults;
   }
 
   get name(): string {
@@ -103,3 +100,7 @@ export class ComposableWorkflowStep<Input, Output> {
 export type StepHandler<Input, Output> = (input: Input) => Promise<Output>;
 
 type PreviousStepHandler<Output> = () => Promise<Output>;
+
+interface WorkflowStateRepository {
+  save: (state: WorkflowState<unknown>) => Promise<void>;
+}
