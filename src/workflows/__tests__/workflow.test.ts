@@ -95,7 +95,7 @@ describe("Workflow", () => {
       handler: (count) => Promise.resolve(count + 5),
     });
 
-    await workflow.execute({ save });
+    await workflow.execute({ save, getById: async () => undefined });
 
     expect(save).toHaveBeenCalledTimes(2);
     expect(snapshots[0]).toStrictEqual({
@@ -130,7 +130,9 @@ describe("Workflow", () => {
       handler: () => Promise.reject(new Error("boom")),
     });
 
-    await expect(workflow.execute({ save })).rejects.toThrow(/Failing Step/);
+    await expect(
+      workflow.execute({ save, getById: async () => undefined }),
+    ).rejects.toThrow(/Failing Step/);
 
     expect(save).toHaveBeenCalledTimes(2);
     expect(snapshots[0]).toStrictEqual({
