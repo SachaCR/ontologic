@@ -112,7 +112,7 @@ export class ComposableWorkflowStep<Input, Output> {
   }
 
   get name(): string {
-    return this.#name;
+    return this.#workflowState.name;
   }
 }
 
