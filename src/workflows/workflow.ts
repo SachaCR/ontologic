@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import { ComposableWorkflowStep, StepHandler } from "./composableWorkflowStep";
 import {
   aggregateFunction,
@@ -16,6 +17,7 @@ export interface WorkflowState<Input> {
 
 export class WorkflowBuilder<Input> {
   #state: WorkflowState<Input>;
+  #eventEmitter: EventEmitter;
 
   constructor(params: {
     id: string;
@@ -35,6 +37,9 @@ export class WorkflowBuilder<Input> {
     };
 
     this.#state = state;
+    this.#eventEmitter = new EventEmitter({
+      captureRejections: true,
+    });
   }
 
   addStep<Output>(
@@ -44,6 +49,7 @@ export class WorkflowBuilder<Input> {
       name: step.name,
       handler: step.handler,
       workflowState: this.#state,
+      eventEmitter: this.#eventEmitter,
       previousStep: async () => await Promise.resolve(this.#state.input),
     });
   }
@@ -61,14 +67,25 @@ export class WorkflowBuilder<Input> {
 
     return new ComposableWorkflowStep({
       workflowState: this.#state,
+      eventEmitter: this.#eventEmitter,
       name: name,
       previousStep: async () => await Promise.resolve(this.#state.input),
       handler: async (input: Input): Promise<AggregateOutput<Steps>> => {
         const subtasks = steps.map(defineSubTask);
-        const result = await aggregateFunction(subtasks, input);
+        const result = await aggregateFunction(
+          subtasks,
+          input,
+          this.#eventEmitter,
+        );
         return result as AggregateOutput<Steps>;
       },
     });
+  }
+
+  onChanges(
+    handler: (event: { step: string; status: "DONE" | "FAILED" }) => void,
+  ) {
+    this.#eventEmitter.on("change", handler);
   }
 
   get name(): string {

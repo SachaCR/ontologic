@@ -1,3 +1,4 @@
+import { EventEmitter } from "node:events";
 import {
   aggregateFunction,
   AggregateOutput,
@@ -11,19 +12,22 @@ export class ComposableWorkflowStep<Input, Output> {
   #previousStep: PreviousStepHandler<Input>;
   #workflowState: WorkflowState<unknown>;
   #isLast: boolean;
+  #eventEmitter: EventEmitter;
 
   constructor(params: {
     name: string;
     handler: StepHandler<Input, Output>;
     previousStep: PreviousStepHandler<Input>;
     workflowState: WorkflowState<unknown>;
+    eventEmitter: EventEmitter;
   }) {
-    const { name, handler, previousStep, workflowState } = params;
+    const { name, handler, previousStep, workflowState, eventEmitter } = params;
     this.#name = name;
     this.#handler = handler;
     this.#previousStep = previousStep;
     this.#workflowState = workflowState;
     this.#isLast = true;
+    this.#eventEmitter = eventEmitter;
   }
 
   addStep<NextOutput>(params: {
@@ -39,6 +43,7 @@ export class ComposableWorkflowStep<Input, Output> {
       handler,
       previousStep: () => this.execute(),
       workflowState: this.#workflowState,
+      eventEmitter: this.#eventEmitter,
     });
   }
 
@@ -55,11 +60,16 @@ export class ComposableWorkflowStep<Input, Output> {
 
     return new ComposableWorkflowStep({
       workflowState: this.#workflowState,
+      eventEmitter: this.#eventEmitter,
       name: name,
       previousStep: () => this.execute(),
       handler: async (input: Output): Promise<AggregateOutput<Steps>> => {
         const subtasks = steps.map(defineSubTask);
-        const result = await aggregateFunction(subtasks, input);
+        const result = await aggregateFunction(
+          subtasks,
+          input,
+          this.#eventEmitter,
+        );
         return result as AggregateOutput<Steps>;
       },
     });
@@ -83,6 +93,8 @@ export class ComposableWorkflowStep<Input, Output> {
 
     const input = await this.#previousStep();
 
+    this.#eventEmitter.emit("change", { step: this.#name, status: "START" });
+
     try {
       const output = await this.#handler(input);
 
@@ -92,9 +104,12 @@ export class ComposableWorkflowStep<Input, Output> {
         this.#workflowState.status = "DONE";
       }
 
+      this.#eventEmitter.emit("change", { step: this.#name, status: "DONE" });
+
       return output;
     } catch (err: unknown) {
       const error = this.#handleError(err);
+
       throw error;
     } finally {
       // Save state from either a success or a failure
@@ -128,6 +143,8 @@ export class ComposableWorkflowStep<Input, Output> {
       name: error.name,
     };
 
+    this.#eventEmitter.emit("change", { step: this.#name, status: "FAILED" });
+
     return error;
   }
 
@@ -137,6 +154,12 @@ export class ComposableWorkflowStep<Input, Output> {
 
   status() {
     return this.#workflowState.status;
+  }
+
+  onChanges(
+    handler: (event: { step: string; status: "DONE" | "FAILED" }) => void,
+  ) {
+    this.#eventEmitter.on("change", handler);
   }
 
   get name(): string {

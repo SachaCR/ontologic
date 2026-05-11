@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+
 export function defineSubTask<const N extends string, Input, Output>(task: {
   name: N;
   handler: (input: Input) => Promise<Output>;
@@ -21,11 +23,21 @@ export async function aggregateFunction<
     name: string;
     handler: (input: Input) => Promise<unknown>;
   }[],
->(handlers: H, input: Input): Promise<AggregateOutput<H>> {
+>(
+  handlers: H,
+  input: Input,
+  eventEmitter: EventEmitter,
+): Promise<AggregateOutput<H>> {
   const entries = await Promise.all(
-    handlers.map(
-      async ({ name, handler }) => [name, await handler(input)] as const,
-    ),
+    handlers.map(async ({ name, handler }) => {
+      eventEmitter.emit("change", { step: name, status: "START" });
+
+      const result = await handler(input);
+
+      eventEmitter.emit("change", { step: name, status: "DONE" });
+
+      return [name, result] as const;
+    }),
   );
 
   return Object.fromEntries(entries) as AggregateOutput<H>;
