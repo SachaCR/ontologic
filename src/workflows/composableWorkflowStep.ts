@@ -118,7 +118,7 @@ export class ComposableWorkflowStep<Input, Output> {
 
 export type StepHandler<Input, Output> = (input: Input) => Promise<Output>;
 
-type PreviousStepHandler<Output> = () => Promise<Output>;
+export type PreviousStepHandler<Output> = () => Promise<Output>;
 
 export interface WorkflowStateRepository {
   save: (state: WorkflowState<unknown>) => Promise<void>;
