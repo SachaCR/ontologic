@@ -1,7 +1,7 @@
 {
   "name": "ontologic",
   "version": "1.4.0",
-  "description": "",
+  "description": "Model What Matters: Domain Entities, Invariant, Domain Events, and much more.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
@@ -16,12 +16,29 @@
   },
   "keywords": [
     "DDD",
-    "Domain",
-    "Entity",
-    "Clean Code"
+    "domain-driven-design",
+    "domain",
+    "entity",
+    "invariants",
+    "domain-events",
+    "event-bus",
+    "outbox",
+    "repository",
+    "result-pattern",
+    "workflow",
+    "clean-code",
+    "typescript"
   ],
   "author": "SachaCR",
   "license": "MIT",
+  "homepage": "https://ontologic.site",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SachaCR/ontologic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SachaCR/ontologic/issues"
+  },
   "packageManager": "pnpm@10.29.2",
   "devDependencies": {
     "@types/node": "^25.4.0",
