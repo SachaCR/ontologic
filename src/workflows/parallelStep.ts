@@ -1,20 +1,16 @@
-import {
-  ComposableWorkflowStep,
-  PreviousStepHandler,
-  StepHandler,
-} from "./composableWorkflowStep";
+import { PreviousStepHandler, StepHandler } from "./composableWorkflowStep";
 import { WorkflowState } from "./workflow";
 
 export class ParallelStep<Input> {
   #name: string;
-  #handlers: StepHandler<Input, unknown>[];
+  #handlers: { name: string; handler: StepHandler<Input, unknown> }[];
   #previousStep: PreviousStepHandler<Input>;
   #workflowState: WorkflowState<unknown>;
   #isLast: boolean;
 
   constructor(params: {
     name: string;
-    handlers: Array<StepHandler<Input, unknown>>;
+    handlers: { name: string; handler: StepHandler<Input, unknown> }[];
     previousStep: PreviousStepHandler<Input>;
     workflowState: WorkflowState<unknown>;
   }) {
@@ -27,8 +23,14 @@ export class ParallelStep<Input> {
     this.#isLast = true;
   }
 
-  async execute(): Promise<Merge<Output>>;
+  async execute(): Promise<Record<string, unknown>> {
+    const input = await this.#previousStep();
+    const entries = await Promise.all(
+      this.#handlers.map(
+        async ({ name, handler }) => [name, await handler(input)] as const,
+      ),
+    );
+
+    return Object.fromEntries(entries);
+  }
 }
-
-
-type MergeOutput = 
