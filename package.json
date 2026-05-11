@@ -34,7 +34,7 @@
   "homepage": "https://ontologic.site",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/SachaCR/ontologic.git"
+    "url": "https://github.com/SachaCR/ontologic.git"
   },
   "bugs": {
     "url": "https://github.com/SachaCR/ontologic/issues"
