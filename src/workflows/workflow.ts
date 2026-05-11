@@ -1,4 +1,9 @@
 import { ComposableWorkflowStep, StepHandler } from "./composableWorkflowStep";
+import {
+  aggregateFunction,
+  AggregateOutput,
+  defineSubTask,
+} from "./parallelStep";
 
 export interface WorkflowState<Input> {
   id: string;
@@ -40,6 +45,29 @@ export class WorkflowBuilder<Input> {
       handler: step.handler,
       workflowState: this.#state,
       previousStep: async () => await Promise.resolve(this.#state.input),
+    });
+  }
+
+  parallelize<
+    const Steps extends readonly {
+      name: string;
+      handler: (input: Input) => Promise<unknown>;
+    }[],
+  >(params: {
+    name: string;
+    steps: Steps;
+  }): ComposableWorkflowStep<Input, AggregateOutput<Steps>> {
+    const { name, steps } = params;
+
+    return new ComposableWorkflowStep({
+      workflowState: this.#state,
+      name: name,
+      previousStep: async () => await Promise.resolve(this.#state.input),
+      handler: async (input: Input): Promise<AggregateOutput<Steps>> => {
+        const subtasks = steps.map(defineSubTask);
+        const result = await aggregateFunction(subtasks, input);
+        return result as AggregateOutput<Steps>;
+      },
     });
   }
 
