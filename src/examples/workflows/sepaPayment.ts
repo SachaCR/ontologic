@@ -15,14 +15,18 @@ async function main() {
     input: {
       accountId: "ACC-001",
       receiverIban: "FR7630006000011234567890189",
-      amount: 25000,
+      amount: 250,
       currency: "EUR",
     },
   })
     .addStep(checkAccountBalance)
     .addStep(checkReceiverIsValid)
     .addStep(checkAmlRisk)
+    .parallelize({ name: "Checks", steps: [check1, check2, check3] })
+    .addStep(clean)
     .addStep(createSepaTransfer);
+
+  workflow.onChanges((event) => console.log("EVENT:", event));
 
   try {
     const transfer = await workflow.execute(repository);
@@ -78,6 +82,47 @@ const checkAmlRisk: WorkflowStep<AfterReceiver, AfterAml> = {
   },
 };
 
+const check1: WorkflowStep<AfterAml, AfterAml> = {
+  name: "check1",
+  handler: async (sepaRequest) => {
+    await sleep(3000);
+    return sepaRequest;
+  },
+};
+
+const check2: WorkflowStep<AfterAml, AfterAml> = {
+  name: "check2",
+  handler: async (sepaRequest) => {
+    await sleep(1000);
+    return sepaRequest;
+  },
+};
+
+const check3: WorkflowStep<AfterAml, AfterAml> = {
+  name: "check3",
+  handler: async (sepaRequest) => {
+    await sleep(2000);
+    return sepaRequest;
+  },
+};
+
+const clean: WorkflowStep<
+  { check1: AfterAml; check2: AfterAml; check3: AfterAml },
+  AfterAml
+> = {
+  name: "Clean",
+  // handler: async (results) => {
+  handler: async (results: {
+    check1: AfterAml;
+    check2: AfterAml;
+    check3: AfterAml;
+  }) => {
+    await sleep(2000);
+    const test = results as { check1: AfterAml };
+    return test.check1;
+  },
+};
+
 const createSepaTransfer: WorkflowStep<AfterAml, SepaTransfer> = {
   name: "Create SEPA Transfer",
   handler: async (sepaRequest) => {
@@ -121,3 +166,9 @@ type AfterReceiver = SepaPaymentRequest & ReceiverCheck;
 type AfterAml = AfterReceiver & AmlCheck;
 
 main().catch(console.error);
+
+function sleep(ms: number) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms);
+  });
+}
