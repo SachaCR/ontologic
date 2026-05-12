@@ -21,15 +21,14 @@ export class WorkflowNode<
   }
 
   async execute(): Promise<Output> {
+    console.log("STEP:", this.#name);
+
     const entries = await Promise.all(
       Object.entries(this.#children).map(
         async ([name, child]) => [name, await child.execute()] as const,
       ),
     );
     const input = Object.fromEntries(entries) as ChildrenOutputs<Children>;
-
-    console.log("STEP:", this.#name);
-
     return this.#handler(input);
   }
 
