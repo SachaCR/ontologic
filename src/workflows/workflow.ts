@@ -54,30 +54,29 @@ export class WorkflowBuilder<Input> {
     });
   }
 
-  parallelize<
-    const Steps extends readonly {
+  addStepWithSubtasks<
+    const Substasks extends readonly {
       name: string;
       handler: (input: Input) => Promise<unknown>;
     }[],
   >(params: {
     name: string;
-    steps: Steps;
-  }): ComposableWorkflowStep<Input, AggregateOutput<Steps>> {
-    const { name, steps } = params;
+    subtasks: Substasks;
+  }): ComposableWorkflowStep<Input, AggregateOutput<Substasks>> {
+    const { name, subtasks } = params;
 
     return new ComposableWorkflowStep({
       workflowState: this.#state,
       eventEmitter: this.#eventEmitter,
       name: name,
       previousStep: async () => await Promise.resolve(this.#state.input),
-      handler: async (input: Input): Promise<AggregateOutput<Steps>> => {
-        const subtasks = steps.map(defineSubTask);
+      handler: async (input: Input): Promise<AggregateOutput<Substasks>> => {
         const result = await aggregateFunction(
           subtasks,
           input,
           this.#eventEmitter,
         );
-        return result as AggregateOutput<Steps>;
+        return result as AggregateOutput<Substasks>;
       },
     });
   }

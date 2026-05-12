@@ -13,7 +13,7 @@
     "build": "tsc",
     "build:release": "tsc --project tsconfig-release.json",
     "example:sepa": "npx tsx src/examples/workflows/sepaPayment.ts",
-    "example:ll": "npx tsx src/workflows/parallelStep.ts"
+    "example:test": "npx tsx src/examples/workflows/test-scripts.ts"
   },
   "keywords": [
     "DDD",
