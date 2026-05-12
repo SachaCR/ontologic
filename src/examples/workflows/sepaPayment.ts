@@ -4,6 +4,7 @@ import {
   InMemoryWorkflowStateRepository,
   WorkflowBuilder,
   WorkflowStep,
+  defineSubTask,
 } from "../../workflows";
 
 async function main() {
@@ -22,7 +23,10 @@ async function main() {
     .addStep(checkAccountBalance)
     .addStep(checkReceiverIsValid)
     .addStep(checkAmlRisk)
-    .parallelize({ name: "Checks", steps: [check1, check2, check3] })
+    .addStepWithSubtasks({
+      name: "Checks",
+      subtasks: [check1, check2, check3],
+    })
     .addStep(clean)
     .addStep(createSepaTransfer);
 
@@ -82,29 +86,29 @@ const checkAmlRisk: WorkflowStep<AfterReceiver, AfterAml> = {
   },
 };
 
-const check1: WorkflowStep<AfterAml, AfterAml> = {
+const check1 = defineSubTask({
   name: "check1",
-  handler: async (sepaRequest) => {
+  handler: async (sepaRequest: AfterAml) => {
     await sleep(3000);
     return sepaRequest;
   },
-};
+});
 
-const check2: WorkflowStep<AfterAml, AfterAml> = {
+const check2 = defineSubTask({
   name: "check2",
-  handler: async (sepaRequest) => {
+  handler: async (sepaRequest: AfterAml) => {
     await sleep(1000);
     return sepaRequest;
   },
-};
+});
 
-const check3: WorkflowStep<AfterAml, AfterAml> = {
+const check3 = defineSubTask({
   name: "check3",
-  handler: async (sepaRequest) => {
+  handler: async (sepaRequest: AfterAml) => {
     await sleep(2000);
     return sepaRequest;
   },
-};
+});
 
 const clean: WorkflowStep<
   { check1: AfterAml; check2: AfterAml; check3: AfterAml },

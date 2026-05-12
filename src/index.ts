@@ -8,3 +8,4 @@ export * from "./event-bus";
 export * from "./messageRelay";
 export * from "./inMemoryRepository";
 export * from "./switchGuard";
+export * from "./workflows";
