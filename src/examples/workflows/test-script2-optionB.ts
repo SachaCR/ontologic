@@ -1,44 +1,43 @@
+import { randomUUID } from "node:crypto";
 import { WorkflowStateRepository } from "../../workflows";
+import { WorkflowState } from "../../workflows/workflow";
 
 type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
   [K in keyof C]: C[K] extends WorkflowNode<any, infer O> ? O : never;
 };
 
-interface WorkflowContext {
-  stepResults: Map<string, unknown>;
-  error: Error | undefined;
-}
-
 export class Workflow<Input, Output> {
-  #name: string;
-  #input: Input;
   #repository: WorkflowStateRepository;
   #rootNode: WorkflowNode<any, Output> | undefined;
-  #context: WorkflowContext;
+  #state: WorkflowState<Input>;
 
   constructor(params: {
+    id: string;
     input: Input;
     name: string;
     repository: WorkflowStateRepository;
   }) {
-    const { name, input, repository } = params;
-    this.#name = name;
+    const { id, name, input, repository } = params;
     this.#repository = repository;
-    this.#input = input;
-    this.#context = {
+
+    this.#state = {
+      id,
+      name,
+      input,
+      status: "TODO",
       stepResults: new Map<string, unknown>(),
       error: undefined,
     };
   }
 
-  get context(): WorkflowContext {
-    return this.#context;
+  get state(): WorkflowState<Input> {
+    return this.#state;
   }
 
   build(builder: (input: Input) => WorkflowNode<any, Output>): void {
-    this.#rootNode = builder(this.#input);
+    this.#rootNode = builder(this.#state.input);
 
-    this.#rootNode.setContext(this.#context);
+    this.#rootNode.setContext(this.#state);
 
     this.#rootNode.onChanges((event) => {
       switch (event.status) {
@@ -63,23 +62,14 @@ export class Workflow<Input, Output> {
     }
 
     const output = await this.#rootNode.execute();
-    await this.#repository.save({
-      id: "",
-      name: this.name,
-      input: this.#input,
-      stepResults: this.#context.stepResults,
-      error: {
-        step: this.name,
-        name: this.#context.error?.name || "",
-        error: this.#context.error?.message || "",
-      },
-      status: "DONE",
-    });
+
+    await this.#repository.save(this.#state);
+
     return output;
   }
 
   get name(): string {
-    return this.#name;
+    return this.#state.name;
   }
 }
 
@@ -90,7 +80,7 @@ export class WorkflowNode<
   #name: string;
   #children: Children;
   #handler: (input: ChildrenOutputs<Children>) => Promise<Output>;
-  #context: WorkflowContext;
+  #context: WorkflowState<unknown>;
 
   #onChanges: (
     event:
@@ -109,7 +99,12 @@ export class WorkflowNode<
     this.#handler = params.handler;
     this.#onChanges = () => {};
     this.#context = {
+      // Set a default context
+      id: randomUUID(),
+      name: this.name,
+      status: "TODO",
       stepResults: new Map<string, unknown>(),
+      input: {},
       error: undefined,
     };
   }
@@ -129,11 +124,11 @@ export class WorkflowNode<
     });
   }
 
-  setContext(context: WorkflowContext): void {
+  setContext(context: WorkflowState<unknown>): void {
     this.#context = context;
 
     Object.entries(this.#children).map(async ([_name, child]) => {
-      child.setContext(this.#context);
+      child.setContext(context);
     });
   }
 
@@ -151,14 +146,48 @@ export class WorkflowNode<
     const input = Object.fromEntries(entries) as ChildrenOutputs<Children>;
 
     this.#onChanges({ step: this.#name, status: "START" });
+    try {
+      const output = await this.#handler(input);
 
-    const output = await this.#handler(input);
+      this.#context.status = "DONE";
+      this.#context.stepResults.set(this.#name, output);
 
-    this.#onChanges({ step: this.#name, status: "DONE", result: output });
+      this.#onChanges({ step: this.#name, status: "DONE", result: output });
 
-    this.#context.stepResults.set(this.#name, output);
+      return output;
+    } catch (err: unknown) {
+      const error: Error = this.#handleError(err);
+      throw error;
+    }
+  }
 
-    return output;
+  #handleError(err: unknown): Error {
+    let message = "unknown error";
+    let name = "Unknown Error";
+
+    if (err instanceof Error) {
+      message = err.message;
+      name = err.name;
+    }
+
+    const error = new Error(
+      `Step: ${this.#name} failed with: ${name} ${message}`,
+      {
+        cause: err,
+      },
+    );
+
+    this.#context.status = "FAILED";
+
+    this.#context.error = {
+      step: this.#name,
+      error: error.message,
+      name: error.name,
+    };
+
+    this.#onChanges({ step: this.#name, status: "FAILED", error });
+
+    return error;
   }
 
   toTree(): string {
