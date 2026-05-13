@@ -1,5 +1,8 @@
 import { randomUUID } from "node:crypto";
-import { WorkflowStateRepository } from "../../workflows";
+import {
+  InMemoryWorkflowStateRepository,
+  WorkflowStateRepository,
+} from "../../workflows";
 import { WorkflowState } from "../../workflows/workflow";
 
 type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
@@ -8,7 +11,7 @@ type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
 
 export class Workflow<Input, Output> {
   #repository: WorkflowStateRepository;
-  #rootNode: WorkflowNode<any, Output> | undefined;
+  #rootNode: WorkflowNode<any, any> | undefined;
   #state: WorkflowState<Input>;
 
   constructor(params: {
@@ -34,26 +37,10 @@ export class Workflow<Input, Output> {
     return this.#state;
   }
 
-  build(builder: (input: Input) => WorkflowNode<any, Output>): void {
+  protected build(builder: (input: Input) => WorkflowNode<any, Output>): void {
     this.#rootNode = builder(this.#state.input);
 
     this.#rootNode.setContext(this.#state);
-
-    this.#rootNode.onChanges((event) => {
-      switch (event.status) {
-        case "DONE":
-          console.log({ step: event.step, status: event.status });
-          break;
-
-        case "FAILED":
-          console.log({ step: event.step, status: event.status });
-          break;
-
-        case "START":
-          console.log(event);
-          break;
-      }
-    });
   }
 
   async execute() {
@@ -65,7 +52,22 @@ export class Workflow<Input, Output> {
 
     await this.#repository.save(this.#state);
 
-    return output;
+    return output as Output;
+  }
+
+  onChanges(
+    handler: (
+      event:
+        | { step: string; status: "START" }
+        | { step: string; status: "DONE"; result: Output }
+        | { step: string; status: "FAILED"; error: Error },
+    ) => void,
+  ) {
+    this.#rootNode?.onChanges(handler);
+  }
+
+  toTree(): void {
+    console.log(this.#rootNode?.toTree());
   }
 
   get name(): string {
@@ -146,6 +148,7 @@ export class WorkflowNode<
     const input = Object.fromEntries(entries) as ChildrenOutputs<Children>;
 
     this.#onChanges({ step: this.#name, status: "START" });
+
     try {
       const output = await this.#handler(input);
 
@@ -286,7 +289,7 @@ function buildMyWorkflow(inputs: {
   const uppercase = new WorkflowNode({
     name: "Uppercase",
     children: { combined, hello },
-    handler: async (input) => {
+    handler: async (input): Promise<string> => {
       await sleep(2000);
       return Promise.resolve(
         input.hello.message.toUpperCase() +
@@ -299,23 +302,56 @@ function buildMyWorkflow(inputs: {
   return uppercase;
 }
 
+class MyWorkflow extends Workflow<
+  {
+    url: string;
+    greeting: string;
+    data: number[];
+    name: string;
+  },
+  string
+> {
+  constructor(params: {
+    id: string;
+    input: {
+      url: string;
+      greeting: string;
+      data: number[];
+      name: string;
+    };
+    repository?: WorkflowStateRepository;
+  }) {
+    const repo = params.repository
+      ? params.repository
+      : new InMemoryWorkflowStateRepository();
+
+    super({ ...params, name: "My Workflow", repository: repo });
+
+    this.build(buildMyWorkflow);
+  }
+}
+
 async function run() {
-  const myWorkflow = buildMyWorkflow({
-    url: "https://ontologic.site",
-    greeting: "Hello",
-    data: [1, 2, 3, 4, 5],
-    name: "Alpha",
+  const repository = new InMemoryWorkflowStateRepository();
+
+  const myWorkflow = new MyWorkflow({
+    id: "123",
+    input: {
+      url: "https://ontologic.site",
+      greeting: "Hello",
+      data: [1, 2, 3, 4, 5],
+      name: "Alpha",
+    },
+    repository,
   });
 
   myWorkflow.onChanges((event) => {
     switch (event.status) {
       case "DONE":
-        event.result;
         console.log({ step: event.step, status: event.status });
         break;
 
       case "FAILED":
-        event.error;
         console.log({ step: event.step, status: event.status });
         break;
 
@@ -325,13 +361,14 @@ async function run() {
     }
   });
 
-  console.log(myWorkflow.toTree());
+  myWorkflow.toTree();
 
   console.log();
 
   const result = await myWorkflow.execute();
 
   console.log("RESULT:", result);
+  console.log(await repository.getById("123"));
 }
 
 run().catch(console.error);

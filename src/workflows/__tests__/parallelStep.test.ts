@@ -9,7 +9,7 @@ describe("Workflow with parallel steps", () => {
       id: randomUUID(),
       name: "workflow",
       input: 4,
-    }).parallelize({
+    }).addStepWithSubtasks({
       name: "parallel",
       steps: [
         { name: "increment", handler: async (n: number) => n + 1 },
@@ -42,7 +42,7 @@ describe("Workflow with parallel steps", () => {
       id: randomUUID(),
       name: "workflow",
       input: 4,
-    }).parallelize({
+    }).addStepWithSubtasks({
       name: "parallel",
       steps: [
         { name: "first", handler: first },
@@ -63,7 +63,7 @@ describe("Workflow with parallel steps", () => {
       name: "workflow",
       input: 4,
     })
-      .parallelize({
+      .addStepWithSubtasks({
         name: "parallel",
         steps: [
           { name: "increment", handler: async (n: number) => n + 1 },
@@ -90,7 +90,7 @@ describe("Workflow with parallel steps", () => {
         name: "double",
         handler: async (n) => n * 2,
       })
-      .parallelize({
+      .addStepWithSubtasks({
         name: "parallel",
         steps: [
           { name: "increment", handler: async (n: number) => n + 1 },
@@ -116,7 +116,7 @@ describe("Workflow with parallel steps", () => {
       name: "workflow",
       input: 4,
       stepResult,
-    }).parallelize({
+    }).addStepWithSubtasks({
       name: "parallel",
       steps: [
         { name: "increment", handler: increment },
@@ -138,7 +138,7 @@ describe("Workflow with parallel steps", () => {
       id: randomUUID(),
       name: "workflow",
       input: 4,
-    }).parallelize({
+    }).addStepWithSubtasks({
       name: "parallel",
       steps: [
         { name: "ok", handler: async (n: number) => n + 1 },

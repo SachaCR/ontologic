@@ -1,10 +1,7 @@
 import { EventEmitter } from "node:events";
-import {
-  aggregateFunction,
-  AggregateOutput,
-  defineSubTask,
-} from "./parallelStep";
-import { WorkflowState } from "./workflow";
+import { aggregateFunction, AggregateOutput } from "./parallelStep";
+import { WorkflowState } from "../interfaces";
+import { WorkflowStateRepository } from "../repository/interfaces";
 
 export class ComposableWorkflowStep<Input, Output> {
   #name: string;
@@ -170,8 +167,3 @@ export class ComposableWorkflowStep<Input, Output> {
 export type StepHandler<Input, Output> = (input: Input) => Promise<Output>;
 
 export type PreviousStepHandler<Output> = () => Promise<Output>;
-
-export interface WorkflowStateRepository {
-  save: (state: WorkflowState<unknown>) => Promise<void>;
-  getById: (id: string) => Promise<WorkflowState<unknown> | undefined>;
-}
