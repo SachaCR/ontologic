@@ -1,6 +1,6 @@
 import { WorkflowState } from "../interfaces";
 import { WorkflowStateRepository } from "../repository/interfaces";
-import { WorkflowNode } from "./workflowNode";
+import { Node, WorkflowNode } from "./workflowNode";
 
 export class GraphWorkflow<Input, Output> {
   #repository: WorkflowStateRepository;
@@ -59,8 +59,15 @@ export class GraphWorkflow<Input, Output> {
     this.#rootNode?.onChanges(handler);
   }
 
-  toTree(): string {
-    return this.#rootNode?.toTree() || "";
+  getGraph(): Node | undefined {
+    const child = this.#rootNode?.getGraph();
+    const childs = [];
+
+    if (child) {
+      childs.push(child);
+    }
+
+    return { name: this.name, childs };
   }
 
   get name(): string {

@@ -1,6 +1,7 @@
 import {
   GraphWorkflow,
   InMemoryWorkflowStateRepository,
+  Node,
   WorkflowNode,
   WorkflowStateRepository,
 } from "../../workflows";
@@ -127,7 +128,10 @@ async function run() {
     }
   });
 
-  console.log(myWorkflow.toTree());
+  const graph = myWorkflow.getGraph();
+  if (graph) {
+    console.log(renderGraph(graph));
+  }
 
   const result = await myWorkflow.execute();
 
@@ -141,4 +145,28 @@ function sleep(ms: number) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms);
   });
+}
+
+function renderGraph(
+  node: Node,
+  prefix = "",
+  isLast = true,
+  isRoot = true,
+): string {
+  const branch = isRoot ? "" : isLast ? "└── " : "├── ";
+  const lines = [prefix + branch + node.name];
+  const childPrefix = prefix + (isRoot ? "" : isLast ? "    " : "│   ");
+
+  node.childs.forEach((child, i) => {
+    lines.push(
+      renderGraph(
+        child,
+        childPrefix,
+        i === node.childs.length - 1,
+        false,
+      ),
+    );
+  });
+
+  return lines.join("\n");
 }
