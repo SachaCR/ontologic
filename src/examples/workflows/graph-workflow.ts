@@ -17,6 +17,7 @@ class MyWorkflow extends GraphWorkflow<MyWorkflowInputs, string> {
     id: string;
     input: MyWorkflowInputs;
     repository?: WorkflowStateRepository;
+    stepResults?: Map<string, unknown>;
   }) {
     const repo = params.repository
       ? params.repository
@@ -111,32 +112,44 @@ async function run() {
     repository,
   });
 
-  myWorkflow.onChanges((event) => {
-    switch (event.status) {
-      case "DONE":
-        console.log({ step: event.step, status: event.status });
-        break;
+  myWorkflow.onChanges(() => {
+    // Clear screen + move cursor to home so the tree redraws in place.
+    process.stdout.write("\x1b[2J\x1b[H");
+    const graph = myWorkflow.getGraph();
 
-      case "FAILED":
-        console.log({ step: event.step, status: event.status });
-        break;
-
-      case "IN_PROGRESS":
-        console.log(event);
-        break;
-    }
+    console.log(graph.toString({ style: "thin", color: true }));
   });
-
-  const graph = myWorkflow.getGraph();
-
-  if (graph) {
-    console.log(graph.toString({ style: "heavy" }));
-  }
 
   const result = await myWorkflow.execute();
 
   console.log("RESULT:", result);
   console.log(await repository.getById("123"));
+
+  // Simulate a retry
+  const previousRunResults = myWorkflow.state.stepResults;
+  const previousRunInputs = myWorkflow.state.input;
+
+  const myWorkflowRetry = new MyWorkflow({
+    id: "123",
+    stepResults: previousRunResults, // Pass previous run results
+    input: previousRunInputs, // Pass previoud run inputs
+    repository,
+  });
+
+  myWorkflowRetry.onChanges(() => {
+    // Clear screen + move cursor to home so the tree redraws in place.
+    process.stdout.write("\x1b[2J\x1b[H");
+    const graph = myWorkflowRetry.getGraph();
+
+    console.log(graph.toString({ style: "heavy", color: true }));
+  });
+
+  console.log("WILL RETRY IN 3 scd");
+  await sleep(3000);
+
+  const result2 = await myWorkflowRetry.execute();
+
+  console.log("RESULT 2:", result2);
 }
 
 function sleep(ms: number) {

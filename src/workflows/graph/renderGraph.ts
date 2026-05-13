@@ -13,6 +13,7 @@ export type RenderTreeOptions = {
   indent?: number; // characters between sibling columns (min 2, default 4)
   verticalSpace?: boolean; // add a skeleton row before each child (default true)
   style?: TreeStyle; // glyph set (default "thin")
+  color?: boolean; // colorize node names by status (default false)
 };
 
 type Glyphs = { tee: string; ell: string; pipe: string; dash: string };
@@ -22,10 +23,19 @@ const GLYPH_SETS: Record<TreeStyle, Glyphs> = {
   heavy: { tee: "┣", ell: "┗", pipe: "┃", dash: "━" },
 };
 
+const ANSI_RESET = "\x1b[0m";
+const ANSI_BY_STATUS: Record<WorkflowStatus, string> = {
+  TODO: "\x1b[90m", // gray
+  IN_PROGRESS: "\x1b[38;5;208m", // orange (256-color)
+  DONE: "\x1b[32m", // green
+  FAILED: "\x1b[31m", // red
+};
+
 type ResolvedOptions = {
   indent: number;
   verticalSpace: boolean;
   glyphs: Glyphs;
+  color: boolean;
 };
 
 export function renderGraph(
@@ -36,6 +46,7 @@ export function renderGraph(
     indent: Math.max(2, options.indent ?? 4),
     verticalSpace: options.verticalSpace ?? true,
     glyphs: GLYPH_SETS[options.style ?? "thin"],
+    color: options.color ?? false,
   };
 
   return renderTree(graph, "", true, true, resolved);
@@ -53,7 +64,10 @@ function renderTree(
   const branch = isRoot
     ? ""
     : (isLast ? glyphs.ell : glyphs.tee) + dashes + " ";
-  const lines = [prefix + branch + graph.name];
+  const name = opts.color
+    ? `${ANSI_BY_STATUS[graph.status]}${graph.name}${ANSI_RESET}`
+    : graph.name;
+  const lines = [prefix + branch + name];
 
   const childPrefix =
     prefix +
