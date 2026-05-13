@@ -71,6 +71,9 @@ export class WorkflowNode<
     this.#context.status = "IN_PROGRESS";
 
     if (this.#context.stepResults.has(this.#name)) {
+      this.#status = "DONE";
+      this.#onChanges({ step: this.#name, status: "DONE" });
+
       return this.#context.stepResults.get(this.#name) as Output;
     }
 
@@ -117,7 +120,10 @@ export class WorkflowNode<
       },
     );
 
+    // Mark the workflow as failed
     this.#context.status = "FAILED";
+
+    // Mark this node as failed
     this.#status = "FAILED";
 
     this.#context.error = {

@@ -7,22 +7,30 @@ export class GraphWorkflow<Input, Output> {
   #repository: WorkflowStateRepository;
   #rootNode: WorkflowNode<any, any> | undefined;
   #state: WorkflowState<Input>;
+  #onChangesHandler: (
+    event:
+      | { step: string; status: "IN_PROGRESS" }
+      | { step: string; status: "DONE" }
+      | { step: string; status: "FAILED"; error: Error },
+  ) => void;
 
   constructor(params: {
     id: string;
     input: Input;
     name: string;
     repository: WorkflowStateRepository;
+    stepResults?: Map<string, unknown>;
   }) {
-    const { id, name, input, repository } = params;
+    const { id, name, input, repository, stepResults } = params;
     this.#repository = repository;
+    this.#onChangesHandler = () => {};
 
     this.#state = {
       id,
       name,
       input,
       status: "TODO",
-      stepResults: new Map<string, unknown>(),
+      stepResults: stepResults ? stepResults : new Map<string, unknown>(),
       error: undefined,
     };
   }
@@ -46,6 +54,7 @@ export class GraphWorkflow<Input, Output> {
 
     if (this.#state.status !== "FAILED") {
       this.#state.status = "DONE";
+      this.#onChangesHandler({ step: this.name, status: this.#state.status });
     }
 
     await this.#repository.save(this.#state);
@@ -61,6 +70,7 @@ export class GraphWorkflow<Input, Output> {
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
   ) {
+    this.#onChangesHandler = handler;
     this.#rootNode?.onChanges(handler);
   }
 
