@@ -147,19 +147,82 @@ type ConceptSectionProps = {
   codeTitle: string;
   accent: string;
   reverse?: boolean;
-  outboxSection?: boolean;
   hasBackground?: boolean;
 };
 
-function SectionDivider({ title }: { title: string }) {
+function SectionDivider({ title, id }: { title: string; id?: string }) {
   return (
     <div className={styles.sectionDivider}>
       <div className="container">
-        <Heading as="h2" className={styles.sectionDividerTitle}>
+        <Heading as="h2" id={id} className={styles.sectionDividerTitle}>
           {title}
         </Heading>
       </div>
     </div>
+  );
+}
+
+type ThemeCard = {
+  id: string;
+  tag: string;
+  accent: string;
+  title: string;
+  description: string;
+  anchor: string;
+};
+
+const themeCards: ThemeCard[] = [
+  {
+    id: "theme-domain-model",
+    tag: "Domain Model",
+    accent: "#6366f1",
+    title: "Model your business rules",
+    description:
+      "Entities, events, invariants and the Result pattern — primitives that keep your domain logic explicit, protected, and easy to test.",
+    anchor: "#domain-model",
+  },
+  {
+    id: "theme-event-bus",
+    tag: "Event Bus",
+    accent: "#8b5cf6",
+    title: "Deliver every event",
+    description:
+      "Built-in outbox pattern, pluggable connectors for any broker, and a message relay that resumes after crashes without losing or duplicating events.",
+    anchor: "#event-bus-builtin",
+  },
+  {
+    id: "theme-workflows",
+    tag: "Workflows",
+    accent: "#22c55e",
+    title: "Orchestrate multi-step processes",
+    description:
+      "Step-by-step chains for linear pipelines and graph workflows for parallel branches — both typed end to end and resumable after failure.",
+    anchor: "#workflows",
+  },
+];
+
+function ThemeOverview() {
+  return (
+    <section className={styles.themeOverview}>
+      <div className="container">
+        <div className={styles.themeGrid}>
+          {themeCards.map((card) => (
+            <Link
+              key={card.id}
+              to={card.anchor}
+              className={styles.themeCard}
+              style={{ "--accent": card.accent } as React.CSSProperties}
+            >
+              <span className={styles.themeCardTag}>{card.tag}</span>
+              <Heading as="h3" className={styles.themeCardTitle}>
+                {card.title}
+              </Heading>
+              <p className={styles.themeCardDescription}>{card.description}</p>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -216,7 +279,7 @@ function ConceptSection({
   );
 }
 
-const conceptSections: ConceptSectionProps[] = [
+const domainModelSections: ConceptSectionProps[] = [
   {
     id: "domain-entities",
     tag: "Domain Entity",
@@ -405,47 +468,13 @@ const repository = new BankAccountRepository();
 // Entity state and event saved atomically
 await repository.saveWithEvents(account, result.value);`,
   },
-  {
-    id: "workflows",
-    tag: "Workflows",
-    accent: "#22c55e",
-    title: "Multi-step processes, type-checked end to end",
-    description: (
-      <>
-        <p>
-          A Workflow orchestrates typed steps into a resumable process. Pick a
-          step-by-step chain for linear pipelines, or a graph for processes
-          where steps fan out and combine results in parallel. Both are checked
-          end to end by the type system.
-        </p>
-        <p>
-          Plug in a repository and the state is persisted in any case. A crashed
-          run resumes exactly where it left off, with no re-execution of work
-          that already succeeded.
-        </p>
-      </>
-    ),
-    link: "/docs/workflows",
-    linkLabel: "Learn about Workflows",
-    codeTitle: "sepa-payment.workflow.ts",
-    code: `const workflow = new WorkflowBuilder<SepaPaymentRequest>({
-  id: randomUUID(),
-  name: "SEPA Payment",
-  input: { accountId, receiverIban, amount },
-})
-  .addStep(checkAccountBalance)
-  .addStep(checkReceiverIsValid)
-  .addStep(checkAmlRisk)
-  .addStep(createSepaTransfer);
+];
 
-// Persist the state, resume after a crash
-const transfer = await workflow.execute(repository);`,
-  },
+const eventBusSections: ConceptSectionProps[] = [
   {
     id: "event-bus",
     tag: "Event Bus",
     accent: "#8b5cf6",
-    outboxSection: true,
     title: "Deliver events to your system",
     description: (
       <>
@@ -517,6 +546,115 @@ repository.onChanges(relay.handler);`,
   },
 ];
 
+const workflowSections: ConceptSectionProps[] = [
+  {
+    id: "step-workflow",
+    tag: "Step Workflow",
+    accent: "#22c55e",
+    title: "Linear chains, type-checked end to end",
+    description: (
+      <>
+        <p>
+          A Step Workflow threads typed steps into a sequential pipeline. Each
+          step's output flows into the next step's input, and the type system
+          enforces the order — reordering the chain is a compile error.
+        </p>
+        <p>
+          Plug in a repository and the state is persisted in any case. A
+          crashed run resumes exactly where it left off, with no re-execution
+          of work that already succeeded.
+        </p>
+      </>
+    ),
+    link: "/docs/workflows/step-workflow",
+    linkLabel: "Learn about Step Workflows",
+    codeTitle: "step-workflow.ts",
+    code: `const workflow = new WorkflowBuilder<SepaPaymentRequest>({
+  id: randomUUID(),
+  name: "SEPA Payment",
+  input: { accountId, receiverIban, amount },
+})
+  .addStep(checkAccountBalance)
+  .addStep(checkReceiverIsValid)
+  .addStep(checkAmlRisk)
+  .addStep(createSepaTransfer);
+
+// Persist the state, resume after a crash
+const transfer = await workflow.execute(repository);`,
+  },
+  {
+    id: "graph-workflow",
+    tag: "Graph Workflow",
+    accent: "#22c55e",
+    title: "Parallel branches, combined by name",
+    description: (
+      <>
+        <p>
+          A Graph Workflow is a DAG of nodes. Each node names its children,
+          runs them concurrently, and receives their outputs as a typed record
+          — the dependency structure lives in the code rather than in your
+          head.
+        </p>
+        <p>
+          Same observability, persistence, and resume guarantees as the step
+          flavor. A crashed run skips any node whose result is already cached
+          and re-runs only what's missing.
+        </p>
+      </>
+    ),
+    link: "/docs/workflows/graph-workflow",
+    linkLabel: "Learn about Graph Workflows",
+    codeTitle: "graph-workflow.ts",
+    code: `class SepaWorkflow extends GraphWorkflow<Inputs, Transfer> {
+  constructor(params: { id: string; input: Inputs }) {
+    super({ ...params, name: "SEPA", repository });
+    this.build((input) => this.#root(input));
+  }
+
+  #root(input: Inputs) {
+    const balance = new WorkflowNode({
+      name: "Check Balance", children: {},
+      handler: async () => ({ ok: input.amount <= 3000 }),
+    });
+    const aml = new WorkflowNode({
+      name: "AML Check", children: {},
+      handler: async () => ({ score: 0.12 }),
+    });
+    return new WorkflowNode({
+      name: "Create Transfer",
+      children: { balance, aml },
+      handler: async ({ balance, aml }) =>
+        buildTransfer(input, balance, aml),
+    });
+  }
+}`,
+  },
+];
+
+function EventBusBanner() {
+  return (
+    <div className={styles.videoSection}>
+      <div className="container">
+        <Heading
+          as="h2"
+          id="event-bus-builtin"
+          className={styles.sectionDividerTitle}
+        >
+          Built-In Event Bus
+        </Heading>
+        <p className={styles.videoSectionSubtitle}>
+          (powered by outbox pattern)
+        </p>
+        <div className={styles.videoWrapper}>
+          <video controls width="30%" loop autoPlay>
+            <source src="/videos/MessageRelay.mp4" />
+          </video>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
   return (
@@ -526,35 +664,35 @@ export default function Home(): ReactNode {
     >
       <HomepageHeader />
       <main>
-        {conceptSections.map((section, idx) => (
-          <>
-            {section.outboxSection && (
-              <div>
-                <div className={styles.videoSection}>
-                  <div className="container">
-                    <Heading
-                      as="h2"
-                      id="outbox-pattern"
-                      className={styles.sectionDividerTitle}
-                    >
-                      Built-in Outbox Pattern
-                    </Heading>
-                    <div className={styles.videoWrapper}>
-                      <video controls width="30%" loop autoPlay>
-                        <source src="/videos/MessageRelay.mp4" />
-                      </video>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-            <ConceptSection
-              key={idx}
-              {...section}
-              reverse={idx % 2 === 1}
-              hasBackground={idx % 2 === 1}
-            />
-          </>
+        <ThemeOverview />
+        <SectionDivider title="Domain Model" id="domain-model" />
+        {domainModelSections.map((section, idx) => (
+          <ConceptSection
+            key={section.id}
+            {...section}
+            reverse={idx % 2 === 1}
+            hasBackground={idx % 2 === 1}
+          />
+        ))}
+
+        <EventBusBanner />
+        {eventBusSections.map((section, idx) => (
+          <ConceptSection
+            key={section.id}
+            {...section}
+            reverse={idx % 2 === 1}
+            hasBackground={idx % 2 === 1}
+          />
+        ))}
+
+        <SectionDivider title="Workflows" id="workflows" />
+        {workflowSections.map((section, idx) => (
+          <ConceptSection
+            key={section.id}
+            {...section}
+            reverse={idx % 2 === 1}
+            hasBackground={idx % 2 === 1}
+          />
         ))}
       </main>
     </Layout>

@@ -166,7 +166,7 @@
 }
 
 .videoSection .sectionDividerTitle {
-  margin-bottom: 2rem;
+  margin-bottom: 0.5rem;
 }
 
 .videoWrapper {
@@ -256,4 +256,83 @@
 
 .conceptCode > div {
   margin: 0 !important;
+}
+
+.themeOverview {
+  padding: 4rem 0 3rem;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.themeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+@media screen and (max-width: 996px) {
+  .themeGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.themeCard {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-radius: 12px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-toc-border-color);
+  border-top: 3px solid var(--accent);
+  text-decoration: none;
+  color: inherit;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    border-color 0.18s ease;
+}
+
+.themeCard:hover,
+.themeCard:focus-visible {
+  transform: translateY(-4px);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.16);
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+  text-decoration: none;
+  color: inherit;
+}
+
+.themeCardTag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+}
+
+.themeCardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+}
+
+.themeCardDescription {
+  color: var(--ifm-color-content-secondary);
+  line-height: 1.6;
+  margin: 0;
+  font-size: 0.95rem;
+}
+
+.videoSectionSubtitle {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 1.05rem;
+  font-style: italic;
+  margin-top: -0.75rem;
+  margin-bottom: 2rem;
 }
