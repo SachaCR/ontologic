@@ -4,6 +4,12 @@
  * work well for content-centric websites.
  */
 
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
 :root {
   --ifm-color-primary: #4f46e5;
   --ifm-color-primary-dark: #4338ca;

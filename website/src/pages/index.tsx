@@ -187,7 +187,7 @@ const themeCards: ThemeCard[] = [
     accent: "#6366f1",
     title: "Model your business rules",
     description:
-      "Entities, events, invariants and the Result pattern — primitives that keep your domain logic explicit, protected, and easy to test.",
+      "Entities, events, invariants and the Result pattern are primitives that keep your domain logic explicit, protected, and easy to test.",
     anchor: "#domain-model",
   },
   {
@@ -196,7 +196,7 @@ const themeCards: ThemeCard[] = [
     accent: "#8b5cf6",
     title: "Deliver every event",
     description:
-      "Built-in outbox pattern, pluggable connectors for any broker, and a message relay that resumes after crashes without losing or duplicating events.",
+      "Built-in outbox pattern, pluggable connectors for any broker, and a message relay that resumes after crashes without losing events.",
     anchor: "#event-bus-builtin",
   },
   {
@@ -205,17 +205,27 @@ const themeCards: ThemeCard[] = [
     accent: "#22c55e",
     title: "Orchestrate multi-step processes",
     description:
-      "Step-by-step chains for linear pipelines and graph workflows for parallel branches — both typed end to end and resumable after failure.",
+      "Step-by-step workflows for linear pipelines and graph workflows for parallel branches. Both typed end to end and resumable after failure.",
     anchor: "#workflows",
   },
 ];
 
 function ScrollSeparator() {
+  const handleScrollDown = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const target = document.getElementById("domain-model");
+    if (target) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      history.pushState(null, "", "#domain-model");
+    }
+  };
+
   return (
     <div className={styles.scrollSeparator}>
       <span className={styles.scrollSeparatorLabel}>Discover</span>
-      <Link
-        to="#domain-model"
+      <a
+        href="#domain-model"
+        onClick={handleScrollDown}
         className={styles.scrollSeparatorButton}
         aria-label="Scroll to Domain Model section"
       >
@@ -233,7 +243,7 @@ function ScrollSeparator() {
         >
           <polyline points="6 9 12 15 18 9" />
         </svg>
-      </Link>
+      </a>
     </div>
   );
 }
@@ -593,9 +603,9 @@ const workflowSections: ConceptSectionProps[] = [
           enforces the order — reordering the chain is a compile error.
         </p>
         <p>
-          Plug in a repository and the state is persisted in any case. A
-          crashed run resumes exactly where it left off, with no re-execution
-          of work that already succeeded.
+          Plug in a repository and the state is persisted in any case. A crashed
+          run resumes exactly where it left off, with no re-execution of work
+          that already succeeded.
         </p>
       </>
     ),
@@ -623,10 +633,9 @@ const transfer = await workflow.execute(repository);`,
     description: (
       <>
         <p>
-          A Graph Workflow is a DAG of nodes. Each node names its children,
-          runs them concurrently, and receives their outputs as a typed record
-          — the dependency structure lives in the code rather than in your
-          head.
+          A Graph Workflow is a DAG of nodes. Each node names its children, runs
+          them concurrently, and receives their outputs as a typed record — the
+          dependency structure lives in the code rather than in your head.
         </p>
         <p>
           Same observability, persistence, and resume guarantees as the step
