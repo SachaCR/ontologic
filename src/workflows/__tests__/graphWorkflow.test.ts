@@ -174,7 +174,7 @@ describe("WorkflowNode", () => {
     });
   });
 
-  test("emits START then DONE through onChanges on success", async () => {
+  test("emits IN_PROGRESS then DONE through onChanges on success", async () => {
     const events: Array<{ step: string; status: string }> = [];
 
     const node = new WorkflowNode({
@@ -189,7 +189,7 @@ describe("WorkflowNode", () => {
     await node.execute();
 
     expect(events).toStrictEqual([
-      { step: "ok", status: "START" },
+      { step: "ok", status: "IN_PROGRESS" },
       { step: "ok", status: "DONE" },
     ]);
   });
@@ -244,9 +244,9 @@ describe("WorkflowNode", () => {
 
     await parent.execute();
 
-    expect(events).toContain("child:START");
+    expect(events).toContain("child:IN_PROGRESS");
     expect(events).toContain("child:DONE");
-    expect(events).toContain("parent:START");
+    expect(events).toContain("parent:IN_PROGRESS");
     expect(events).toContain("parent:DONE");
   });
 
@@ -297,14 +297,16 @@ describe("WorkflowNode", () => {
       handler: async () => ({}),
     });
 
-    expect(combine.getGraph()).toStrictEqual({
+    expect(combine.getGraph()).toMatchObject({
       name: "Combine",
+      status: "TODO",
       childs: [
         {
           name: "Sum",
-          childs: [{ name: "Data Source", childs: [] }],
+          status: "TODO",
+          childs: [{ name: "Data Source", status: "TODO", childs: [] }],
         },
-        { name: "Tag", childs: [] },
+        { name: "Tag", status: "TODO", childs: [] },
       ],
     });
   });
@@ -433,17 +435,17 @@ describe("GraphWorkflow", () => {
 
     expect(events).toEqual(
       expect.arrayContaining([
-        "a:START",
+        "a:IN_PROGRESS",
         "a:DONE",
-        "b:START",
+        "b:IN_PROGRESS",
         "b:DONE",
-        "root:START",
+        "root:IN_PROGRESS",
         "root:DONE",
       ]),
     );
   });
 
-  test("getGraph returns the root node's tree", () => {
+  test("getGraph wraps the root node under the workflow name", () => {
     const repository = new InMemoryWorkflowStateRepository();
     const workflow = new TestWorkflow({
       id: randomUUID(),
@@ -451,16 +453,23 @@ describe("GraphWorkflow", () => {
       repository,
     });
 
-    expect(workflow.getGraph()).toStrictEqual({
-      name: "root",
+    expect(workflow.getGraph()).toMatchObject({
+      name: "test",
+      status: "TODO",
       childs: [
-        { name: "a", childs: [] },
-        { name: "b", childs: [] },
+        {
+          name: "root",
+          status: "TODO",
+          childs: [
+            { name: "a", status: "TODO", childs: [] },
+            { name: "b", status: "TODO", childs: [] },
+          ],
+        },
       ],
     });
   });
 
-  test("getGraph returns undefined when no root was built", () => {
+  test("getGraph returns an empty wrapper when no root was built", () => {
     class EmptyWorkflow extends GraphWorkflow<number, number> {
       constructor(params: { repository: WorkflowStateRepository }) {
         super({
@@ -476,6 +485,10 @@ describe("GraphWorkflow", () => {
       repository: new InMemoryWorkflowStateRepository(),
     });
 
-    expect(workflow.getGraph()).toBeUndefined();
+    expect(workflow.getGraph()).toMatchObject({
+      name: "empty",
+      status: "TODO",
+      childs: [],
+    });
   });
 });
