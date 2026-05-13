@@ -11,7 +11,7 @@ type TreeStyle = "thin" | "heavy";
 
 export type RenderTreeOptions = {
   indent?: number; // characters between sibling columns (min 2, default 4)
-  verticalSpace?: boolean; // add a skeleton row before each child (default false)
+  verticalSpace?: boolean; // add a skeleton row before each child (default true)
   style?: TreeStyle; // glyph set (default "thin")
 };
 

@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { describe, test, expect } from "vitest";
 import { InMemoryWorkflowStateRepository } from "../inMemoryWorkflowStateRepository";
-import { WorkflowState } from "../../workflow";
+import { WorkflowState } from "../../interfaces";
 
 function makeState(
   overrides: Partial<WorkflowState<unknown>> = {},
@@ -45,7 +45,7 @@ describe("InMemoryWorkflowStateRepository", () => {
 
     await repository.save(state);
     state.stepResults.set("Step 1", 9);
-    state.error = { step: "Step 1", error: "boom" };
+    state.error = { step: "Step 1", error: "boom", name: "Error" };
 
     const loaded = await repository.getById(state.id);
 

@@ -11,7 +11,7 @@ describe("Workflow with parallel steps", () => {
       input: 4,
     }).addStepWithSubtasks({
       name: "parallel",
-      steps: [
+      subtasks: [
         { name: "increment", handler: async (n: number) => n + 1 },
         { name: "label", handler: async (n: number) => `n=${n}` },
       ],
@@ -44,7 +44,7 @@ describe("Workflow with parallel steps", () => {
       input: 4,
     }).addStepWithSubtasks({
       name: "parallel",
-      steps: [
+      subtasks: [
         { name: "first", handler: first },
         { name: "second", handler: second },
       ],
@@ -65,7 +65,7 @@ describe("Workflow with parallel steps", () => {
     })
       .addStepWithSubtasks({
         name: "parallel",
-        steps: [
+        subtasks: [
           { name: "increment", handler: async (n: number) => n + 1 },
           { name: "label", handler: async (n: number) => `n=${n}` },
         ],
@@ -92,7 +92,7 @@ describe("Workflow with parallel steps", () => {
       })
       .addStepWithSubtasks({
         name: "parallel",
-        steps: [
+        subtasks: [
           { name: "increment", handler: async (n: number) => n + 1 },
           { name: "label", handler: async (n: number) => `n=${n}` },
         ],
@@ -118,7 +118,7 @@ describe("Workflow with parallel steps", () => {
       stepResult,
     }).addStepWithSubtasks({
       name: "parallel",
-      steps: [
+      subtasks: [
         { name: "increment", handler: increment },
         { name: "label", handler: label },
       ],
@@ -140,7 +140,7 @@ describe("Workflow with parallel steps", () => {
       input: 4,
     }).addStepWithSubtasks({
       name: "parallel",
-      steps: [
+      subtasks: [
         { name: "ok", handler: async (n: number) => n + 1 },
         { name: "fails", handler: () => Promise.reject(original) },
       ],

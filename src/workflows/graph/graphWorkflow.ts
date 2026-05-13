@@ -64,7 +64,7 @@ export class GraphWorkflow<Input, Output> {
     this.#rootNode?.onChanges(handler);
   }
 
-  getGraph(): Graph | undefined {
+  getGraph(): Graph {
     const child = this.#rootNode?.getGraph();
 
     const childs: Graph[] = [];

@@ -68,6 +68,8 @@ export class WorkflowNode<
   }
 
   async execute(): Promise<Output> {
+    this.#context.status = "IN_PROGRESS";
+
     if (this.#context.stepResults.has(this.#name)) {
       return this.#context.stepResults.get(this.#name) as Output;
     }
