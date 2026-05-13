@@ -121,7 +121,7 @@ async function run() {
         console.log({ step: event.step, status: event.status });
         break;
 
-      case "START":
+      case "IN_PROGRESS":
         console.log(event);
         break;
     }
