@@ -4,6 +4,10 @@ sidebar_position: 1
 
 # Workflows
 
+:::warning
+This part of the documentation has been AI generated and I haven't reviewed it yet. So please be kind if you find mistakes or inconsistencies. I'll remove this warning once I've reviewed this page.
+:::
+
 Some business operations cannot fit in a single method. A SEPA payment is not just a database write — it is a sequence: check the balance, validate the receiver, run an AML screen, reserve the funds, then create the transfer. Other processes look less like a chain and more like a graph: pull user data and order data and inventory data in parallel, then combine the three into a single decision.
 
 `ontologic` ships two flavors of workflow for these two shapes:
@@ -92,12 +96,12 @@ For domain-meaningful cancellations (a balance too low, a receiver flagged as fr
 
 ## Choosing between step and graph
 
-| Question                                                    | Use this                          |
-| ----------------------------------------------------------- | --------------------------------- |
-| Each step depends on exactly one prior step's output        | Step                              |
-| A step occasionally fans out to a fixed set of N tasks      | Step + `addStepWithSubtasks`      |
-| Dependencies form a tree or DAG with branching              | Graph                             |
-| You want to name and reference inputs by child node         | Graph                             |
-| Linear pipeline, no fan-out                                 | Step                              |
+| Question                                               | Use this                     |
+| ------------------------------------------------------ | ---------------------------- |
+| Each step depends on exactly one prior step's output   | Step                         |
+| A step occasionally fans out to a fixed set of N tasks | Step + `addStepWithSubtasks` |
+| Dependencies form a tree or DAG with branching         | Graph                        |
+| You want to name and reference inputs by child node    | Graph                        |
+| Linear pipeline, no fan-out                            | Step                         |
 
-If your process reads naturally as *"do A, then B, then C"*, the [step flavor](./step-workflow.md) matches that shape. If it reads as *"D depends on B and C, which both depend on A"*, the [graph flavor](./graph-workflow.md) lets the dependency structure live in the code rather than in your head.
+If your process reads naturally as _"do A, then B, then C"_, the [step flavor](./step-workflow.md) matches that shape. If it reads as _"D depends on B and C, which both depend on A"_, the [graph flavor](./graph-workflow.md) lets the dependency structure live in the code rather than in your head.
