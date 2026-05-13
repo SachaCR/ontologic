@@ -123,37 +123,19 @@ export class WorkflowNode<
     return error;
   }
 
-  toTree(): string {
-    return this.#renderLines().join("\n");
-  }
-
-  #renderLines(): string[] {
-    const lines: string[] = [this.#name];
-    const entries = Object.entries(this.#children) as [
-      string,
-      WorkflowNode<any, any>,
-    ][];
-
-    entries.forEach(([_key, child], i) => {
-      const isLast = i === entries.length - 1;
-      const branch = isLast ? "└── " : "├── ";
-      const cont = isLast ? "    " : "│   ";
-
-      const childLines = child.#renderLines();
-
-      childLines.forEach((line, j) => {
-        if (j === 0) {
-          lines.push(`${branch}${line}`);
-        } else {
-          lines.push(`${cont}${line}`);
-        }
-      });
-    });
-
-    return lines;
+  getGraph(): Node {
+    return {
+      name: this.#name,
+      childs: Object.values(this.#children).map((child) => child.getGraph()),
+    };
   }
 
   get name(): string {
     return this.#name;
   }
 }
+
+export type Node = {
+  name: string;
+  childs: Node[];
+};

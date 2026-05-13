@@ -1,9 +1,7 @@
-import { WorkflowStateRepository } from "../composableWorkflowStep";
-import { WorkflowState } from "../workflow";
+import { WorkflowState } from "../interfaces";
+import { WorkflowStateRepository } from "./interfaces";
 
-export class InMemoryWorkflowStateRepository
-  implements WorkflowStateRepository
-{
+export class InMemoryWorkflowStateRepository implements WorkflowStateRepository {
   #states: Map<string, WorkflowState<unknown>>;
 
   constructor() {
