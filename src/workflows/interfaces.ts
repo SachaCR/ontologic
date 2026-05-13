@@ -4,5 +4,7 @@ export interface WorkflowState<Input> {
   input: Input;
   stepResults: Map<string, unknown>;
   error: { step: string; error: string; name: string } | undefined;
-  status: "TODO" | "IN_PROGRESS" | "FAILED" | "DONE";
+  status: WorkflowStatus;
 }
+
+export type WorkflowStatus = "TODO" | "IN_PROGRESS" | "FAILED" | "DONE";

@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { WorkflowState } from "../interfaces";
+import { WorkflowState, WorkflowStatus } from "../interfaces";
+import { Graph, renderGraph, RenderTreeOptions } from "./renderGraph";
 
 type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
   [K in keyof C]: C[K] extends WorkflowNode<any, infer O> ? O : never;
@@ -13,10 +14,11 @@ export class WorkflowNode<
   #children: Children;
   #handler: (input: ChildrenOutputs<Children>) => Promise<Output>;
   #context: WorkflowState<unknown>;
+  #status: WorkflowStatus;
 
   #onChanges: (
     event:
-      | { step: string; status: "START" }
+      | { step: string; status: "IN_PROGRESS" }
       | { step: string; status: "DONE" }
       | { step: string; status: "FAILED"; error: Error },
   ) => void;
@@ -30,6 +32,7 @@ export class WorkflowNode<
     this.#children = params.children;
     this.#handler = params.handler;
     this.#onChanges = () => {};
+    this.#status = "TODO";
     this.#context = {
       // Set a default context
       id: randomUUID(),
@@ -44,7 +47,7 @@ export class WorkflowNode<
   onChanges(
     handler: (
       event:
-        | { step: string; status: "START" }
+        | { step: string; status: "IN_PROGRESS" }
         | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
@@ -77,13 +80,15 @@ export class WorkflowNode<
 
     const input = Object.fromEntries(entries) as ChildrenOutputs<Children>;
 
-    this.#onChanges({ step: this.#name, status: "START" });
+    this.#status = "IN_PROGRESS";
+
+    this.#onChanges({ step: this.#name, status: "IN_PROGRESS" });
 
     try {
       const output = await this.#handler(input);
 
-      this.#context.status = "DONE";
       this.#context.stepResults.set(this.#name, output);
+      this.#status = "DONE";
 
       this.#onChanges({ step: this.#name, status: "DONE" });
 
@@ -111,6 +116,7 @@ export class WorkflowNode<
     );
 
     this.#context.status = "FAILED";
+    this.#status = "FAILED";
 
     this.#context.error = {
       step: this.#name,
@@ -123,10 +129,17 @@ export class WorkflowNode<
     return error;
   }
 
-  getGraph(): Node {
+  getGraph(): Graph {
+    const childs = Object.values(this.#children).map((child) =>
+      child.getGraph(),
+    );
+
     return {
       name: this.#name,
-      childs: Object.values(this.#children).map((child) => child.getGraph()),
+      status: this.#status,
+      childs,
+      toString: (opts?: RenderTreeOptions) =>
+        renderGraph({ name: this.#name, status: this.#status, childs }, opts),
     };
   }
 
@@ -134,8 +147,3 @@ export class WorkflowNode<
     return this.#name;
   }
 }
-
-export type Node = {
-  name: string;
-  childs: Node[];
-};

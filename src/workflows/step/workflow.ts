@@ -77,7 +77,7 @@ export class WorkflowBuilder<Input> {
   onChanges(
     handler: (
       event:
-        | { step: string; status: "START" }
+        | { step: string; status: "IN_PROGRESS" }
         | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,

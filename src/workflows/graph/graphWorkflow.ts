@@ -1,6 +1,7 @@
 import { WorkflowState } from "../interfaces";
 import { WorkflowStateRepository } from "../repository/interfaces";
-import { Node, WorkflowNode } from "./workflowNode";
+import { Graph, renderGraph, RenderTreeOptions } from "./renderGraph";
+import { WorkflowNode } from "./workflowNode";
 
 export class GraphWorkflow<Input, Output> {
   #repository: WorkflowStateRepository;
@@ -43,6 +44,10 @@ export class GraphWorkflow<Input, Output> {
 
     const output = await this.#rootNode.execute();
 
+    if (this.#state.status !== "FAILED") {
+      this.#state.status = "DONE";
+    }
+
     await this.#repository.save(this.#state);
 
     return output as Output;
@@ -51,7 +56,7 @@ export class GraphWorkflow<Input, Output> {
   onChanges(
     handler: (
       event:
-        | { step: string; status: "START" }
+        | { step: string; status: "IN_PROGRESS" }
         | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
@@ -59,15 +64,25 @@ export class GraphWorkflow<Input, Output> {
     this.#rootNode?.onChanges(handler);
   }
 
-  getGraph(): Node | undefined {
+  getGraph(): Graph | undefined {
     const child = this.#rootNode?.getGraph();
-    const childs = [];
+
+    const childs: Graph[] = [];
 
     if (child) {
       childs.push(child);
     }
 
-    return { name: this.name, childs };
+    return {
+      name: this.name,
+      status: this.#state.status,
+      childs,
+      toString: (opts: RenderTreeOptions) =>
+        renderGraph(
+          { name: this.name, status: this.#state.status, childs },
+          opts,
+        ),
+    };
   }
 
   get name(): string {

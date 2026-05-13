@@ -1,2 +1,2 @@
 export { GraphWorkflow } from "./graphWorkflow";
-export { WorkflowNode, type Node } from "./workflowNode";
+export { WorkflowNode } from "./workflowNode";
