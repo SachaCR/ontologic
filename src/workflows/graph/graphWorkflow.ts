@@ -59,8 +59,8 @@ export class GraphWorkflow<Input, Output> {
     this.#rootNode?.onChanges(handler);
   }
 
-  toTree(): void {
-    console.log(this.#rootNode?.toTree());
+  toTree(): string {
+    return this.#rootNode?.toTree() || "";
   }
 
   get name(): string {
