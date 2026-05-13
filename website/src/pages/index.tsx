@@ -707,13 +707,14 @@ const workflowSections: ConceptSectionProps[] = [
     id: "step-workflow",
     tag: "Step Workflow",
     accent: "#22c55e",
-    title: "Linear chains, type-checked end to end",
+    title: "Step by step processes",
     description: (
       <>
         <p>
-          A Step Workflow threads typed steps into a sequential pipeline. Each
-          step's output flows into the next step's input, and the type system
-          enforces the order — reordering the chain is a compile error.
+          A Step by step Workflow threads typed steps into a sequential
+          pipeline. Each step's output flows into the next step's input, and the
+          type system enforces the order, reordering the chain is a compile
+          error.
         </p>
         <p>
           Plug in a repository and the state is persisted in any case. A crashed
@@ -742,17 +743,16 @@ const transfer = await workflow.execute(repository);`,
     id: "graph-workflow",
     tag: "Graph Workflow",
     accent: "#22c55e",
-    title: "Parallel branches, combined by name",
+    title: "Complex Workflow with parallel branches",
     description: (
       <>
         <p>
           A Graph Workflow is a DAG of nodes. Each node names its children, runs
-          them concurrently, and receives their outputs as a typed record — the
-          dependency structure lives in the code rather than in your head.
+          them concurrently, and receives their outputs as a typed record.
         </p>
         <p>
           Same observability, persistence, and resume guarantees as the step
-          flavor. A crashed run skips any node whose result is already cached
+          flavor. A crashed run skips any node whose result is already persisted
           and re-runs only what's missing.
         </p>
       </>
@@ -810,6 +810,23 @@ function EventBusBanner() {
   );
 }
 
+function WorkflowsBanner() {
+  return (
+    <div className={styles.videoSection}>
+      <div className="container">
+        <Heading as="h2" id="workflows" className={styles.sectionDividerTitle}>
+          Workflows
+        </Heading>
+        <div className={styles.videoWrapper}>
+          <video controls autoPlay>
+            <source src="/videos/Workflow.mp4" />
+          </video>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
   return (
@@ -840,7 +857,7 @@ export default function Home(): ReactNode {
           />
         ))}
 
-        <SectionDivider title="Workflows" id="workflows" />
+        <WorkflowsBanner />
         {workflowSections.map((section, idx) => (
           <ConceptSection
             key={section.id}
