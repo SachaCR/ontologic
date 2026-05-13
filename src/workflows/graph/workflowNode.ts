@@ -17,7 +17,7 @@ export class WorkflowNode<
   #onChanges: (
     event:
       | { step: string; status: "START" }
-      | { step: string; status: "DONE"; result: Output }
+      | { step: string; status: "DONE" }
       | { step: string; status: "FAILED"; error: Error },
   ) => void;
 
@@ -45,7 +45,7 @@ export class WorkflowNode<
     handler: (
       event:
         | { step: string; status: "START" }
-        | { step: string; status: "DONE"; result: Output }
+        | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
   ) {
@@ -85,7 +85,7 @@ export class WorkflowNode<
       this.#context.status = "DONE";
       this.#context.stepResults.set(this.#name, output);
 
-      this.#onChanges({ step: this.#name, status: "DONE", result: output });
+      this.#onChanges({ step: this.#name, status: "DONE" });
 
       return output;
     } catch (err: unknown) {

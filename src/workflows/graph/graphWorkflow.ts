@@ -52,7 +52,7 @@ export class GraphWorkflow<Input, Output> {
     handler: (
       event:
         | { step: string; status: "START" }
-        | { step: string; status: "DONE"; result: Output }
+        | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
   ) {

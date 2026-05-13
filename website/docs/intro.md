@@ -18,31 +18,31 @@ It starts small: a rule that should belong to the domain ends up in a controller
 
 `ontologic` is organized around a few key ideas. Each one has its own page read them in order if you're new to DDD, or jump to what you need.
 
-### [Domain Entity](./domain-entity.md)
+### [Domain Entity](./domain-model/domain-entity.md)
 
 An entity is a domain object with a unique identity and a lifecycle. It owns its state, enforces its invariants, and exposes behavior rather than raw data. If you're new to `ontologic`, start here.
 
-### [Domain Events](./domain-events.md)
+### [Domain Events](./domain-model/domain-events.md)
 
 A domain event is a record that something meaningful happened past tense, immutable, and named after a business fact. Events are the mechanism by which different parts of your system stay in sync without becoming tightly coupled.
 
-### [The Result Pattern](./result-pattern.md)
+### [The Result Pattern](./domain-model/result-pattern.md)
 
 Some failures are not bugs — they are valid branches of the business logic. The Result pattern makes those failures explicit in the type system, so callers are forced to handle them and errors carry structured context rather than just a message string.
 
-### [Invariants](./invariants.md)
+### [Invariants](./domain-model/invariants.md)
 
 An invariant is a rule that must always be true about an entity not just after certain operations, but at all times. `ontologic` checks invariants on every state read, catching corrupted data the moment it enters the system.
 
-### [Repository](./repository.md)
+### [Repository](./domain-model/repository.md)
 
 The repository is the interface between your domain and your persistence layer. It hides all database details behind a clean, domain-friendly API and ensures that entity state and domain events are always saved together in a single transaction.
 
-### [Event Bus](./event-bus.md)
+### [Event Bus](./event-bus/event-bus.md)
 
 The event bus delivers domain events to the rest of your system. A pluggable connector interface lets you use any broker SQS, Kafka, RabbitMQ, Redis, or others. While the publisher and listener logic stays the same across all environments. In-memory connectors are included for tests and local prototyping.
 
-### [Message Relay](./message-relay.mdx)
+### [Message Relay](./event-bus/message-relay.mdx)
 
 The message relay is the bridge between the outbox table and the event bus. It reads events that were persisted by the repository and forwards them to the broker, tracking exactly what has been published so the system can recover from failures without skipping or restarting from scratch.
 

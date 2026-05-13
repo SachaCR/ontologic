@@ -75,7 +75,12 @@ export class WorkflowBuilder<Input> {
   }
 
   onChanges(
-    handler: (event: { step: string; status: "DONE" | "FAILED" }) => void,
+    handler: (
+      event:
+        | { step: string; status: "START" }
+        | { step: string; status: "DONE" }
+        | { step: string; status: "FAILED"; error: Error },
+    ) => void,
   ) {
     this.#eventEmitter.on("change", handler);
   }
