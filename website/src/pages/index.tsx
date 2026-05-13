@@ -132,6 +132,7 @@ function HomepageHeader() {
               className={styles.themeCard}
               style={{ "--accent": card.accent } as React.CSSProperties}
             >
+              <span className={styles.themeCardIcon}>{card.icon}</span>
               <span className={styles.themeCardTag}>{card.tag}</span>
               <Heading as="h3" className={styles.themeCardTitle}>
                 {card.title}
@@ -178,7 +179,69 @@ type ThemeCard = {
   title: string;
   description: string;
   anchor: string;
+  icon: ReactNode;
 };
+
+function DomainModelIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <polygon points="12 2 2 7 12 12 22 7 12 2" />
+      <polyline points="2 17 12 22 22 17" />
+      <polyline points="2 12 12 17 22 12" />
+    </svg>
+  );
+}
+
+function WorkflowsIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <circle cx="18" cy="5" r="3" />
+      <circle cx="6" cy="12" r="3" />
+      <circle cx="18" cy="19" r="3" />
+      <line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+      <line x1="15.41" y1="6.51" x2="8.59" y2="11.49" />
+    </svg>
+  );
+}
+
+function EventBusIcon() {
+  return (
+    <svg
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
+  );
+}
 
 const themeCards: ThemeCard[] = [
   {
@@ -189,6 +252,7 @@ const themeCards: ThemeCard[] = [
     description:
       "Entities, events, invariants and the Result pattern are primitives that keep your domain logic explicit, protected, and easy to test.",
     anchor: "#domain-model",
+    icon: <DomainModelIcon />,
   },
   {
     id: "theme-event-bus",
@@ -198,6 +262,7 @@ const themeCards: ThemeCard[] = [
     description:
       "Built-in outbox pattern, pluggable connectors for any broker, and a message relay that resumes after crashes without losing events.",
     anchor: "#event-bus-builtin",
+    icon: <EventBusIcon />,
   },
   {
     id: "theme-workflows",
@@ -207,6 +272,7 @@ const themeCards: ThemeCard[] = [
     description:
       "Step-by-step workflows for linear pipelines and graph workflows for parallel branches. Both typed end to end and resumable after failure.",
     anchor: "#workflows",
+    icon: <WorkflowsIcon />,
   },
 ];
 
