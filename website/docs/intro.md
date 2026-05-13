@@ -46,9 +46,9 @@ The event bus delivers domain events to the rest of your system. A pluggable con
 
 The message relay is the bridge between the outbox table and the event bus. It reads events that were persisted by the repository and forwards them to the broker, tracking exactly what has been published so the system can recover from failures without skipping or restarting from scratch.
 
-### [Workflows](./workflows.md)
+### [Workflows](./workflows/index.md)
 
-A workflow is a typed, resumable pipeline for multi-step business processes. Each step is a named function with its own input and output types, the chain is checked end to end by the type system, and the state can be persisted to any backend so a crashed run can pick up exactly where it left off.
+A workflow is a typed, resumable orchestration for multi-step business processes. `ontologic` provides two flavors: a step-by-step chain for linear pipelines and a graph for processes where steps fan out and combine results in parallel. Both give you observability, persistence, and the ability to resume after a failure exactly where the previous run stopped.
 
 ---
 

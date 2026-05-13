@@ -413,9 +413,10 @@ await repository.saveWithEvents(account, result.value);`,
     description: (
       <>
         <p>
-          A Workflow chains typed steps into a resumable pipeline. Each step's
-          output flows into the next step's input, and the type system enforces
-          the order reordering the chain is a compile error.
+          A Workflow orchestrates typed steps into a resumable process. Pick a
+          step-by-step chain for linear pipelines, or a graph for processes
+          where steps fan out and combine results in parallel. Both are checked
+          end to end by the type system.
         </p>
         <p>
           Plug in a repository and the state is persisted in any case. A crashed
