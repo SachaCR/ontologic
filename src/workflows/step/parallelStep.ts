@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 
-function defineSubTask<const N extends string, Input, Output>(task: {
+export function defineSubTask<const N extends string, Input, Output>(task: {
   name: N;
   handler: (input: Input) => Promise<Output>;
 }): { name: N; handler: (input: Input) => Promise<Output> } {
