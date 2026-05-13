@@ -90,7 +90,10 @@ export class ComposableWorkflowStep<Input, Output> {
 
     const input = await this.#previousStep();
 
-    this.#eventEmitter.emit("change", { step: this.#name, status: "START" });
+    this.#eventEmitter.emit("change", {
+      step: this.#name,
+      status: "IN_PROGRESS",
+    });
 
     try {
       const output = await this.#handler(input);
@@ -160,7 +163,7 @@ export class ComposableWorkflowStep<Input, Output> {
   onChanges(
     handler: (
       event:
-        | { step: string; status: "START" }
+        | { step: string; status: "IN_PROGRESS" }
         | { step: string; status: "DONE" }
         | { step: string; status: "FAILED"; error: Error },
     ) => void,
