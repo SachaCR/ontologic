@@ -1,18 +1,11 @@
 import { EventEmitter } from "node:events";
 import { ComposableWorkflowStep, StepHandler } from "./composableWorkflowStep";
-import {
-  aggregateFunction,
-  AggregateOutput,
-  defineSubTask,
-} from "./parallelStep";
+import { aggregateFunction, AggregateOutput } from "./parallelStep";
+import { WorkflowState } from "../interfaces";
 
-export interface WorkflowState<Input> {
-  id: string;
+export interface WorkflowStep<Input, Output> {
   name: string;
-  input: Input;
-  stepResults: Map<string, unknown>;
-  error: { step: string; error: string; name: string } | undefined;
-  status: "TODO" | "IN_PROGRESS" | "FAILED" | "DONE";
+  handler: StepHandler<Input, Output>;
 }
 
 export class WorkflowBuilder<Input> {
@@ -90,9 +83,4 @@ export class WorkflowBuilder<Input> {
   get name(): string {
     return this.#state.name;
   }
-}
-
-export interface WorkflowStep<Input, Output> {
-  name: string;
-  handler: StepHandler<Input, Output>;
 }
