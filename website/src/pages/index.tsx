@@ -124,12 +124,21 @@ function HomepageHeader() {
           </Link>
         </div>
 
-        <br />
-        <br />
-        <div className={styles.videoWrapper} style={{ maxWidth: "600px" }}>
-          <video controls autoPlay>
-            <source src="/videos/Introduction.mp4" />
-          </video>
+        <div className={styles.themeGrid}>
+          {themeCards.map((card) => (
+            <Link
+              key={card.id}
+              to={card.anchor}
+              className={styles.themeCard}
+              style={{ "--accent": card.accent } as React.CSSProperties}
+            >
+              <span className={styles.themeCardTag}>{card.tag}</span>
+              <Heading as="h3" className={styles.themeCardTitle}>
+                {card.title}
+              </Heading>
+              <p className={styles.themeCardDescription}>{card.description}</p>
+            </Link>
+          ))}
         </div>
       </div>
     </header>
@@ -201,28 +210,24 @@ const themeCards: ThemeCard[] = [
   },
 ];
 
-function ThemeOverview() {
+function DomainModelBanner() {
   return (
-    <section className={styles.themeOverview}>
+    <div className={styles.videoSection}>
       <div className="container">
-        <div className={styles.themeGrid}>
-          {themeCards.map((card) => (
-            <Link
-              key={card.id}
-              to={card.anchor}
-              className={styles.themeCard}
-              style={{ "--accent": card.accent } as React.CSSProperties}
-            >
-              <span className={styles.themeCardTag}>{card.tag}</span>
-              <Heading as="h3" className={styles.themeCardTitle}>
-                {card.title}
-              </Heading>
-              <p className={styles.themeCardDescription}>{card.description}</p>
-            </Link>
-          ))}
+        <Heading
+          as="h2"
+          id="domain-model"
+          className={styles.sectionDividerTitle}
+        >
+          Domain Model
+        </Heading>
+        <div className={styles.videoWrapper}>
+          <video controls autoPlay>
+            <source src="/videos/Introduction.mp4" />
+          </video>
         </div>
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -664,8 +669,7 @@ export default function Home(): ReactNode {
     >
       <HomepageHeader />
       <main>
-        <ThemeOverview />
-        <SectionDivider title="Domain Model" id="domain-model" />
+        <DomainModelBanner />
         {domainModelSections.map((section, idx) => (
           <ConceptSection
             key={section.id}
