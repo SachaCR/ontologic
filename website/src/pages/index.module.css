@@ -277,6 +277,7 @@
 }
 
 .themeCard {
+  position: relative;
   display: flex;
   flex-direction: column;
   padding: 1.75rem;
@@ -300,6 +301,30 @@
   border-color: color-mix(in srgb, var(--accent) 55%, rgba(255, 255, 255, 0.12));
   box-shadow: 0 16px 36px rgba(0, 0, 0, 0.35);
   color: inherit;
+}
+
+.themeCardIcon {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  color: color-mix(in srgb, var(--accent) 70%, white);
+  transition:
+    background 0.2s ease,
+    transform 0.2s ease;
+}
+
+.themeCard:hover .themeCardIcon,
+.themeCard:focus-visible .themeCardIcon {
+  background: color-mix(in srgb, var(--accent) 28%, transparent);
+  transform: scale(1.05);
 }
 
 .themeCardTag {
