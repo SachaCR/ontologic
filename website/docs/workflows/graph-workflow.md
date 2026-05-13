@@ -4,7 +4,11 @@ sidebar_position: 3
 
 # Graph workflow
 
-Use the graph flavor when the dependencies between steps form a tree (or DAG) rather than a line: a node has *named* children, runs them concurrently, and receives a record of their outputs as its input. The dependency structure lives in the code rather than in a procedural chain.
+:::warning
+This part of the documentation has been AI generated and I haven't reviewed it yet. So please be kind if you find mistakes or inconsistencies. I'll remove this warning once I've reviewed this page.
+:::
+
+Use the graph flavor when the dependencies between steps form a tree (or DAG) rather than a line: a node has _named_ children, runs them concurrently, and receives a record of their outputs as its input. The dependency structure lives in the code rather than in a procedural chain.
 
 The shared semantics — state, persistence, observability via `onChanges`, and structured failure handling — are described on the [Workflows introduction](./index.md). This page focuses on the graph-specific API.
 
@@ -116,12 +120,12 @@ For the full description of state, repository plumbing, and failure handling —
 
 ## Summary
 
-| Concept                       | Purpose                                                         |
-| ----------------------------- | --------------------------------------------------------------- |
-| `GraphWorkflow` (subclass)    | DAG-shaped workflow; constructs its root in `build(...)`        |
-| `WorkflowNode`                | Node with named children, runs them in parallel                 |
-| `children: {}`                | Marks a leaf node — produces a value with no dependencies       |
-| `children: { key: node }`     | Wires `node` into the `key` slot of the handler input           |
-| `toTree()`                    | ASCII rendering of the graph for debugging                      |
-| `setContext(state)`           | Shares the workflow state through the tree (called by `build`)  |
-| `onChanges(...)`              | Subscribe to `START` / `DONE` / `FAILED` events on any node     |
+| Concept                    | Purpose                                                        |
+| -------------------------- | -------------------------------------------------------------- |
+| `GraphWorkflow` (subclass) | DAG-shaped workflow; constructs its root in `build(...)`       |
+| `WorkflowNode`             | Node with named children, runs them in parallel                |
+| `children: {}`             | Marks a leaf node — produces a value with no dependencies      |
+| `children: { key: node }`  | Wires `node` into the `key` slot of the handler input          |
+| `toTree()`                 | ASCII rendering of the graph for debugging                     |
+| `setContext(state)`        | Shares the workflow state through the tree (called by `build`) |
+| `onChanges(...)`           | Subscribe to `START` / `DONE` / `FAILED` events on any node    |

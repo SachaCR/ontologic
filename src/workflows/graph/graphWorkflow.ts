@@ -50,14 +50,20 @@ export class GraphWorkflow<Input, Output> {
       return;
     }
 
+    await this.#repository.save(this.#state);
+
     const output = await this.#rootNode.execute();
 
     if (this.#state.status !== "FAILED") {
       this.#state.status = "DONE";
-      this.#onChangesHandler({ step: this.name, status: this.#state.status });
     }
 
     await this.#repository.save(this.#state);
+
+    // We do this after having saved the state. This way if the onChangesHandler throw we don't lose the state.
+    if (this.#state.status !== "FAILED") {
+      this.#onChangesHandler({ step: this.name, status: this.#state.status });
+    }
 
     return output as Output;
   }
