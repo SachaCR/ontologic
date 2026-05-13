@@ -1,10 +1,10 @@
 ---
-sidebar_position: 4
+sidebar_position: 1
 ---
 
 # Event Bus
 
-Once domain events are persisted via the [Outbox pattern](./domain-events.md#publishing-with-the-outbox-pattern), a message relay needs to read them from the database and then use an event bus to deliver events to the rest of your system.
+Once domain events are persisted via the [Outbox pattern](../domain-model/domain-events.md#publishing-with-the-outbox-pattern), a message relay needs to read them from the database and then use an event bus to deliver events to the rest of your system.
 
 `ontologic` ships a typed event bus with a **publisher** and a **listener**, each backed by a pluggable **connector**. The connector is the only piece you swap out between environments: the publisher/listener logic stays the same whether you're running tests locally or processing millions of messages in production.
 

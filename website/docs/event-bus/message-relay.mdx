@@ -1,10 +1,10 @@
 ---
-sidebar_position: 6
+sidebar_position: 2
 ---
 
 # Message Relay
 
-The **Message Relay** is the bridge between your outbox table and your event bus. Its job is to read domain events that were persisted by the [repository](./repository.md#saving-entities-and-events-together) and forward them to the rest of your system via the [event bus](./event-bus.md).
+The **Message Relay** is the bridge between your outbox table and your event bus. Its job is to read domain events that were persisted by the [repository](../domain-model/repository.md#saving-entities-and-events-together) and forward them to the rest of your system via the [event bus](./event-bus.md).
 
 It is designed to be **fault-tolerant**: it tracks exactly which events have been published so that, after a crash or restart, it picks up precisely where it left off — no events skipped, however events maybe be published twice.
 

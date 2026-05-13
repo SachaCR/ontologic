@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 2
 ---
 
 # Domain Events
@@ -182,11 +182,11 @@ The solution is the **Outbox pattern**. Instead of publishing directly, a backgr
 This separates two concerns that should never be coupled:
 
 - **Writing** — the use case saves state and records what happened, transactionally
-- **Publishing** — a reliable background process, the [Message Relay](/docs/message-relay.mdx), delivers events to the rest of the system
+- **Publishing** — a reliable background process, the [Message Relay](/docs/event-bus/message-relay), delivers events to the rest of the system
 
 The use case stays simple. The delivery guarantee is handled by infrastructure, not by application code.
 
-`ontologic` provides an [Event Bus](./event-bus.md) with a pluggable connector interface to handle the delivery side of this pattern.
+`ontologic` provides an [Event Bus](../event-bus/event-bus.md) with a pluggable connector interface to handle the delivery side of this pattern.
 
 ---
 

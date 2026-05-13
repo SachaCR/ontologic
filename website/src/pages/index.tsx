@@ -407,7 +407,7 @@ const domainModelSections: ConceptSectionProps[] = [
         </p>
       </>
     ),
-    link: "/docs/domain-entity",
+    link: "/docs/domain-model/domain-entity",
     linkLabel: "Learn about Domain Entities",
     codeTitle: "bank-account.ts",
     code: `class BankAccount extends DomainEntity<State> {
@@ -448,7 +448,7 @@ const domainModelSections: ConceptSectionProps[] = [
         </p>
       </>
     ),
-    link: "/docs/domain-events",
+    link: "/docs/domain-model/domain-events",
     linkLabel: "Learn about Domain Events",
     codeTitle: "money-withdrawn.event.ts",
     code: `class MoneyWithdrawn extends DomainEvent<
@@ -484,7 +484,7 @@ event.payload.amount = 0; // has no effect`,
         </p>
       </>
     ),
-    link: "/docs/invariants",
+    link: "/docs/domain-model/invariants",
     linkLabel: "Learn about Invariants",
     codeTitle: "bank-account.invariants.ts",
     code: `const balanceIsPositive =
@@ -522,7 +522,7 @@ const validBalance =
         </p>
       </>
     ),
-    link: "/docs/result-pattern",
+    link: "/docs/domain-model/result-pattern",
     linkLabel: "Learn about the Result Pattern",
     codeTitle: "debit-balance.use-case.ts",
     code: `class InsufficientFunds extends DomainError<
@@ -560,7 +560,7 @@ await repository.saveWithEvents(account, [result.value]);`,
         </p>
       </>
     ),
-    link: "/docs/repository",
+    link: "/docs/domain-model/repository",
     linkLabel: "Learn about the Repository",
     codeTitle: "bank-account.repository.ts",
     code: `// Extend the built-in generic — no boilerplate needed
@@ -636,7 +636,7 @@ await listener.start();`,
         </p>
       </>
     ),
-    link: "/docs/message-relay",
+    link: "/docs/event-bus/message-relay",
     linkLabel: "Learn about the Message Relay",
     codeTitle: "message-relay.ts",
     code: `const relay = new MessageRelay(
