@@ -332,6 +332,108 @@
   font-size: 0.95rem;
 }
 
+.scrollSeparator {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.1rem;
+  padding: 3.5rem 0 4rem;
+  position: relative;
+}
+
+.scrollSeparator::before,
+.scrollSeparator::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(420px, 60%);
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--ifm-toc-border-color) 50%,
+    transparent 100%
+  );
+}
+
+.scrollSeparator::before {
+  top: 0;
+}
+
+.scrollSeparator::after {
+  bottom: 0;
+}
+
+.scrollSeparatorLabel {
+  color: var(--ifm-color-content-secondary);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+.scrollSeparatorButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--ifm-toc-border-color);
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-color-content) !important;
+  text-decoration: none !important;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+  animation: scrollSeparatorPulse 2.4s ease-in-out infinite;
+}
+
+.scrollSeparatorButton:hover,
+.scrollSeparatorButton:focus-visible {
+  background: color-mix(in srgb, #6366f1 8%, var(--ifm-background-surface-color));
+  border-color: color-mix(in srgb, #6366f1 45%, var(--ifm-toc-border-color));
+  color: var(--ifm-color-content) !important;
+  transform: translateY(2px);
+}
+
+.scrollSeparatorChevron {
+  animation: scrollSeparatorBounce 1.8s ease-in-out infinite;
+}
+
+@keyframes scrollSeparatorPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.55);
+  }
+  70% {
+    box-shadow: 0 0 0 14px rgba(139, 92, 246, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0);
+  }
+}
+
+@keyframes scrollSeparatorBounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scrollSeparatorButton {
+    animation: none;
+  }
+  .scrollSeparatorChevron {
+    animation: none;
+  }
+}
+
 .videoSectionSubtitle {
   color: rgba(255, 255, 255, 0.72);
   font-size: 1.05rem;

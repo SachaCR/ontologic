@@ -210,6 +210,34 @@ const themeCards: ThemeCard[] = [
   },
 ];
 
+function ScrollSeparator() {
+  return (
+    <div className={styles.scrollSeparator}>
+      <span className={styles.scrollSeparatorLabel}>Discover</span>
+      <Link
+        to="#domain-model"
+        className={styles.scrollSeparatorButton}
+        aria-label="Scroll to Domain Model section"
+      >
+        <svg
+          className={styles.scrollSeparatorChevron}
+          width="22"
+          height="22"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <polyline points="6 9 12 15 18 9" />
+        </svg>
+      </Link>
+    </div>
+  );
+}
+
 function DomainModelBanner() {
   return (
     <div className={styles.videoSection}>
@@ -669,6 +697,7 @@ export default function Home(): ReactNode {
     >
       <HomepageHeader />
       <main>
+        <ScrollSeparator />
         <DomainModelBanner />
         {domainModelSections.map((section, idx) => (
           <ConceptSection
