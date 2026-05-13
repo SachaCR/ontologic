@@ -1,4 +1,5 @@
 import { WorkflowState } from "../interfaces";
+
 import { WorkflowStateRepository } from "./interfaces";
 
 export class InMemoryWorkflowStateRepository implements WorkflowStateRepository {
