@@ -1,8 +1,11 @@
 ---
 sidebar_position: 1
+title: Model Your Business in TypeScript
+description: Ontologic is a TypeScript toolkit for Domain-Driven Design typed entities, invariants, domain events with outbox pattern, and resumable workflows.
+slug: /intro
 ---
 
-# Introduction
+# Model Your Business in TypeScript with Ontologic
 
 Software has a tendency to drift away from the business it was built to serve.
 

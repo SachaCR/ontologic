@@ -292,6 +292,29 @@
   width: 100%;
 }
 
+.videoTranscript {
+  max-width: 800px;
+  margin: 1.5rem auto 0;
+  padding: 1rem 1.25rem;
+  text-align: left;
+  color: rgba(255, 255, 255, 0.78);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+.videoTranscript > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.videoTranscript > p {
+  margin: 0.75rem 0 0;
+}
+
 /* ── Concept sections ─────────────────────────────────────────────────────── */
 
 .conceptSection {

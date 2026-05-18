@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useState } from "react";
 import clsx from "clsx";
 import Link from "@docusaurus/Link";
+import Head from "@docusaurus/Head";
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext";
 import Layout from "@theme/Layout";
 import Heading from "@theme/Heading";
@@ -336,7 +337,7 @@ const themeCards: ThemeCard[] = [
     id: "theme-domain-model",
     tag: "Domain Model",
     accent: "#6366f1",
-    title: "Model your business rules",
+    title: "Model your business",
     description:
       "Entities, events, invariants and the Result pattern are primitives that keep your domain logic explicit, protected, and easy to test.",
     anchor: "#domain-model",
@@ -418,6 +419,21 @@ function DomainModelBanner() {
             <source src="/videos/Introduction.mp4" />
           </video>
         </div>
+        <details className={styles.videoTranscript}>
+          <summary>What this video covers</summary>
+          <p>
+            A walk-through of how Ontologic models a domain in TypeScript.
+            Entities own their state and expose behavior rather than setters.
+            Invariants. Rules like “balance must stay positive” are checked on
+            every state read, so corrupted data is caught the moment it enters
+            the system. Domain events record what happened in past tense,
+            immutably, and form a versioned contract for the rest of the system.
+            The Result pattern makes expected failures (insufficient funds,
+            validation errors) into typed return values that callers cannot
+            ignore. The Repository persists entity state and events atomically
+            in the same transaction.
+          </p>
+        </details>
       </div>
     </div>
   );
@@ -846,6 +862,20 @@ function EventBusBanner() {
             <source src="/videos/MessageRelay.mp4" />
           </video>
         </div>
+        <details className={styles.videoTranscript}>
+          <summary>What this video covers</summary>
+          <p>
+            A demo of the outbox pattern built into Ontologic. Domain events are
+            written to an outbox in the same transaction as the entity state,
+            guaranteeing they cannot be lost on a crash. The Message Relay reads
+            from the outbox, forwards events to the event bus, and checkpoints
+            each one individually so after a failure, delivery resumes precisely
+            where it stopped, with no skipped events and no need to restart the
+            relay from scratch. Pluggable connectors let you target SQS, Kafka,
+            RabbitMQ, Redis, or any other broker without touching the publisher
+            or listener logic.
+          </p>
+        </details>
       </div>
     </div>
   );
@@ -863,18 +893,58 @@ function WorkflowsBanner() {
             <source src="/videos/Workflow.mp4" />
           </video>
         </div>
+        <details className={styles.videoTranscript}>
+          <summary>What this video covers</summary>
+          <p>
+            A tour of Ontologic's two workflow flavors. Step workflows thread
+            typed steps into a sequential pipeline. Each step's output feeds the
+            next step's input, and the type system rejects out-of-order
+            composition at compile time. Graph workflows model the same idea as
+            a directed acyclic graph: each node names its children, runs them
+            concurrently, and receives their results as a typed record. Both
+            flavors persist state to a repository, so when a multi-step business
+            process crashes mid-run, you simply restart the workflow and it
+            resumes from the last completed step. No recovery scripts, no
+            replaying already-successful work.
+          </p>
+        </details>
       </div>
     </div>
   );
 }
+
+const structuredData = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareSourceCode",
+  name: "Ontologic",
+  description:
+    "Ontologic is a TypeScript toolkit for Domain-Driven Design: typed entities, invariants, domain events with built-in outbox pattern, and resumable workflows. Zero dependencies.",
+  codeRepository: "https://github.com/SachaCR/ontologic",
+  programmingLanguage: "TypeScript",
+  license: "https://opensource.org/licenses/MIT",
+  url: "https://ontologic.site",
+  author: {
+    "@type": "Person",
+    name: "Sacha Clerc-Renaud",
+  },
+};
 
 export default function Home(): ReactNode {
   const { siteConfig } = useDocusaurusContext();
   return (
     <Layout
       title={siteConfig.title}
-      description="A TypeScript toolkit for Domain-Driven Design"
+      description="Ontologic — TypeScript DDD toolkit: typed entities, invariants, domain events with outbox pattern, and resumable workflows. Zero dependencies."
     >
+      <Head>
+        <meta
+          name="keywords"
+          content="TypeScript DDD, Domain-Driven Design TypeScript, TypeScript DDD library, outbox pattern TypeScript, domain events TypeScript, resumable workflows, TypeScript saga, aggregate TypeScript, invariants TypeScript"
+        />
+        <script type="application/ld+json">
+          {JSON.stringify(structuredData)}
+        </script>
+      </Head>
       <HomepageHeader />
       <main>
         <ScrollSeparator />
