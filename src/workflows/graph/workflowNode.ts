@@ -68,12 +68,9 @@ export class WorkflowNode<
   }
 
   async execute(): Promise<Output> {
-    this.#context.status = "IN_PROGRESS";
-
     if (this.#context.stepResults.has(this.#name)) {
       this.#status = "DONE";
       this.#onChanges({ step: this.#name, status: "DONE" });
-
       return this.#context.stepResults.get(this.#name) as Output;
     }
 

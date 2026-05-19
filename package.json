@@ -12,8 +12,8 @@
     "test:report": "vitest run && npx vite preview --outDir html",
     "build": "tsc",
     "build:release": "tsc --project tsconfig-release.json",
-    "example:step": "npx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
-    "example:graph": "npx tsx src/examples/workflows/graph-workflow.ts"
+    "example:step": "pnpx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
+    "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts"
   },
   "keywords": [
     "DDD",
