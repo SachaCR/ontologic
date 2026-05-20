@@ -14,7 +14,7 @@ on:
 
 permissions:
   id-token: write # Required for OIDC
-  contents: read
+  contents: write
 
 jobs:
   release:
@@ -23,11 +23,11 @@ jobs:
       contents: write # required to push the version commit and tag
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: pnpm
