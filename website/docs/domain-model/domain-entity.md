@@ -80,7 +80,7 @@ This is encapsulation in the DDD sense: **the entity controls all changes to its
 
 An **invariant** is a rule that must always be true about your entity. No matter what operation you perform, the entity should never end up in a state that violates it.
 
-A classic invariant for a bank account: *the balance must never be negative*.
+A classic invariant for a bank account: _the balance must never be negative_.
 
 With `ontologic`, you express this as a `BaseDomainInvariant`:
 
@@ -89,7 +89,7 @@ import { BaseDomainInvariant } from "ontologic";
 
 const balanceIsPositive = new BaseDomainInvariant<BankAccountState>(
   "Balance must be positive",
-  (state) => state.balance >= 0
+  (state) => state.balance >= 0,
 );
 ```
 
@@ -109,7 +109,10 @@ From this point on, **every time the state is read**, the invariant is checked. 
 
 ```typescript
 // This will throw "Corrupted state detected" at read time
-const account = BankAccount.fromState("abc-123", { ownerId: "u1", balance: -50 });
+const account = BankAccount.fromState("abc-123", {
+  ownerId: "u1",
+  balance: -50,
+});
 account.readState(); // throws!
 ```
 
@@ -118,12 +121,12 @@ Invariants also compose. You can combine them with logical operators:
 ```typescript
 const balanceIsPositive = new BaseDomainInvariant<State>(
   "Balance is positive",
-  (state) => state.balance >= 0
+  (state) => state.balance >= 0,
 );
 
 const balanceIsReasonable = new BaseDomainInvariant<State>(
   "Balance is under limit",
-  (state) => state.balance <= 1_000_000
+  (state) => state.balance <= 1_000_000,
 );
 
 // Both must hold
@@ -133,6 +136,32 @@ const validBalance = balanceIsPositive.and(balanceIsReasonable);
 ```
 
 This lets you build complex business rules from simple, readable, named pieces.
+
+---
+
+## Reading state without paying for safety
+
+`readState()` is safe by default: it runs the invariants and returns a **deep clone**. For most code paths, that's exactly what you want.
+
+On hot paths, tight loops, large state objects, high-throughput services, the clone shows up in profiles. The entity exposes two opt-in accessors for those cases:
+
+```typescript
+account.readState(); // deep clone + invariant check  (default, safe)
+account.unsafeReadState(); // no clone, but invariant check still runs
+account.unsafeRawState(); // no clone, no check  (cheapest, fully on you)
+```
+
+- **`unsafeReadState(): Readonly<State>`**: returns the live internal state without cloning. The return type is `Readonly<State>`, which signals at the type level that you must not mutate it. Invariants still run, so a corrupted entity still throws. Use this when you only need to **read** the state and the clone cost is measurable.
+
+- **`unsafeRawState(): State`**: returns the live internal state with no clone and no invariant check. The cheapest possible accessor and the most dangerous one. Reserve it for code that is provably read-only or that already holds an invariant proof by construction.
+
+A practical rule:
+
+- Default to `readState()`. It is the right choice 99% of the time.
+- Reach for `unsafeReadState()` only after a profiler tells you the clone matters.
+- Reach for `unsafeRawState()` only when you also need to skip the invariant check (for example, inside a serialization adapter where you've already validated the state upstream).
+
+Both methods are deliberately named `unsafe*` so they are grep-able in code review.
 
 ---
 
@@ -152,7 +181,10 @@ Using `Result` for technical errors would pollute every call site with error han
 ```typescript
 import { Result, ok, err, DomainError } from "ontologic";
 
-class InsufficientFunds extends DomainError<"INSUFFICIENT_FUNDS", { available: number; requested: number }> {
+class InsufficientFunds extends DomainError<
+  "INSUFFICIENT_FUNDS",
+  { available: number; requested: number }
+> {
   constructor(context: { available: number; requested: number }) {
     super({
       name: "INSUFFICIENT_FUNDS",
@@ -169,7 +201,7 @@ class BankAccount extends DomainEntity<BankAccountState> {
         new InsufficientFunds({
           available: this.state.balance,
           requested: amount,
-        })
+        }),
       );
     }
 
@@ -206,7 +238,7 @@ This is domain logic done right: the entity is the single source of truth for wh
 
 ## Domain Events
 
-A **Domain Event** is a record that something meaningful happened in your domain. Not a log line — a first-class object that says *"this happened, at this time, to this entity"*.
+A **Domain Event** is a record that something meaningful happened in your domain. Not a log line — a first-class object that says _"this happened, at this time, to this entity"_.
 
 Domain events are useful for:
 
@@ -223,7 +255,11 @@ interface MoneyWithdrawnPayload {
   amount: number;
 }
 
-class MoneyWithdrawn extends DomainEvent<"MONEY_WITHDRAWN", 1, MoneyWithdrawnPayload> {
+class MoneyWithdrawn extends DomainEvent<
+  "MONEY_WITHDRAWN",
+  1,
+  MoneyWithdrawnPayload
+> {
   constructor(entityId: string, payload: MoneyWithdrawnPayload) {
     super({ name: "MONEY_WITHDRAWN", version: 1, entityId, payload });
   }
@@ -238,7 +274,12 @@ When you do return events, your entity methods become the natural place to emit 
 class BankAccount extends DomainEntity<BankAccountState> {
   withdraw(amount: number): Result<MoneyWithdrawn, InsufficientFunds> {
     if (this.state.balance < amount) {
-      return err(new InsufficientFunds({ available: this.state.balance, requested: amount }));
+      return err(
+        new InsufficientFunds({
+          available: this.state.balance,
+          requested: amount,
+        }),
+      );
     }
 
     this.state.balance -= amount;
@@ -264,7 +305,7 @@ if (result.isOk()) {
 
 Events don't always belong on the entity. Sometimes the entity simply doesn't have enough context to produce a meaningful event — that context only exists at the use case level.
 
-Consider creating a new account and immediately crediting it in one operation. The entity knows how to create itself, and it knows how to apply a credit. But the fact that *"an account was opened with an initial deposit"* is a higher-level business concept that neither operation alone can express. The use case has the full picture.
+Consider creating a new account and immediately crediting it in one operation. The entity knows how to create itself, and it knows how to apply a credit. But the fact that _"an account was opened with an initial deposit"_ is a higher-level business concept that neither operation alone can express. The use case has the full picture.
 
 In that case, the use case itself is responsible for producing the event:
 
@@ -309,18 +350,25 @@ interface CreditBalanceState {
 // 2. Define an invariant — balance must never go negative
 const balanceIsPositive = new BaseDomainInvariant<CreditBalanceState>(
   "Balance Is Positive",
-  (state) => state.subCreditBalance >= 0
+  (state) => state.subCreditBalance >= 0,
 );
 
 // 3. Define events
-class CreditBalanceDebited extends DomainEvent<"CREDIT_BALANCE_DEBITED", 1, { amount: number }> {
+class CreditBalanceDebited extends DomainEvent<
+  "CREDIT_BALANCE_DEBITED",
+  1,
+  { amount: number }
+> {
   constructor(entityId: string, payload: { amount: number }) {
     super({ name: "CREDIT_BALANCE_DEBITED", version: 1, entityId, payload });
   }
 }
 
 // 4. Define errors
-class NotEnoughFunds extends DomainError<"NOT_ENOUGH_FUNDS", { available: number; amount: number }> {
+class NotEnoughFunds extends DomainError<
+  "NOT_ENOUGH_FUNDS",
+  { available: number; amount: number }
+> {
   constructor(message: string, context: { available: number; amount: number }) {
     super({ name: "NOT_ENOUGH_FUNDS", message, context });
   }
@@ -344,14 +392,18 @@ class CreditBalance extends DomainEntity<CreditBalanceState> {
     });
   }
 
-  debit(params: { amount: number }): Result<CreditBalanceDebited, NotEnoughFunds> {
+  debit(params: {
+    amount: number;
+  }): Result<CreditBalanceDebited, NotEnoughFunds> {
     const { amount } = params;
 
     if (this.state.subCreditBalance < amount) {
-      return err(new NotEnoughFunds("Not enough credits", {
-        available: this.state.subCreditBalance,
-        amount,
-      }));
+      return err(
+        new NotEnoughFunds("Not enough credits", {
+          available: this.state.subCreditBalance,
+          amount,
+        }),
+      );
     }
 
     this.state.subCreditBalance -= amount;
@@ -371,7 +423,9 @@ const result = balance.debit({ amount: 50 });
 
 if (result.isErr()) {
   // Fully typed: result.error is NotEnoughFunds
-  console.error(`Cannot debit: only ${result.error.context.available} available`);
+  console.error(
+    `Cannot debit: only ${result.error.context.available} available`,
+  );
 } else {
   // Fully typed: result.value is CreditBalanceDebited
   await eventStore.save(result.value);
@@ -382,12 +436,12 @@ if (result.isErr()) {
 
 ## Summary
 
-| Concept | What it means | How `ontologic` helps |
-|---|---|---|
-| **State Encapsulation** | The entity controls its own data | `protected state`, deep-cloned `readState()` |
-| **Invariants** | Rules that must always hold | `BaseDomainInvariant`, checked on read |
-| **Domain Logic** | Behavior lives in the entity | Methods return `Result<Event, Error>` |
-| **Domain Events** | Records of meaningful things that happened | Typed `DomainEvent` with name, version, payload |
+| Concept                 | What it means                              | How `ontologic` helps                           |
+| ----------------------- | ------------------------------------------ | ----------------------------------------------- |
+| **State Encapsulation** | The entity controls its own data           | `protected state`, deep-cloned `readState()`    |
+| **Invariants**          | Rules that must always hold                | `BaseDomainInvariant`, checked on read          |
+| **Domain Logic**        | Behavior lives in the entity               | Methods return `Result<Event, Error>`           |
+| **Domain Events**       | Records of meaningful things that happened | Typed `DomainEvent` with name, version, payload |
 
 DDD is ultimately about making your code reflect reality. When your `BankAccount` class knows what it means to be a bank account — what it can do, what it can't, what happens when it changes — you stop fighting the code and start thinking in your domain.
 
