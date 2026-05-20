@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 
+import { CorruptedStateError } from "../corruptedStateError";
 import { DomainEntity } from "../domainEntity";
 import { BaseDomainInvariant } from "../domainInvariant";
 
@@ -71,6 +72,52 @@ describe("DomainEntity.unsafeRawState", () => {
 
     expect(() => balance.unsafeRawState()).not.toThrow();
     expect(balance.unsafeRawState().amount).toBe(-1);
+  });
+});
+
+describe("DomainEntity invariant violation", () => {
+  const ledgerNotEmpty = new BaseDomainInvariant<BalanceState>(
+    "Ledger must not be empty",
+    (state) => state.ledger.length > 0,
+  );
+
+  it("throws a CorruptedStateError with entityId, state and violations", () => {
+    const balance = Balance.make(100, [{ id: "e0", delta: 100 }]);
+    balance.corrupt(-1);
+
+    let caught: unknown;
+    try {
+      balance.readState();
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(CorruptedStateError);
+    const error = caught as CorruptedStateError<BalanceState>;
+    expect(error.name).toBe("CORRUPTED_STATE");
+    expect(error.entityId).toBe("balance-1");
+    expect(error.state.amount).toBe(-1);
+    expect(error.violations).toEqual([{ description: "Amount must be >= 0" }]);
+  });
+
+  it("collects every failing invariant, not just the first", () => {
+    const balance = Balance.make(100, [{ id: "e0", delta: 100 }]);
+    balance.addInvariant(ledgerNotEmpty);
+
+    // Corrupt amount AND empty the ledger so both invariants fail at once
+    balance.corrupt(-1);
+    balance.unsafeRawState().ledger.length = 0;
+
+    try {
+      balance.readState();
+      throw new Error("expected throw");
+    } catch (err) {
+      const violations = (err as CorruptedStateError).violations;
+      expect(violations).toEqual([
+        { description: "Amount must be >= 0" },
+        { description: "Ledger must not be empty" },
+      ]);
+    }
   });
 });
 
