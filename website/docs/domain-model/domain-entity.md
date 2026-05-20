@@ -105,16 +105,41 @@ class BankAccount extends DomainEntity<BankAccountState> {
 }
 ```
 
-From this point on, **every time the state is read**, the invariant is checked. If the state is ever found in violation, an error is thrown immediately — before any corrupted data can propagate through the system.
+From this point on, **every time the state is read**, the invariant is checked. If the state is ever found in violation, a `CorruptedStateError` is thrown immediately — before any corrupted data can propagate through the system.
 
 ```typescript
-// This will throw "Corrupted state detected" at read time
+import { CorruptedStateError } from "ontologic";
+
 const account = BankAccount.fromState("abc-123", {
   ownerId: "u1",
   balance: -50,
 });
-account.readState(); // throws!
+
+try {
+  account.readState();
+} catch (err) {
+  if (err instanceof CorruptedStateError) {
+    err.name; // "CORRUPTED_STATE"
+    err.entityId; // "abc-123"
+    err.state; // the offending state, for logging
+    err.violations; // [{ description: "Balance must be positive" }]
+  }
+}
 ```
+
+### `CorruptedStateError` is not a domain failure
+
+The library treats corrupted state as a **programmer error**, not as a recoverable domain failure. The entity was constructed with valid state and something — a method, a hydration step, a hand-written migration — drove it into an invalid state. That is a bug. There is no safe way to "handle" it and continue manipulating the entity.
+
+For that reason, `CorruptedStateError` extends `Error` directly and is **thrown**, not returned. Do not try to wrap it in a `Result`. The right reaction at the application boundary is:
+
+1. Log every field on the error (`entityId`, `state`, `violations`).
+2. Fail the current operation.
+3. Page whoever owns the entity, because something in your code path is producing illegal state.
+
+If you find yourself wanting to catch and recover from one, the underlying failure is probably a **domain failure** (something the business explicitly allows to fail) and deserves its own `DomainError` subtype returned inside a `Result`, not an invariant.
+
+When several invariants fail at once, every failing description is collected into `err.violations`, so a single log line tells you all the rules the state broke — not just the first one the checker happened to hit.
 
 Invariants also compose. You can combine them with logical operators:
 
@@ -151,7 +176,7 @@ account.unsafeReadState(); // no clone, but invariant check still runs
 account.unsafeRawState(); // no clone, no check  (cheapest, fully on you)
 ```
 
-- **`unsafeReadState(): Readonly<State>`**: returns the live internal state without cloning. The return type is `Readonly<State>`, which signals at the type level that you must not mutate it. Invariants still run, so a corrupted entity still throws. Use this when you only need to **read** the state and the clone cost is measurable.
+- **`unsafeReadState(): Readonly<State>`**: returns the live internal state without cloning. The return type is `Readonly<State>`, which signals at the type level that you must not mutate it. Invariants still run, so a corrupted entity still throws `CorruptedStateError`. Use this when you only need to **read** the state and the clone cost is measurable.
 
 - **`unsafeRawState(): State`**: returns the live internal state with no clone and no invariant check. The cheapest possible accessor and the most dangerous one. Reserve it for code that is provably read-only or that already holds an invariant proof by construction.
 
