@@ -5,3 +5,4 @@ dist/
 html/
 coverage/
 .DS_Store
+scripts/
