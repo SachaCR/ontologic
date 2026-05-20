@@ -1,4 +1,5 @@
 export * from "./domainError";
+export * from "./corruptedStateError";
 export * from "./domainEvent";
 export * from "./domainEntity";
 export * from "./repository";

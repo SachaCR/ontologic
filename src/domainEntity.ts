@@ -1,3 +1,4 @@
+import { CorruptedStateError } from "./corruptedStateError";
 import { DomainInvariant } from "./domainInvariant/interfaces";
 
 export interface IDomainEntity {
@@ -57,13 +58,16 @@ export class DomainEntity<State> implements IDomainEntity {
   }
 
   private checkInvariants() {
-    const isValid = this.#invariants.every(
-      (invariant) => invariant.complyWith(this.state).isCompliant,
-    );
+    const violations = this.#invariants
+      .map((invariant) => invariant.complyWith(this.state))
+      .filter((result) => !result.isCompliant)
+      .map(({ description }) => ({ description }));
 
-    if (!isValid) {
-      throw new Error("Corrupted state detected", {
-        cause: this.state,
+    if (violations.length > 0) {
+      throw new CorruptedStateError({
+        entityId: this.#id,
+        state: this.state,
+        violations,
       });
     }
   }
