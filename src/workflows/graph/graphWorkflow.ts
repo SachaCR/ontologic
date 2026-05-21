@@ -5,7 +5,7 @@ import { WorkflowNode } from "./workflowNode";
 
 export class GraphWorkflow<Input, Output> {
   #repository: WorkflowStateRepository;
-  #rootNode: WorkflowNode<any, any> | undefined;
+  #rootNode: WorkflowNode<any, Output> | undefined;
   #state: WorkflowState<Input>;
   #onChangesHandler: (
     event:
@@ -67,7 +67,7 @@ export class GraphWorkflow<Input, Output> {
       this.#onChangesHandler({ step: this.name, status: this.#state.status });
     }
 
-    return output as Output;
+    return output;
   }
 
   onChanges(

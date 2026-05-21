@@ -7,7 +7,7 @@ type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
 };
 
 export class WorkflowNode<
-  Children extends Record<string, WorkflowNode<any, any>>,
+  Children extends Record<string, WorkflowNode<any, unknown>>,
   Output,
 > {
   #name: string;
