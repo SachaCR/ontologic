@@ -169,7 +169,7 @@ function GoodNewsCorner() {
         <span className={styles.heroBadge}>
           <FeatherIcon />
           <span>
-            <strong>140kB</strong>
+            <strong>175kB</strong>
           </span>
         </span>
       )}
