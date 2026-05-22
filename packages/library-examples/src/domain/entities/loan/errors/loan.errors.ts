@@ -1,4 +1,4 @@
-import { DomainError } from "ontologic";
+import { DomainError } from "@ontologic/ontologic";
 
 export class LoanAlreadyReturnedError extends DomainError<
   "LOAN_ALREADY_RETURNED",

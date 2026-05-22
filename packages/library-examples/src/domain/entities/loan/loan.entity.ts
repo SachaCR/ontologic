@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 
-import { DomainEntity, Result, err, ok } from "ontologic";
+import { DomainEntity, Result, err, ok } from "@ontologic/ontologic";
 
 import { LoanAlreadyReturnedError } from "./errors/loan.errors";
 import { LoanCreatedEvent } from "./events/loanCreated.event";
@@ -22,12 +22,12 @@ export interface LoanState {
 const STANDARD_LOAN_LENGTH_DAYS = 21;
 
 export class Loan extends DomainEntity<LoanState> {
-  private constructor(id: string, state: LoanState) {
-    super(id, state, [dueDateAfterLoanDate, returnDateAfterLoanDate]);
+  private constructor(id: string, version: number, state: LoanState) {
+    super(id, version, state, [dueDateAfterLoanDate, returnDateAfterLoanDate]);
   }
 
-  static fromState(id: string, state: LoanState) {
-    return new Loan(id, state);
+  static fromState(id: string, version: number, state: LoanState) {
+    return new Loan(id, version, state);
   }
 
   static create(params: { bookId: string; memberId: string }): {
@@ -58,7 +58,7 @@ export class Loan extends DomainEntity<LoanState> {
 
     return {
       event,
-      loan: new Loan(id, state),
+      loan: new Loan(id, 0, state),
     };
   }
 

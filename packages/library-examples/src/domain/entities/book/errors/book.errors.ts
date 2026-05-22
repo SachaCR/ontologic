@@ -1,4 +1,4 @@
-import { DomainError } from "ontologic";
+import { DomainError } from "@ontologic/ontologic";
 
 export class BookAlreadyDeclaredLostError extends DomainError<
   "BOOK_ALREADY_DECLARED_LOST",

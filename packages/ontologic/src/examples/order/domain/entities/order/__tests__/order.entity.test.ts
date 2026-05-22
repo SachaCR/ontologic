@@ -10,7 +10,7 @@ const makeItem = (id: string): OrderItem => ({
 });
 
 const makeOrderState = (
-  overrides: Partial<Parameters<typeof Order.fromState>[1]> = {},
+  overrides: Partial<Parameters<typeof Order.fromState>[2]> = {},
 ) => ({
   id: "order-1",
   customerId: "customer-1",
@@ -22,20 +22,25 @@ const makeOrderState = (
 describe("Order - orderHasAtLeastOneItem invariant", () => {
   describe("fromState", () => {
     it("does not throw when order has one item", () => {
-      const entity = Order.fromState("order-1", makeOrderState());
+      const entity = Order.fromState("order-1", 1, makeOrderState());
       expect(() => entity.readState()).not.toThrow();
     });
 
     it("does not throw when order has multiple items", () => {
       const entity = Order.fromState(
         "order-1",
+        1,
         makeOrderState({ items: [makeItem("item-1"), makeItem("item-2")] }),
       );
       expect(() => entity.readState()).not.toThrow();
     });
 
     it("throws when order has no items", () => {
-      const entity = Order.fromState("order-1", makeOrderState({ items: [] }));
+      const entity = Order.fromState(
+        "order-1",
+        1,
+        makeOrderState({ items: [] }),
+      );
       expect(() => entity.readState()).toThrow("Corrupted state detected");
     });
   });
@@ -45,6 +50,7 @@ describe("Order - removeItem", () => {
   it("removes an item successfully when more than one item exists", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ items: [makeItem("item-1"), makeItem("item-2")] }),
     );
 
@@ -56,7 +62,7 @@ describe("Order - removeItem", () => {
   });
 
   it("returns an error when trying to remove the last item", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
 
     const result = entity.removeItem({ itemId: "item-1" });
 
@@ -69,6 +75,7 @@ describe("Order - removeItem", () => {
   it("returns an error when order is not in DRAFT status", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
 
@@ -83,7 +90,7 @@ describe("Order - removeItem", () => {
 
 describe("Order - addItem", () => {
   it("adds an item when order is in DRAFT status", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
 
     const result = entity.addItem({ item: makeItem("item-2") });
 
@@ -94,6 +101,7 @@ describe("Order - addItem", () => {
   it("returns an error when order is not in DRAFT status", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
 
@@ -108,7 +116,7 @@ describe("Order - addItem", () => {
 
 describe("Order - applyVoucher", () => {
   it("applies a voucher when none is already applied", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
 
     const result = entity.applyVoucher({ voucherId: "voucher-abc" });
 
@@ -119,6 +127,7 @@ describe("Order - applyVoucher", () => {
   it("returns an error when a voucher is already applied", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ voucherId: "voucher-abc" }),
     );
 
@@ -133,6 +142,7 @@ describe("Order - applyVoucher", () => {
   it("returns an error when order is not in DRAFT status", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
 
@@ -147,7 +157,7 @@ describe("Order - applyVoucher", () => {
 
 describe("Order - place", () => {
   it("transitions from DRAFT to PLACED", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
 
     const result = entity.place();
 
@@ -158,6 +168,7 @@ describe("Order - place", () => {
   it("returns an error when order is already PLACED", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
 
@@ -172,6 +183,7 @@ describe("Order - place", () => {
   it("returns an error when order is already PAID", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PAID" }),
     );
 
@@ -188,6 +200,7 @@ describe("Order - pay", () => {
   it("transitions from PLACED to PAID and stores the invoiceId", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
 
@@ -199,7 +212,7 @@ describe("Order - pay", () => {
   });
 
   it("returns an error when order is in DRAFT status", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
 
     const result = entity.pay({ invoiceId: "invoice-123" });
 
@@ -212,6 +225,7 @@ describe("Order - pay", () => {
   it("returns an error when order is already PAID", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PAID", invoiceId: "invoice-123" }),
     );
 
@@ -228,6 +242,7 @@ describe("Order - paidOrderHasInvoiceId invariant", () => {
   it("does not throw when a PAID order has an invoiceId", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PAID", invoiceId: "invoice-123" }),
     );
     expect(() => entity.readState()).not.toThrow();
@@ -236,19 +251,21 @@ describe("Order - paidOrderHasInvoiceId invariant", () => {
   it("throws when a PAID order has no invoiceId", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PAID" }),
     );
     expect(() => entity.readState()).toThrow("Corrupted state detected");
   });
 
   it("does not throw when a DRAFT order has no invoiceId", () => {
-    const entity = Order.fromState("order-1", makeOrderState());
+    const entity = Order.fromState("order-1", 1, makeOrderState());
     expect(() => entity.readState()).not.toThrow();
   });
 
   it("does not throw when a PLACED order has no invoiceId", () => {
     const entity = Order.fromState(
       "order-1",
+      1,
       makeOrderState({ status: "PLACED" }),
     );
     expect(() => entity.readState()).not.toThrow();

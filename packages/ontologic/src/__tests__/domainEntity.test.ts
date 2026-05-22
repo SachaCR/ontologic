@@ -11,7 +11,7 @@ interface BalanceState {
 
 class Balance extends DomainEntity<BalanceState> {
   static make(amount: number, ledger: BalanceState["ledger"] = []): Balance {
-    const balance = new Balance("balance-1", { amount, ledger });
+    const balance = new Balance("balance-1", 1, { amount, ledger });
     balance.addInvariant(positiveAmount);
     return balance;
   }

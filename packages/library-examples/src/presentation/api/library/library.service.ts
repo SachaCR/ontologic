@@ -1,5 +1,6 @@
 import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
-import { Result, err, ok } from "ontologic";
+
+import { Result, err, ok } from "@ontologic/ontologic";
 
 import { Book, BookState } from "../../../domain/entities/book";
 import { LoanState } from "../../../domain/entities/loan";

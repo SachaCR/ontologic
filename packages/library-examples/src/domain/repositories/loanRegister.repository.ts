@@ -1,4 +1,4 @@
-import { InMemoryRepository, Result, ok } from "ontologic";
+import { InMemoryRepository, Result, ok } from "@ontologic/ontologic";
 
 import { Loan, LoanEvent } from "../entities/loan";
 
@@ -10,9 +10,9 @@ export class LoanRegister extends InMemoryRepository<Loan, LoanEvent> {
   async findOutstandingLoanForBook(
     bookId: string,
   ): Promise<Result<Loan | undefined, Error>> {
-    for (const [id, state] of this.store) {
+    for (const [id, { version, state }] of this.store) {
       if (state.bookId === bookId && state.returnedAt === null) {
-        return ok(Loan.fromState(id, state));
+        return ok(Loan.fromState(id, version, state));
       }
     }
 
@@ -24,9 +24,9 @@ export class LoanRegister extends InMemoryRepository<Loan, LoanEvent> {
   ): Promise<Result<Loan[], Error>> {
     const loans: Loan[] = [];
 
-    for (const [id, state] of this.store) {
+    for (const [id, { version, state }] of this.store) {
       if (state.memberId === memberId && state.returnedAt === null) {
-        loans.push(Loan.fromState(id, state));
+        loans.push(Loan.fromState(id, version, state));
       }
     }
 

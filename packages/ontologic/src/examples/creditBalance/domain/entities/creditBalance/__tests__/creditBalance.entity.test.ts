@@ -13,7 +13,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       expect(() => entity.readState()).not.toThrow();
     });
 
@@ -26,7 +26,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       expect(() => entity.readState()).not.toThrow();
     });
 
@@ -39,7 +39,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       expect(() => entity.readState()).toThrow("Corrupted state detected");
     });
   });
@@ -54,7 +54,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       entity.debit({ amount: 50 });
 
       expect(() => entity.readState()).not.toThrow();
@@ -70,7 +70,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       entity.debit({ amount: 100 });
 
       expect(() => entity.readState()).not.toThrow();
@@ -88,7 +88,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       entity.resetSubCredit({ amount: 42 });
 
       expect(() => entity.readState()).not.toThrow();
@@ -104,7 +104,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       entity.resetSubCredit({ amount: 0 });
 
       expect(() => entity.readState()).not.toThrow();
@@ -120,7 +120,7 @@ describe("CreditBalance - balanceIsPositive invariant", () => {
         purchasedCreditBalance: 0,
       };
 
-      const entity = CreditBalance.fromState("abc", state);
+      const entity = CreditBalance.fromState("abc", 1, state);
       entity.resetSubCredit({ amount: -10 });
 
       expect(() => entity.readState()).toThrow("Corrupted state detected");

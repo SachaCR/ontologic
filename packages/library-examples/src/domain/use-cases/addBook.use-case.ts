@@ -1,4 +1,4 @@
-import { err, ok, Result } from "ontologic";
+import { err, ok, Result } from "@ontologic/ontologic";
 import { Book, BookState } from "../entities/book";
 import { LibraryCollection } from "../repositories/libraryCollection.repository";
 

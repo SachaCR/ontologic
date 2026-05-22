@@ -137,7 +137,7 @@ describe("Given the library has a saved loan record (id and full snapshot)", () 
   };
 
   describe("When I load the loan back from that saved snapshot", () => {
-    const loan = Loan.fromState(savedLoanId, savedSnapshot);
+    const loan = Loan.fromState(savedLoanId, 1, savedSnapshot);
 
     it("Then the loan has the same identifier and lending details as when it was saved", () => {
       expect(loan.id()).toBe(savedLoanId);

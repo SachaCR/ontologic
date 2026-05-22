@@ -1,11 +1,6 @@
 import { randomUUID } from "crypto";
 
-import {
-  Result,
-  err,
-  ok,
-  DomainEntity,
-} from "../../../../..";
+import { Result, err, ok, DomainEntity } from "../../../../..";
 
 import { NotEnoughFunds } from "./errors/notEnoughFunds.error";
 
@@ -27,14 +22,13 @@ export interface CreditBalanceState {
 }
 
 export class CreditBalance extends DomainEntity<CreditBalanceState> {
-  private constructor(id: string, state: CreditBalanceState) {
-    super(id, state);
-
+  private constructor(id: string, version: number, state: CreditBalanceState) {
+    super(id, version, state);
     this.addInvariant(balanceIsPositiveInvariant);
   }
 
-  static fromState(id: string, state: CreditBalanceState) {
-    return new CreditBalance(id, state);
+  static fromState(id: string, version: number, state: CreditBalanceState) {
+    return new CreditBalance(id, version, state);
   }
 
   static create(params: { organizationId: string }): {
@@ -55,7 +49,7 @@ export class CreditBalance extends DomainEntity<CreditBalanceState> {
       ...creationEvent.payload,
     };
 
-    const creditBalance = new CreditBalance(id, initialState);
+    const creditBalance = new CreditBalance(id, 0, initialState);
 
     return { creditBalance, creationEvent };
   }

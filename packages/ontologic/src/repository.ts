@@ -2,6 +2,7 @@ import { Result } from "./result/index";
 
 import { DomainEntity } from "./domainEntity";
 import { DomainEventInterface } from "./domainEvent";
+import { ConcurrentWriteError } from "./concurrentWriteError";
 
 export interface EventWithMetadata<Event extends DomainEventInterface> {
   event: Event;
@@ -17,12 +18,12 @@ export interface Repository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
   Event extends DomainEventInterface,
 > {
-  save(entity: Entity): Promise<Result<void, Error>>;
+  save(entity: Entity): Promise<Result<void, Error | ConcurrentWriteError>>;
 
   saveWithEvents(
     entity: Entity,
     domainEvents: DomainEventInterface | DomainEventInterface[],
-  ): Promise<Result<void, Error>>;
+  ): Promise<Result<void, Error | ConcurrentWriteError>>;
 
   getById(id: string): Promise<Result<Entity | undefined, Error>>;
 

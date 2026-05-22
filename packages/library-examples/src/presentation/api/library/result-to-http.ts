@@ -4,12 +4,9 @@ import {
   InternalServerErrorException,
   NotFoundException,
 } from "@nestjs/common";
-import { Result } from "ontologic";
+import { Result } from "@ontologic/ontologic";
 
-const NOT_FOUND_NAMES = new Set([
-  "BOOK_NOT_FOUND",
-  "LOAN_NOT_FOUND",
-]);
+const NOT_FOUND_NAMES = new Set(["BOOK_NOT_FOUND", "LOAN_NOT_FOUND"]);
 
 const CONFLICT_NAMES = new Set([
   "BOOK_ALREADY_ON_LOAN",
@@ -20,7 +17,10 @@ const CONFLICT_NAMES = new Set([
 ]);
 
 function errorName(error: Error): string {
-  if ("name" in error && typeof (error as { name: unknown }).name === "string") {
+  if (
+    "name" in error &&
+    typeof (error as { name: unknown }).name === "string"
+  ) {
     return (error as { name: string }).name;
   }
   return "";
@@ -29,7 +29,9 @@ function errorName(error: Error): string {
 /**
  * Returns the success value or throws an HTTP exception derived from the domain error.
  */
-export function unwrapResultOrThrow<T, E extends Error>(result: Result<T, E>): T {
+export function unwrapResultOrThrow<T, E extends Error>(
+  result: Result<T, E>,
+): T {
   if (result.isOk()) {
     return result.value;
   }

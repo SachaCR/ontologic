@@ -1,5 +1,6 @@
 import { z } from "zod";
-import { switchGuard } from "ontologic";
+
+import { switchGuard } from "@ontologic/ontologic";
 
 import { BookCreatedEvent, BookLostEvent } from "../domain/entities/book";
 import { LoanCreatedEvent, LoanReturnedEvent } from "../domain/entities/loan";

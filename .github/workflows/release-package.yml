@@ -10,8 +10,7 @@ on:
         default: "ontologic"
         options:
           - "ontologic"
-          - "ontologic-pg"
-          - "ontologic-redis"
+          - "postgres"
 
       release_type:
         description: Release type

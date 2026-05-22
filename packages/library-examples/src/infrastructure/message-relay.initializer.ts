@@ -4,7 +4,7 @@ import {
   DomainEventInterface,
   InMemoryMessageRelayStateRepository,
   MessageRelay,
-} from "ontologic";
+} from "@ontologic/ontologic";
 
 import { LibraryCollection } from "../domain/repositories/libraryCollection.repository";
 import { LoanRegister } from "../domain/repositories/loanRegister.repository";

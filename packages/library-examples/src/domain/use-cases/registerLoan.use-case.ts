@@ -1,4 +1,4 @@
-import { err, ok, Result } from "ontologic";
+import { err, ok, Result } from "@ontologic/ontologic";
 import { Loan, LoanState } from "../entities/loan";
 import {
   BookAlreadyOnLoanError,

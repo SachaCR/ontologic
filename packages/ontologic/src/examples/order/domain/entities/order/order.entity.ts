@@ -38,15 +38,15 @@ export interface OrderState {
 }
 
 export class Order extends DomainEntity<OrderState> {
-  private constructor(id: string, state: OrderState) {
-    super(id, state);
+  private constructor(id: string, version: number, state: OrderState) {
+    super(id, version, state);
 
     this.addInvariant(orderHasAtLeastOneItemInvariant);
     this.addInvariant(paidOrderHasInvoiceIdInvariant);
   }
 
-  static fromState(id: string, state: OrderState) {
-    return new Order(id, state);
+  static fromState(id: string, version: number, state: OrderState) {
+    return new Order(id, version, state);
   }
 
   static create(params: { customerId: string; firstItem: OrderItem }): {
@@ -66,7 +66,7 @@ export class Order extends DomainEntity<OrderState> {
       ...creationEvent.payload,
     };
 
-    const order = new Order(id, initialState);
+    const order = new Order(id, 0, initialState);
 
     return { order, creationEvent };
   }

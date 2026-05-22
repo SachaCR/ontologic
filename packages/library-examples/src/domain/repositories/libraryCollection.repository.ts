@@ -1,4 +1,4 @@
-import { InMemoryRepository, Result, ok } from "ontologic";
+import { InMemoryRepository, Result, ok } from "@ontologic/ontologic";
 
 import { Book, BookEvent } from "../entities/book";
 
@@ -37,7 +37,7 @@ export class LibraryCollection extends InMemoryRepository<Book, BookEvent> {
 
     const matches: Book[] = [];
 
-    for (const [id, state] of this.store) {
+    for (const [id, { version, state }] of this.store) {
       const titleMatches =
         filterByTitle && state.title.toLowerCase().includes(titleToSearch!);
 
@@ -45,7 +45,7 @@ export class LibraryCollection extends InMemoryRepository<Book, BookEvent> {
         filterByAuthor && state.author.toLowerCase().includes(authorToSearch!);
 
       if (titleMatches || authorMatches) {
-        matches.push(Book.fromState(id, state));
+        matches.push(Book.fromState(id, version, state));
       }
     }
 

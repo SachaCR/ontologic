@@ -4,7 +4,7 @@ import {
   OnModuleDestroy,
   Inject,
 } from "@nestjs/common";
-import { DomainEventBusListener } from "ontologic";
+import { DomainEventBusListener } from "@ontologic/ontologic";
 
 import { BookCreatedEvent, BookLostEvent } from "../../../domain/entities/book";
 import {

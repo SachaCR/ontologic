@@ -1,4 +1,5 @@
-import { DomainEvent } from "ontologic";
+import { DomainEvent } from "@ontologic/ontologic";
+
 import { z } from "zod";
 
 export interface LoanCreatedPayload {

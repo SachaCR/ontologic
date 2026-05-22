@@ -1,10 +1,11 @@
 import { Module } from "@nestjs/common";
+
 import {
   DomainEventBusListener,
   DomainEventBusPublisher,
   InMemoryConnectors,
   InMemoryMessageRelayStateRepository,
-} from "ontologic";
+} from "@ontologic/ontologic";
 
 import { LibraryCollection } from "../../../domain/repositories/libraryCollection.repository";
 import { LoanRegister } from "../../../domain/repositories/loanRegister.repository";

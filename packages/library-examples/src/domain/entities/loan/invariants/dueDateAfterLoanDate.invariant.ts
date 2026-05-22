@@ -1,4 +1,4 @@
-import { BaseDomainInvariant } from "ontologic";
+import { BaseDomainInvariant } from "@ontologic/ontologic";
 
 import { LoanState } from "../loan.entity";
 

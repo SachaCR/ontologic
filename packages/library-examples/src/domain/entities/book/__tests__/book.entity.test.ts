@@ -108,7 +108,7 @@ describe("Given the library has a saved record of a book (id and catalogue snaps
   };
 
   describe("When I load the book back from that saved snapshot", () => {
-    const book = Book.fromState(savedBookId, savedSnapshot);
+    const book = Book.fromState(savedBookId, 1, savedSnapshot);
 
     it("Then the book has the same identifier and catalogue information as when it was saved", () => {
       expect(book.id()).toBe(savedBookId);

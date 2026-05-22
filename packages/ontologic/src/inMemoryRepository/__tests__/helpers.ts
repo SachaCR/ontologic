@@ -6,17 +6,17 @@ export interface UserState {
 }
 
 export class User extends DomainEntity<UserState> {
-  constructor(id: string, state: UserState) {
-    super(id, state);
+  constructor(id: string, version: number, state: UserState) {
+    super(id, version, state);
   }
 
-  static fromState(id: string, state: UserState): User {
-    return new User(id, state);
+  static fromState(id: string, version: number, state: UserState): User {
+    return new User(id, version, state);
   }
 }
 
-export function makeUser(id: string, name = "Alice"): User {
-  return new User(id, { id, name });
+export function makeUser(id: string, name = "Alice", version = 1): User {
+  return new User(id, version, { id, name });
 }
 
 export function makeEvent(

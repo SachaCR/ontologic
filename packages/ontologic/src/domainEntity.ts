@@ -3,17 +3,26 @@ import { DomainInvariant } from "./domainInvariant/interfaces";
 
 export interface IDomainEntity {
   id(): string;
+  version(): number;
+  setVersion(version: number): void;
   readState(): unknown;
   addInvariant(invariant: DomainInvariant<unknown>): void;
 }
 
 export class DomainEntity<State> implements IDomainEntity {
   #id: string;
+  #version: number;
   #invariants: DomainInvariant<State>[];
   protected state: State;
 
-  constructor(id: string, state: State, invariants?: DomainInvariant<State>[]) {
+  constructor(
+    id: string,
+    version: number,
+    state: State,
+    invariants?: DomainInvariant<State>[],
+  ) {
     this.#id = id;
+    this.#version = version;
     this.state = structuredClone(state); // TODO: Verify it's JSON compatible ??
     this.#invariants = invariants || [];
     this.checkInvariants();
@@ -21,6 +30,10 @@ export class DomainEntity<State> implements IDomainEntity {
 
   id(): string {
     return this.#id;
+  }
+
+  version(): number {
+    return this.#version;
   }
 
   readState(): State {
@@ -51,6 +64,18 @@ export class DomainEntity<State> implements IDomainEntity {
    */
   unsafeRawState(): State {
     return this.state;
+  }
+
+  /**
+   * Updates the entity's in-memory version. Repositories call this after a
+   * successful save so subsequent saves of the same instance see the
+   * up-to-date version and don't trip the optimistic-concurrency check.
+   *
+   * Domain code should not call this directly — mutating the version outside
+   * of a persistence boundary defeats the purpose of optimistic locking.
+   */
+  setVersion(version: number): void {
+    this.#version = version;
   }
 
   addInvariant(invariant: DomainInvariant<State>) {

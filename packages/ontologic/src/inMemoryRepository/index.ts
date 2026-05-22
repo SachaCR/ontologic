@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
-import { ok, Result } from "../result";
+import { err, ok, Result } from "../result";
+import { ConcurrentWriteError } from "../concurrentWriteError";
 import { DomainEntity } from "../domainEntity";
 import { DomainEventInterface } from "../domainEvent";
 import { EventWithMetadata, Repository } from "../repository";
@@ -9,30 +10,105 @@ export class InMemoryRepository<
   Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
   Event extends DomainEventInterface,
 > implements Repository<Entity, Event> {
-  #mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity;
+  #mapper: (
+    id: string,
+    version: number,
+    state: ReturnType<Entity["readState"]>,
+  ) => Entity;
   #emitter = new EventEmitter({
     captureRejections: true,
   });
 
   constructor(
-    mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity,
+    mapper: (
+      id: string,
+      version: number,
+      state: ReturnType<Entity["readState"]>,
+    ) => Entity,
   ) {
     this.#mapper = mapper;
   }
 
-  protected readonly store = new Map<string, ReturnType<Entity["readState"]>>();
+  protected readonly store = new Map<
+    string,
+    { version: number; state: ReturnType<Entity["readState"]> }
+  >();
   protected readonly eventStore = new Map<string, EventWithMetadata<Event>[]>();
 
-  async save(entity: Entity): Promise<Result<void, Error>> {
-    this.store.set(entity.id(), entity.readState());
+  async save(entity: Entity): Promise<Result<void, ConcurrentWriteError>> {
+    const existing = this.store.get(entity.id());
+
+    if (existing) {
+      // Creation attempted (v=0) but a row already exists — concurrent create.
+      // Stale update — loaded version no longer matches what's stored.
+      if (
+        entity.version() === 0 ||
+        existing.version !== entity.version()
+      ) {
+        return Promise.resolve(
+          err(
+            new ConcurrentWriteError({
+              entityId: entity.id(),
+              expectedVersion: entity.version(),
+            }),
+          ),
+        );
+      }
+    }
+
+    // Fresh creation lands at v=1 so subsequent saves take the UPDATE path.
+    const newVersion =
+      entity.version() === 0
+        ? 1
+        : existing
+          ? existing.version + 1
+          : entity.version();
+
+    this.store.set(entity.id(), {
+      state: entity.readState(),
+      version: newVersion,
+    });
+
+    entity.setVersion(newVersion);
+
     return Promise.resolve(ok());
   }
 
   async saveWithEvents(
     entity: Entity,
     domainEvents: Event | Event[],
-  ): Promise<Result<void, Error>> {
-    this.store.set(entity.id(), entity.readState());
+  ): Promise<Result<void, ConcurrentWriteError>> {
+    const existing = this.store.get(entity.id());
+
+    if (existing) {
+      if (
+        entity.version() === 0 ||
+        existing.version !== entity.version()
+      ) {
+        return Promise.resolve(
+          err(
+            new ConcurrentWriteError({
+              entityId: entity.id(),
+              expectedVersion: entity.version(),
+            }),
+          ),
+        );
+      }
+    }
+
+    const newVersion =
+      entity.version() === 0
+        ? 1
+        : existing
+          ? existing.version + 1
+          : entity.version();
+
+    this.store.set(entity.id(), {
+      state: entity.readState(),
+      version: newVersion,
+    });
+
+    entity.setVersion(newVersion);
 
     const events = this.eventStore.get(entity.id()) || [];
 
@@ -61,13 +137,15 @@ export class InMemoryRepository<
   }
 
   getById(id: string): Promise<Result<Entity | undefined, Error>> {
-    const state = this.store.get(id);
+    const snapshot = this.store.get(id);
 
-    if (state === undefined) {
+    if (snapshot === undefined) {
       return Promise.resolve(ok(undefined));
     }
 
-    return Promise.resolve(ok(this.#mapper(id, state)));
+    return Promise.resolve(
+      ok(this.#mapper(id, snapshot.version, snapshot.state)),
+    );
   }
 
   list(params: {
@@ -78,8 +156,8 @@ export class InMemoryRepository<
   > {
     const entities: Entity[] = [];
 
-    this.store.forEach((state, id) => {
-      entities.push(this.#mapper(id, state));
+    this.store.forEach((snapshot, id) => {
+      entities.push(this.#mapper(id, snapshot.version, snapshot.state));
     });
 
     const paginatedEntities = entities.slice(
