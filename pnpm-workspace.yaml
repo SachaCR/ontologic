@@ -1,0 +1,6 @@
+packages:
+  - "packages/*"
+  # - "website"
+
+  # exclude packages that are inside test directories
+  - "!**/__tests__/**"

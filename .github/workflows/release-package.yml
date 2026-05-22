@@ -3,14 +3,25 @@ name: Release package
 on:
   workflow_dispatch:
     inputs:
+      package:
+        type: choice
+        description: "Select a package"
+        required: true
+        default: "ontologic"
+        options:
+          - "ontologic"
+          - "ontologic-pg"
+          - "ontologic-redis"
+
       release_type:
         description: Release type
-        required: true
         type: choice
+        required: true
+        default: "patch"
         options:
-          - patch
-          - minor
-          - major
+          - "patch"
+          - "minor"
+          - "major"
 
 permissions:
   id-token: write # Required for OIDC
@@ -32,10 +43,19 @@ jobs:
         with:
           node-version: 24
           cache: pnpm
+          scope: ontologic
           registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Cache turbo build setup
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
 
       - name: Configure git
         run: |
@@ -46,10 +66,10 @@ jobs:
         run: pnpm version ${{ github.event.inputs.release_type }}
 
       - name: Build
-        run: pnpm tsc --project tsconfig-release.json
+        run: pnpm release --filter=@ontologic/${{ github.event.inputs.package }}
 
       - name: Push version commit and tag
         run: git push --follow-tags
 
       - name: Publish to NPM
-        run: pnpm publish --no-git-checks --access public
+        run: pnpm publish --no-git-checks --access public --workspace=@ontologic/${{ github.event.inputs.package }}

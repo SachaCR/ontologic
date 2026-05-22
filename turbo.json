@@ -1,0 +1,23 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "test": {
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**"],
+      "outputs": ["reports/**"],
+      "dependsOn": ["^test", "^build"]
+    },
+    "build": {
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**"],
+      "outputs": ["dist/**"],
+      "dependsOn": ["^build"]
+    },
+    "build:release": {
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**"],
+      "outputs": ["dist/**"],
+      "dependsOn": ["^build:release"]
+    }
+  }
+}

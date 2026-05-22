@@ -6,3 +6,6 @@ html/
 coverage/
 .DS_Store
 scripts/
+.turbo/
+reports/
+

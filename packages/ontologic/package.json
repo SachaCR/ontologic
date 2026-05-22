@@ -1,0 +1,52 @@
+{
+  "name": "@ontologic/ontologic",
+  "version": "1.6.2",
+  "description": "Model What Matters: Domain Entities, Invariant, Domain Events, and much more.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "/dist"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "test:report": "vitest run && npx vite preview --outDir html",
+    "build": "tsc",
+    "build:release": "tsc --project tsconfig-release.json",
+    "example:step": "pnpx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
+    "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts"
+  },
+  "keywords": [
+    "DDD",
+    "domain-driven-design",
+    "domain",
+    "entity",
+    "invariants",
+    "domain-events",
+    "event-bus",
+    "outbox",
+    "repository",
+    "result-pattern",
+    "workflow",
+    "clean-code",
+    "typescript"
+  ],
+  "author": "SachaCR",
+  "license": "MIT",
+  "homepage": "https://ontologic.site",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SachaCR/ontologic.git"
+  },
+  "bugs": {
+    "url": "https://github.com/SachaCR/ontologic/issues"
+  },
+  "packageManager": "pnpm@10.29.2",
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.0.18",
+    "@vitest/ui": "4.0.18",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.3"
+  }
+}
