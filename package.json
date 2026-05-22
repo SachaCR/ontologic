@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "description": "Model What Matters: Domain Entities, Invariant, Domain Events, and much more.",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "website"
   ],
   "scripts": {
     "test": "turbo test",
