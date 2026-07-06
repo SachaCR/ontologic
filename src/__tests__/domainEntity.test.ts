@@ -121,6 +121,31 @@ describe("DomainEntity invariant violation", () => {
   });
 });
 
+describe("DomainEntity constructor (defensive copy on ingest)", () => {
+  it("clones the passed-in state when no custom serialize is provided, so later mutations don't bleed in", () => {
+    const seed: BalanceState = { amount: 50, ledger: [{ id: "e0", delta: 50 }] };
+    const balance = new Balance("balance-1", seed);
+
+    // Mutate the object we handed to the constructor.
+    seed.amount = 999;
+    seed.ledger.push({ id: "tampered", delta: 1 });
+
+    const snapshot = balance.readState();
+    expect(snapshot.amount).toBe(50);
+    expect(snapshot.ledger).toHaveLength(1);
+  });
+
+  it("takes ownership without cloning when a custom serialize is provided", () => {
+    const seed: BalanceState = { amount: 50, ledger: [] };
+    const entity = new DomainEntity<BalanceState>("balance-1", seed, {
+      serialize: (state) => structuredClone(state),
+    });
+
+    // With a custom serialize the entity keeps the exact reference it was given.
+    expect(entity.unsafeRawState()).toBe(seed);
+  });
+});
+
 describe("DomainEntity.readState (regression)", () => {
   it("returns a deep clone disconnected from the entity", () => {
     const balance = Balance.make(50, [{ id: "e0", delta: 50 }]);
