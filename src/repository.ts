@@ -14,7 +14,7 @@ export interface EventMetadata {
   createdAt: string;
 }
 export interface Repository<
-  Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
+  Entity extends DomainEntity<any, ReturnType<Entity["readState"]>>,
   Event extends DomainEventInterface,
 > {
   save(entity: Entity): Promise<Result<void, Error>>;

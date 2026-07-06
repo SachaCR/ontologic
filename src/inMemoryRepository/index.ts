@@ -6,7 +6,7 @@ import { EventWithMetadata, Repository } from "../repository";
 import { randomUUID } from "node:crypto";
 
 export class InMemoryRepository<
-  Entity extends DomainEntity<ReturnType<Entity["readState"]>>,
+  Entity extends DomainEntity<any, ReturnType<Entity["readState"]>>,
   Event extends DomainEventInterface,
 > implements Repository<Entity, Event> {
   #mapper: (id: string, state: ReturnType<Entity["readState"]>) => Entity;

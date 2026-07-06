@@ -2,6 +2,7 @@ export * from "./domainError";
 export * from "./corruptedStateError";
 export * from "./domainEvent";
 export * from "./domainEntity";
+export * from "./valueObject";
 export * from "./repository";
 export * from "./result";
 export * from "./domainInvariant";

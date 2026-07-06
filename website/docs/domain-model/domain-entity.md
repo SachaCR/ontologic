@@ -70,7 +70,7 @@ class BankAccount extends DomainEntity<BankAccountState> {
 }
 ```
 
-The `state` property is `protected` — only the entity and its subclasses can touch it. When you call `readState()`, you get back a **deep clone**, so there's no way for outside code to accidentally mutate the internal state.
+The `state` property is `protected` — only the entity and its subclasses can touch it. When you call `readState()`, you get back a **safe copy** — a deep clone by default — so there's no way for outside code to accidentally mutate the internal state. (When your state holds live sub-entities, you control how that copy is produced — see [Custom serialization](#custom-serialization-for-states-with-sub-entities).)
 
 This is encapsulation in the DDD sense: **the entity controls all changes to itself**.
 
@@ -166,12 +166,12 @@ This lets you build complex business rules from simple, readable, named pieces.
 
 ## Reading state without paying for safety
 
-`readState()` is safe by default: it runs the invariants and returns a **deep clone**. For most code paths, that's exactly what you want.
+`readState()` is safe by default: it runs the invariants and returns a **safe copy** — a deep clone unless you supply a custom [`serialize`](#custom-serialization-for-states-with-sub-entities). For most code paths, that's exactly what you want.
 
-On hot paths, tight loops, large state objects, high-throughput services, the clone shows up in profiles. The entity exposes two opt-in accessors for those cases:
+On hot paths, tight loops, large state objects, high-throughput services, the copy shows up in profiles. The entity exposes two opt-in accessors for those cases:
 
 ```typescript
-account.readState(); // deep clone + invariant check  (default, safe)
+account.readState(); // safe copy + invariant check  (default, safe)
 account.unsafeReadState(); // no clone, but invariant check still runs
 account.unsafeRawState(); // no clone, no check  (cheapest, fully on you)
 ```
@@ -187,6 +187,75 @@ A practical rule:
 - Reach for `unsafeRawState()` only when you also need to skip the invariant check (for example, inside a serialization adapter where you've already validated the state upstream).
 
 Both methods are deliberately named `unsafe*` so they are grep-able in code review.
+
+---
+
+## Custom serialization for states with sub-entities
+
+By default, `readState()` produces its safe copy with `structuredClone`. That is exactly right when your state is plain, JSON-like data — the common case, and it needs no configuration.
+
+But `structuredClone` **drops class prototypes**. If your state holds live instances — the sub-entities of an aggregate, value objects with behavior — cloning turns them back into plain objects and strips their methods:
+
+```typescript
+class OrderLine {
+  constructor(
+    private state: { sku: string; quantity: number; unitPrice: number },
+  ) {}
+
+  subtotal(): number {
+    return this.state.quantity * this.state.unitPrice;
+  }
+
+  serialize() {
+    return { ...this.state };
+  }
+}
+
+const line = new OrderLine({ sku: "A", quantity: 2, unitPrice: 10 });
+structuredClone(line).subtotal();
+// 💥 TypeError: subtotal is not a function — the prototype is gone
+```
+
+To keep sub-entities alive inside an aggregate, give the entity a **`serialize`** function through the constructor's options. `readState()` calls it instead of `structuredClone`, and you decide how the rich internal state collapses into a plain, decoupled snapshot.
+
+`DomainEntity` takes a second type parameter for this: `DomainEntity<State, Serialized>`. `State` is the rich internal form (holding live sub-entities); `Serialized` is the plain form `readState()` hands out.
+
+```typescript
+interface OrderState {
+  lines: OrderLine[]; // live sub-entities, with domain logic
+}
+
+interface OrderSnapshot {
+  lines: { sku: string; quantity: number; unitPrice: number }[]; // plain data
+}
+
+class Order extends DomainEntity<OrderState, OrderSnapshot> {
+  constructor(id: string, state: OrderState) {
+    super(id, state, {
+      serialize: (state) => ({
+        lines: state.lines.map((line) => line.serialize()),
+      }),
+    });
+  }
+
+  total(): number {
+    // sub-entity logic stays usable internally
+    return this.state.lines.reduce((sum, line) => sum + line.subtotal(), 0);
+  }
+}
+```
+
+The sub-entities keep their behavior inside the entity, while `readState()` still returns a plain, side-effect-free snapshot that outside code cannot use to reach back into the aggregate.
+
+**When to provide `serialize`:**
+
+- Your state contains **class instances** — sub-entities, value objects, anything with methods you still need after a read.
+- **Not** for plain data. If your state is only objects, arrays, strings, numbers, dates, `Map`/`Set`, leave `serialize` out — the `structuredClone` default is correct and there's nothing to do.
+
+Two things to keep in mind:
+
+- **`serialize` is not persistence.** Its only job is to decouple the returned value from the entity's internals. How that snapshot is stored in a database or put on the wire is the [Repository](./repository.md)'s concern — and that's also where you rehydrate the sub-entities on the way back in.
+- **The entity takes ownership of the state you pass it.** Because it cannot defensively clone on construction without stripping sub-entity prototypes, it keeps the exact object you hand to the constructor. Do not keep mutating that reference afterward.
 
 ---
 
@@ -463,7 +532,8 @@ if (result.isErr()) {
 
 | Concept                 | What it means                              | How `ontologic` helps                           |
 | ----------------------- | ------------------------------------------ | ----------------------------------------------- |
-| **State Encapsulation** | The entity controls its own data           | `protected state`, deep-cloned `readState()`    |
+| **State Encapsulation** | The entity controls its own data           | `protected state`, safe-copy `readState()`      |
+| **Custom serialization**| Keep sub-entities alive inside an aggregate| `serialize` option, `DomainEntity<State, Serialized>` |
 | **Invariants**          | Rules that must always hold                | `BaseDomainInvariant`, checked on read          |
 | **Domain Logic**        | Behavior lives in the entity               | Methods return `Result<Event, Error>`           |
 | **Domain Events**       | Records of meaningful things that happened | Typed `DomainEvent` with name, version, payload |
