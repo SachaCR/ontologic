@@ -28,7 +28,9 @@ export interface ValueObjectOptions<State, Serialized = State> {
 
 export class ValueObject<State, Serialized = State> implements IValueObject {
   #invariants: DomainInvariant<State>[];
+
   #serialize: (state: State) => Serialized;
+
   protected state: State;
 
   constructor(state: State, options?: ValueObjectOptions<State, Serialized>) {
@@ -44,7 +46,8 @@ export class ValueObject<State, Serialized = State> implements IValueObject {
       // No custom serialize: the state is treated as plain, structuredClone-able
       // data throughout. Defensively clone on ingest so callers cannot mutate
       // the value object through the reference they passed in.
-      this.#serialize = (state) => structuredClone(state) as unknown as Serialized;
+      this.#serialize = (state) =>
+        structuredClone(state) as unknown as Serialized;
       this.state = structuredClone(state);
     }
 

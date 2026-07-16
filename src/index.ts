@@ -1,5 +1,6 @@
 export * from "./domainError";
 export * from "./corruptedStateError";
+export * from "./concurrentWriteError";
 export * from "./domainEvent";
 export * from "./domainEntity";
 export * from "./valueObject";

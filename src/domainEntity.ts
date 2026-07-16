@@ -3,6 +3,8 @@ import { DomainInvariant } from "./domainInvariant/interfaces";
 
 export interface IDomainEntity {
   id(): string;
+  version(): number;
+  setVersion(version: number): void;
   readState(): unknown;
   addInvariant(invariant: DomainInvariant<unknown>): void;
 }
@@ -30,6 +32,7 @@ export interface DomainEntityOptions<State, Serialized = State> {
 
 export class DomainEntity<State, Serialized = State> implements IDomainEntity {
   #id: string;
+  #version = 0;
   #invariants: DomainInvariant<State>[];
   #serialize: (state: State) => Serialized;
   protected state: State;
@@ -61,6 +64,27 @@ export class DomainEntity<State, Serialized = State> implements IDomainEntity {
 
   id(): string {
     return this.#id;
+  }
+
+  /**
+   * The optimistic-concurrency version the entity was loaded at — for event-sourced
+   * aggregates, the sequence of its last persisted event (`0` when never persisted).
+   * Repositories read this to guard the write against concurrent modifications.
+   */
+  version(): number {
+    return this.#version;
+  }
+
+  /**
+   * Updates the entity's in-memory version. Repositories call this after a
+   * successful save so subsequent saves of the same instance see the
+   * up-to-date version and don't trip the optimistic-concurrency check.
+   *
+   * Domain code should not call this directly — mutating the version outside
+   * of a persistence boundary defeats the purpose of optimistic locking.
+   */
+  setVersion(version: number): void {
+    this.#version = version;
   }
 
   readState(): Serialized {
