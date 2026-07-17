@@ -4,7 +4,11 @@ import { EventMetadata } from "../repository";
 export interface IDomainEventBusPublisher<Event extends DomainEventInterface> {
   start(): void | Promise<void>;
   stop(): void | Promise<void>;
-  publish(event: Event, metadata: EventMetadata): Promise<void>;
+  publish(
+    event: Event,
+    metadata: EventMetadata,
+    options?: { orderingKey?: string },
+  ): Promise<void>;
 }
 
 export interface IDomainEventBusListener<Event extends DomainEventInterface> {
