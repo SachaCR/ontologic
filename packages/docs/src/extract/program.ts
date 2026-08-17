@@ -48,7 +48,7 @@ export function buildProgram(options: BuildProgramOptions): ExtractContext {
 
   const paths = (options.paths ?? []).map((p) => resolve(p));
   if (paths.length === 0) {
-    throw new Error("ontologic-docs: provide either --project or a source path");
+    throw new Error("provide either --project or a source path");
   }
 
   const files = paths.flatMap((p) =>
@@ -59,7 +59,7 @@ export function buildProgram(options: BuildProgramOptions): ExtractContext {
 
   if (files.length === 0) {
     throw new Error(
-      `ontologic-docs: no TypeScript files found under ${paths.join(", ")}`,
+      `no TypeScript files found under ${paths.join(", ")}`,
     );
   }
 
@@ -74,13 +74,13 @@ export function buildProgram(options: BuildProgramOptions): ExtractContext {
 
 function fromTsConfig(configPath: string): ExtractContext {
   if (!existsSync(configPath)) {
-    throw new Error(`ontologic-docs: no tsconfig at ${configPath}`);
+    throw new Error(`no tsconfig at ${configPath}`);
   }
 
   const readResult = ts.readConfigFile(configPath, ts.sys.readFile);
   if (readResult.error) {
     throw new Error(
-      `ontologic-docs: could not read ${configPath}: ${ts.flattenDiagnosticMessageText(readResult.error.messageText, " ")}`,
+      `could not read ${configPath}: ${ts.flattenDiagnosticMessageText(readResult.error.messageText, " ")}`,
     );
   }
 
