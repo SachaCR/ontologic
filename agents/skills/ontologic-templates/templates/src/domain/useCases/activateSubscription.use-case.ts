@@ -8,18 +8,25 @@ import { SubscriptionRepository } from "../subscription.repository";
 import { EntityNotFound } from "./errors/entityNotFound.error";
 
 /**
- * A use case is a plain exported async function taking the repository as its
- * first argument. There is no `UseCase` base class.
+ * A use case is a plain exported async function. There is no `UseCase` base
+ * class. It takes two arguments: the caller's INPUT, then a named DEPENDENCIES
+ * bag. The bag scales to use cases that need several repositories — see
+ * `subscribeToPlan.use-case.ts`.
  *
  * The governing rule: TECHNICAL failures are thrown, DOMAIN failures are
  * returned in a `Result`.
+ *
+ * Note that `activatedAt` is part of the input rather than read from the clock
+ * inside the entity — see references/where-logic-goes.md.
  */
 export async function activateSubscriptionUseCase(
-  repository: SubscriptionRepository,
-  id: string,
-  activatedAt: string,
+  input: { id: string; activatedAt: string },
+  dependencies: { subscriptions: SubscriptionRepository },
 ): Promise<Result<SubscriptionState, InvalidStatusTransition | EntityNotFound>> {
-  const resultGetById = await repository.getById(id);
+  const { id, activatedAt } = input;
+  const { subscriptions } = dependencies;
+
+  const resultGetById = await subscriptions.getById(id);
 
   if (resultGetById.isErr()) {
     // Infrastructure is broken. Not a business outcome — throw.
@@ -49,7 +56,7 @@ export async function activateSubscriptionUseCase(
     }
   }
 
-  const saveResult = await repository.saveWithEvents(subscription, result.value);
+  const saveResult = await subscriptions.saveWithEvents(subscription, result.value);
 
   if (saveResult.isErr()) {
     throw saveResult.error;

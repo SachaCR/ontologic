@@ -19,16 +19,18 @@ decision, so it is returned as `err(new EntityNotFound(...))`.
 
 ## Use case shape
 
-A use case is a plain exported async function taking the repository first. There is no
-`UseCase` base class. The canonical sequence:
+A use case is a plain exported async function taking the **input** first, then a named
+**dependencies** bag. There is no `UseCase` base class. The canonical sequence:
 
 ```typescript
 export async function activateSubscriptionUseCase(
-  repository: SubscriptionRepository,
-  id: string,
-  activatedAt: string,
+  input: { id: string; activatedAt: string },
+  dependencies: { subscriptions: SubscriptionRepository },
 ): Promise<Result<SubscriptionState, InvalidStatusTransition | EntityNotFound>> {
-  const resultGetById = await repository.getById(id);
+  const { id, activatedAt } = input;
+  const { subscriptions } = dependencies;
+
+  const resultGetById = await subscriptions.getById(id);
   if (resultGetById.isErr()) throw resultGetById.error;        // technical → throw
 
   const subscription = resultGetById.value;
@@ -46,15 +48,57 @@ export async function activateSubscriptionUseCase(
     }
   }
 
-  const saveResult = await repository.saveWithEvents(subscription, result.value);
+  const saveResult = await subscriptions.saveWithEvents(subscription, result.value);
   if (saveResult.isErr()) throw saveResult.error;
 
   return ok(subscription.readState());                          // state, not the entity
 }
 ```
 
+The dependencies bag is what lets a use case span two aggregates — the positional
+`(repository, ...args)` form cannot express that cleanly.
+
 When a use case produces several events, collect them in an array and hand the array to
 `saveWithEvents`.
+
+## Which rules belong here
+
+A rule belongs in a use case when it **cannot be decided from one entity's state alone** —
+it needs another aggregate, a count, or a lookup. Rules that only read one entity's own
+fields belong on the entity, as an invariant or a guard clause.
+
+Structure a use case to **read from as many aggregates as it needs and write to exactly
+one**: `saveWithEvents(entity, events)` is the only atomic unit, and there is no
+cross-aggregate transaction. See `references/where-logic-goes.md` in the
+`ontologic-domain-modeling` skill for the full decision table.
+
+## Repository finders
+
+A predicate that names a domain concept — "active means `returnedAt === null`" — belongs
+on the repository as a finder, not repeated in each use case:
+
+```typescript
+export class LoanRegister extends InMemoryRepository<Loan, LoanEvent> {
+  constructor() {
+    super(Loan.fromState);
+  }
+
+  async findActiveLoansForMember(memberId: string): Promise<Result<Loan[], Error>> {
+    const loans: Loan[] = [];
+
+    for (const [id, state] of this.store) {
+      if (state.memberId === memberId && state.returnedAt === null) {
+        loans.push(Loan.fromState(id, state));
+      }
+    }
+
+    return ok(loans);
+  }
+}
+```
+
+Filter over raw state, rehydrate through `Entity.fromState(id, state)`, return a `Result`.
+The use case then reads as business language rather than as a filter expression.
 
 ## Repository
 
@@ -102,6 +146,10 @@ In this skill:
 
 - `references/use-cases.md` — dependency injection, error unions, multi-event use cases, the throw-or-return table
 - `references/testing.md` — vitest patterns for use cases
+
+In the `ontologic-domain-modeling` skill:
+
+- `references/where-logic-goes.md` — the entity-vs-use-case decision table, with a worked cross-aggregate example
 
 On the docs site:
 

@@ -2,24 +2,44 @@
 
 There is no `UseCase` class or interface in the library. A use case is a convention:
 an exported async function in a `<verbNoun>.use-case.ts` file, exporting `<verbNoun>UseCase`,
-taking the repository as its first argument.
+taking the caller's **input** first and a named **dependencies** bag second.
 
 ## Dependency injection
 
-Take the repository as a parameter. Do not instantiate it at module scope — that makes
-the use case untestable and couples it to one implementation.
+Two parameters, both objects: what the caller is asking for, and what the use case needs
+to do it. Never instantiate a repository at module scope — that makes the use case
+untestable and couples it to one implementation.
 
 ```typescript
-// Good
-export async function activateSubscriptionUseCase(
-  repository: SubscriptionRepository,
-  id: string,
+// Good — scales to any number of collaborators
+export async function subscribeToPlanUseCase(
+  input: { customerId: string; planId: string },
+  dependencies: { subscriptions: SubscriptionRepository; plans: PlanRepository },
 ) { /* ... */ }
 
-// Avoid
+// Avoid — a second aggregate has nowhere to go, and positional args get ambiguous
+export async function subscribeToPlanUseCase(
+  repository: SubscriptionRepository,
+  customerId: string,
+  planId: string,
+) { /* ... */ }
+
+// Avoid — untestable, single implementation forever
 const repository = new SubscriptionRepository();
-export async function activateSubscriptionUseCase(id: string) { /* ... */ }
+export async function subscribeToPlanUseCase(customerId: string) { /* ... */ }
 ```
+
+Destructure both at the top of the body, so the rest of the function reads the same as a
+positional one:
+
+```typescript
+const { customerId, planId } = input;
+const { subscriptions, plans } = dependencies;
+```
+
+The bag is also what keeps a cross-aggregate use case honest: the names say which
+aggregates are in play, so a reviewer can see at a glance that `subscribeToPlan` touches
+two. Read from as many as you need; **write to exactly one**.
 
 ## The return type is a contract
 
@@ -84,7 +104,7 @@ if (activated.isErr()) {
 }
 domainEvents.push(activated.value);
 
-const saveResult = await repository.saveWithEvents(subscription, domainEvents);
+const saveResult = await subscriptions.saveWithEvents(subscription, domainEvents);
 if (saveResult.isErr()) throw saveResult.error;
 ```
 
