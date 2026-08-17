@@ -1,5 +1,7 @@
 import { EventEmitter } from "node:events";
 
+import { WorkflowChangeEvent } from "../interfaces";
+
 export function defineSubTask<const N extends string, Input, Output>(task: {
   name: N;
   handler: (input: Input) => Promise<Output>;
@@ -30,11 +32,13 @@ export async function aggregateFunction<
 ): Promise<AggregateOutput<H>> {
   const entries = await Promise.all(
     handlers.map(async ({ name, handler }) => {
-      eventEmitter.emit("change", { step: name, status: "START" });
+      const started: WorkflowChangeEvent = { step: name, status: "IN_PROGRESS" };
+      eventEmitter.emit("change", started);
 
       const result = await handler(input);
 
-      eventEmitter.emit("change", { step: name, status: "DONE" });
+      const done: WorkflowChangeEvent = { step: name, status: "DONE" };
+      eventEmitter.emit("change", done);
 
       return [name, result] as const;
     }),

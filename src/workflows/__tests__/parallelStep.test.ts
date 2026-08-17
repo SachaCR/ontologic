@@ -22,6 +22,33 @@ describe("Workflow with parallel steps", () => {
     expect(result).toStrictEqual({ increment: 5, label: "n=4" });
   });
 
+  test("emits IN_PROGRESS then DONE for each subtask through onChanges", async () => {
+    const workflow = new WorkflowBuilder<number>({
+      id: randomUUID(),
+      name: "workflow",
+      input: 4,
+    }).addStepWithSubtasks({
+      name: "parallel",
+      subtasks: [
+        { name: "increment", handler: async (n: number) => n + 1 },
+        { name: "label", handler: async (n: number) => `n=${n}` },
+      ],
+    });
+
+    const events: string[] = [];
+    workflow.onChanges((event) => events.push(`${event.step}:${event.status}`));
+
+    await workflow.execute();
+
+    // Subtasks must report the same statuses as every other step. They used to
+    // emit "START", which was absent from the declared onChanges event union.
+    expect(events).toContain("increment:IN_PROGRESS");
+    expect(events).toContain("increment:DONE");
+    expect(events).toContain("label:IN_PROGRESS");
+    expect(events).toContain("label:DONE");
+    expect(events.filter((e) => e.endsWith(":START"))).toStrictEqual([]);
+  });
+
   test("runs parallel handlers concurrently", async () => {
     let signalSecond!: () => void;
     const secondStarted = new Promise<void>((resolve) => {
