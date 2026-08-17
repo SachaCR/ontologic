@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { aggregateFunction, AggregateOutput } from "./parallelStep";
-import { WorkflowState } from "../interfaces";
+import { WorkflowChangeEvent, WorkflowState } from "../interfaces";
 import { WorkflowStateRepository } from "../repository/interfaces";
 
 export class ComposableWorkflowStep<Input, Output> {
@@ -90,10 +90,11 @@ export class ComposableWorkflowStep<Input, Output> {
 
     const input = await this.#previousStep();
 
-    this.#eventEmitter.emit("change", {
+    const started: WorkflowChangeEvent = {
       step: this.#name,
       status: "IN_PROGRESS",
-    });
+    };
+    this.#eventEmitter.emit("change", started);
 
     try {
       const output = await this.#handler(input);
@@ -104,7 +105,8 @@ export class ComposableWorkflowStep<Input, Output> {
         this.#workflowState.status = "DONE";
       }
 
-      this.#eventEmitter.emit("change", { step: this.#name, status: "DONE" });
+      const done: WorkflowChangeEvent = { step: this.#name, status: "DONE" };
+      this.#eventEmitter.emit("change", done);
 
       return output;
     } catch (err: unknown) {
@@ -143,11 +145,12 @@ export class ComposableWorkflowStep<Input, Output> {
       name: error.name,
     };
 
-    this.#eventEmitter.emit("change", {
+    const failed: WorkflowChangeEvent = {
       step: this.#name,
       status: "FAILED",
       error,
-    });
+    };
+    this.#eventEmitter.emit("change", failed);
 
     return error;
   }
@@ -160,14 +163,7 @@ export class ComposableWorkflowStep<Input, Output> {
     return this.#workflowState.status;
   }
 
-  onChanges(
-    handler: (
-      event:
-        | { step: string; status: "IN_PROGRESS" }
-        | { step: string; status: "DONE" }
-        | { step: string; status: "FAILED"; error: Error },
-    ) => void,
-  ) {
+  onChanges(handler: (event: WorkflowChangeEvent) => void) {
     this.#eventEmitter.on("change", handler);
   }
 

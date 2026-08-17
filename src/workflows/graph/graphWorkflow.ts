@@ -1,4 +1,4 @@
-import { WorkflowState } from "../interfaces";
+import { WorkflowChangeEvent, WorkflowState } from "../interfaces";
 import { WorkflowStateRepository } from "../repository/interfaces";
 import { Graph, renderGraph, RenderTreeOptions } from "./renderGraph";
 import { WorkflowNode } from "./workflowNode";
@@ -7,12 +7,7 @@ export class GraphWorkflow<Input, Output> {
   #repository: WorkflowStateRepository;
   #rootNode: WorkflowNode<any, Output> | undefined;
   #state: WorkflowState<Input>;
-  #onChangesHandler: (
-    event:
-      | { step: string; status: "IN_PROGRESS" }
-      | { step: string; status: "DONE" }
-      | { step: string; status: "FAILED"; error: Error },
-  ) => void;
+  #onChangesHandler: (event: WorkflowChangeEvent) => void;
 
   constructor(params: {
     id: string;
@@ -70,14 +65,7 @@ export class GraphWorkflow<Input, Output> {
     return output;
   }
 
-  onChanges(
-    handler: (
-      event:
-        | { step: string; status: "IN_PROGRESS" }
-        | { step: string; status: "DONE" }
-        | { step: string; status: "FAILED"; error: Error },
-    ) => void,
-  ) {
+  onChanges(handler: (event: WorkflowChangeEvent) => void) {
     this.#onChangesHandler = handler;
     this.#rootNode?.onChanges(handler);
   }

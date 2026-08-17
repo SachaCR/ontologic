@@ -1,7 +1,7 @@
 import { EventEmitter } from "node:events";
 import { ComposableWorkflowStep, StepHandler } from "./composableWorkflowStep";
 import { aggregateFunction, AggregateOutput } from "./parallelStep";
-import { WorkflowState } from "../interfaces";
+import { WorkflowChangeEvent, WorkflowState } from "../interfaces";
 
 export interface WorkflowStep<Input, Output> {
   name: string;
@@ -74,14 +74,7 @@ export class WorkflowBuilder<Input> {
     });
   }
 
-  onChanges(
-    handler: (
-      event:
-        | { step: string; status: "IN_PROGRESS" }
-        | { step: string; status: "DONE" }
-        | { step: string; status: "FAILED"; error: Error },
-    ) => void,
-  ) {
+  onChanges(handler: (event: WorkflowChangeEvent) => void) {
     this.#eventEmitter.on("change", handler);
   }
 
