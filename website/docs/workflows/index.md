@@ -4,10 +4,6 @@ sidebar_position: 1
 
 # Workflows
 
-:::warning
-This part of the documentation has been AI generated and I haven't reviewed it yet. So please be kind if you find mistakes or inconsistencies. I'll remove this warning once I've reviewed this page.
-:::
-
 Some business operations cannot fit in a single method. A SEPA payment is not just a database write — it is a sequence: check the balance, validate the receiver, run an AML screen, reserve the funds, then create the transfer. Other processes look less like a chain and more like a graph: pull user data and order data and inventory data in parallel, then combine the three into a single decision.
 
 `ontologic` ships two flavors of workflow for these two shapes:
@@ -63,12 +59,26 @@ Both flavors expose an `onChanges` callback that fires as steps transition:
 
 ```typescript
 workflow.onChanges((event) => {
-  // step flavor:  { step, status: "DONE" | "FAILED" }
-  // graph flavor: { step, status: "START" | "DONE" | "FAILED", result?, error? }
+  // event =
+  //   | { step: string; status: "IN_PROGRESS" }
+  //   | { step: string; status: "DONE" }
+  //   | { step: string; status: "FAILED"; error: Error }
 });
 ```
 
-Use it for logging, progress UIs, metrics, or audit trails. Subscribe before calling `execute()`.
+Both flavors emit the same three statuses, and `step` is the name you gave the step or node. The parallel subtasks of `addStepWithSubtasks` report under their own subtask names. Use it for logging, progress UIs, metrics, or audit trails. Subscribe before calling `execute()`.
+
+The event shape is exported as `WorkflowChangeEvent`, so a handler defined outside the `onChanges` call can still be typed:
+
+```typescript
+import { WorkflowChangeEvent } from "ontologic";
+
+function logProgress(event: WorkflowChangeEvent) {
+  console.log(`${event.step} → ${event.status}`);
+}
+
+workflow.onChanges(logProgress);
+```
 
 ---
 

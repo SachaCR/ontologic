@@ -36,7 +36,7 @@ A full-featured library management application built with NestJS, demonstrating 
 
 ### Smaller examples
 
-Focused examples (entity, invariants, events, use cases) are in the [`examples/`](https://github.com/SachaCR/ontologic/tree/main/examples) directory — a credit balance aggregate and an order lifecycle.
+Focused examples (entity, invariants, events, use cases) are in the [`src/examples/`](https://github.com/SachaCR/ontologic/tree/main/src/examples) directory — a credit balance aggregate and an order lifecycle.
 
 ## License
 

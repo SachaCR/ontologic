@@ -4,10 +4,6 @@ sidebar_position: 2
 
 # Step workflow
 
-:::warning
-This part of the documentation has been AI generated and I haven't reviewed it yet. So please be kind if you find mistakes or inconsistencies. I'll remove this warning once I've reviewed this page.
-:::
-
 Use the step flavor when your process is essentially a chain: each step depends on the previous one's output, and the order is sequential. Steps are added one after the other with `addStep`, and the type system enforces that the output of step N matches the input of step N+1.
 
 The shared semantics — state, persistence, observability via `onChanges`, and structured failure handling — are described on the [Workflows introduction](./index.md). This page focuses on the step-specific API.

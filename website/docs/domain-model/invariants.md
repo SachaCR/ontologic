@@ -1,5 +1,5 @@
 ---
-sidebar_position: 3
+sidebar_position: 4
 ---
 
 # Invariants
@@ -134,9 +134,11 @@ class BankAccount extends DomainEntity<BankAccountState> {
 Defining them at module level also makes them easy to unit test independently of the entity:
 
 ```typescript
-expect(balanceIsPositive.isSatisfiedBy({ balance: 100 })).toBe(true);
-expect(balanceIsPositive.isSatisfiedBy({ balance: -1 })).toBe(false);
+expect(balanceIsPositive.complyWith({ balance: 100 }).isCompliant).toBe(true);
+expect(balanceIsPositive.complyWith({ balance: -1 }).isCompliant).toBe(false);
 ```
+
+`complyWith(state)` returns an `InvariantCheckResult` — `{ isCompliant: boolean; description: string; operator?: string }` — rather than a bare boolean. The `description` is the name you gave the invariant, and it is what `CorruptedStateError` reports when the rule is violated.
 
 ---
 

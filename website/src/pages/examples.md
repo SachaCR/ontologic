@@ -25,7 +25,7 @@ A credit wallet that supports crediting, debiting, locking funds, and sub-credit
 
 **Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
 
-[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/examples/creditBalance)
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/src/examples/creditBalance)
 
 ---
 
@@ -35,4 +35,4 @@ An order lifecycle that moves through `DRAFT → PLACED → PAID` states. Demons
 
 **Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
 
-[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/examples/order)
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/src/examples/order)

@@ -25,6 +25,10 @@ It starts small: a rule that should belong to the domain ends up in a controller
 
 An entity is a domain object with a unique identity and a lifecycle. It owns its state, enforces its invariants, and exposes behavior rather than raw data. If you're new to `ontologic`, start here.
 
+### [Value Object](./domain-model/value-object.md)
+
+Some concepts in your domain have no identity — an amount of money, a date range, an address. Two of them with the same fields are simply the same thing. Value objects bundle those fields with the rules that make them valid, so an invalid one cannot exist.
+
 ### [Domain Events](./domain-model/domain-events.md)
 
 A domain event is a record that something meaningful happened past tense, immutable, and named after a business fact. Events are the mechanism by which different parts of your system stay in sync without becoming tightly coupled.
