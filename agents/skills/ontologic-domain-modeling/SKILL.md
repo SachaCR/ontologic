@@ -15,6 +15,11 @@ receive the live state — they get a decoupled copy from `readState()`, which a
 re-checks the entity's invariants. A behavior method **mutates the state and returns the
 event that records what happened**, wrapped in a `Result` when it can fail.
 
+**What belongs on an entity**: rules decidable from `this.state` alone. If a rule needs
+another aggregate, a count, or a lookup, it is a business rule and belongs in a use case
+— see `references/where-logic-goes.md`. Entities never do I/O, never generate their own
+timestamps, and hold other aggregates by **id**, never by reference.
+
 That gives three separate failure channels, and mixing them up is the most common
 mistake with this library:
 
@@ -75,6 +80,7 @@ installed version of the library.
 
 In this skill:
 
+- `references/where-logic-goes.md` — **read this when unsure whether a rule belongs on the entity or in a use case**
 - `references/entity.md` — the two factories, state access, aggregates with sub-entities and `serialize`
 - `references/events-and-errors.md` — event versioning, the union file, why `setPrototypeOf` matters
 - `references/testing.md` — vitest patterns for domain code

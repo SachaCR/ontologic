@@ -24,11 +24,22 @@ templates/src/domain/
 │   │   └── invalidStatusTransition.error.ts     # DomainError + Object.setPrototypeOf
 │   └── invariants/
 │       └── subscriptionHasPlan.ts               # BaseDomainInvariant
+├── entities/plan/                               # a SECOND aggregate, deliberately minimal
+│   ├── plan.entity.ts                           # read-only fact source for the cross-aggregate rule
+│   ├── events/planCreated.event.ts, events/planEvents.ts
+│   └── errors/planNoLongerOffered.error.ts      # named after Plan, raised by a Subscription use case
 ├── subscription.repository.ts                   # InMemoryRepository<Entity, Event>
+├── plan.repository.ts
 └── useCases/
-    ├── activateSubscription.use-case.ts         # the canonical use-case sequence
+    ├── activateSubscription.use-case.ts         # single-aggregate: the canonical sequence
+    ├── subscribeToPlan.use-case.ts              # CROSS-aggregate: reads Plan, writes Subscription
     └── errors/entityNotFound.error.ts
 ```
+
+`subscribeToPlan.use-case.ts` is the one to read when deciding where a rule goes. "A
+subscription may only be created for a plan that is still offered" needs the `Plan`
+aggregate, so it cannot be a `Subscription` invariant — it lives in the use case, the
+`Plan` is read and never written, and the write goes to exactly one aggregate.
 
 Imports are written the way a consumer writes them — `from "ontologic"` — so a copied
 file works unchanged in an application.
