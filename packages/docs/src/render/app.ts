@@ -289,12 +289,16 @@ export const APP_SCRIPT = String.raw`
   }
 
   function viewRepository(node) {
-    var html = header(node, "Repository");
+    var html = header(node, node.isPort ? "Repository port" : "Repository");
 
     html += '<div class="section"><h2 class="section__head">Contract</h2>' +
       '<div class="scroll"><table><tbody>' +
       '<tr><td class="faint nowrap">Entity</td><td class="mono">' + esc(node.entityTypeName) + "</td></tr>" +
       '<tr><td class="faint nowrap">Event union</td><td class="mono">' + esc(node.eventUnionTypeName) + "</td></tr>" +
+      (node.implementations && node.implementations.length
+        ? '<tr><td class="faint nowrap">Implemented by</td><td class="mono">' +
+          esc(node.implementations.join(", ")) + "</td></tr>"
+        : "") +
       "</tbody></table></div></div>";
 
     if (node.finders.length > 0) {

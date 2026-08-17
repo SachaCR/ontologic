@@ -165,14 +165,21 @@ function inferredReturnType(
 /**
  * Which invariants are attached, and how.
  *
- * Three shapes exist in the wild and all three must be read:
+ * Several shapes exist in the wild and all must be read:
  *   1. `this.addInvariant(x)` in the constructor        — the documented form
  *   2. `super(id, state, { invariants: [x, y] })`       — 1.7.0 options object
- *   3. `super(id, state, [x, y])`                       — the pre-1.7 array
+ *   3. `super(state, { invariants: TOOL_INVARIANTS })`  — same, but a value
+ *      object, so the options are the SECOND argument, and the list is an
+ *      imported const rather than an inline array
+ *   4. `super(id, state, [x, y])`                       — the pre-1.7 array
  *
- * A fourth exists — `entity.addInvariant(x)` from a static factory, outside the
- * class body — which this deliberately does not chase; it is confined to the
- * library's own unit tests.
+ * Getting this wrong is expensive: a missed attachment makes every invariant on
+ * the entity look dead, and the "declared but never attached" finding then fires
+ * on rules that are in fact enforced.
+ *
+ * One shape is deliberately not chased — `entity.addInvariant(x)` from a static
+ * factory, outside the class body — because it is confined to the library's own
+ * unit tests.
  */
 function findInvariantAttachment(
   node: ts.ClassDeclaration,
@@ -202,28 +209,32 @@ function findInvariantAttachment(
         }
       }
 
-      // super(id, state, <third argument>)
       if (callee.kind === ts.SyntaxKind.SuperKeyword) {
-        const third = n.arguments[2];
+        // The options object sits at a different index for an entity
+        // (id, state, options) than for a value object (state, options), so
+        // scan the arguments rather than assuming a position.
+        for (const argument of n.arguments) {
+          if (!ts.isObjectLiteralExpression(argument)) continue;
 
+          for (const property of argument.properties) {
+            if (
+              !ts.isPropertyAssignment(property) ||
+              property.name.getText(sf) !== "invariants"
+            ) {
+              continue;
+            }
+
+            names.push(...resolveInvariantList(property.initializer, ctx));
+            attachment = "optionsObject";
+          }
+        }
+
+        // A bare array is only the legacy form, and only in the entity
+        // position — anywhere else an array argument means something different.
+        const third = n.arguments[2];
         if (third && ts.isArrayLiteralExpression(third)) {
           names.push(...third.elements.map((e) => e.getText(sf)));
           attachment = "positionalArray";
-        }
-
-        if (third && ts.isObjectLiteralExpression(third)) {
-          for (const prop of third.properties) {
-            if (
-              ts.isPropertyAssignment(prop) &&
-              prop.name.getText(sf) === "invariants" &&
-              ts.isArrayLiteralExpression(prop.initializer)
-            ) {
-              names.push(
-                ...prop.initializer.elements.map((e) => e.getText(sf)),
-              );
-              attachment = "optionsObject";
-            }
-          }
         }
       }
     }
@@ -233,8 +244,104 @@ function findInvariantAttachment(
 
   visit(ctor.body);
 
-  void ctx;
   return { invariants: dedupe(names), attachment };
+}
+
+/**
+ * The value of an `invariants:` property, as a list of invariant names.
+ *
+ * Written inline as `[a, b]`, or — commonly, once a codebase has more than a
+ * couple — as a named const exported from a sibling module, which has to be
+ * followed to its declaration.
+ */
+function resolveInvariantList(
+  expression: ts.Expression,
+  ctx: ExtractContext,
+): string[] {
+  if (ts.isArrayLiteralExpression(expression)) {
+    return expression.elements.map((e) => qualify(e, ctx));
+  }
+
+  if (ts.isIdentifier(expression)) {
+    const elements = resolveIdentifierToArray(expression, ctx);
+    // Fall back to the identifier itself so the attachment is still recorded,
+    // even when the declaration cannot be reached.
+    return elements ?? [qualify(expression, ctx)];
+  }
+
+  return [];
+}
+
+/**
+ * Qualify an invariant reference with the file it is declared in.
+ *
+ * Bare names are not unique: a codebase with several tool value objects will
+ * declare `instructionsMustNotBeEmpty` once per tool, in sibling modules. A
+ * name-only reference is then ambiguous and gets dropped, silently losing the
+ * link. Following the symbol to its declaration makes it exact.
+ */
+function qualify(expression: ts.Node, ctx: ExtractContext): string {
+  const text = expression.getText(expression.getSourceFile());
+  if (!ts.isIdentifier(expression)) return text;
+
+  const declaration = declarationOf(expression, ctx);
+  if (!declaration) return text;
+
+  const file = relativeTo(ctx.root, declaration.getSourceFile().fileName);
+  return `${file}#${text}`;
+}
+
+function declarationOf(
+  identifier: ts.Identifier,
+  ctx: ExtractContext,
+): ts.Declaration | undefined {
+  try {
+    const symbol = ctx.checker.getSymbolAtLocation(identifier);
+    if (!symbol) return undefined;
+
+    const resolved =
+      symbol.flags & ts.SymbolFlags.Alias
+        ? tryResolveAlias(symbol, ctx)
+        : symbol;
+
+    return resolved?.declarations?.[0];
+  } catch {
+    return undefined;
+  }
+}
+
+/** Follow an identifier to a `const X = [a, b]` declaration, across modules. */
+function resolveIdentifierToArray(
+  identifier: ts.Identifier,
+  ctx: ExtractContext,
+): string[] | undefined {
+  const declaration = declarationOf(identifier, ctx);
+  if (!declaration || !ts.isVariableDeclaration(declaration)) return undefined;
+
+  const initializer = declaration.initializer;
+  if (!initializer || !ts.isArrayLiteralExpression(initializer)) {
+    return undefined;
+  }
+
+  return initializer.elements.map((element) => qualify(element, ctx));
+}
+
+function relativeTo(root: string, file: string): string {
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return (file.startsWith(prefix) ? file.slice(prefix.length) : file)
+    .split("\\")
+    .join("/");
+}
+
+function tryResolveAlias(
+  symbol: ts.Symbol,
+  ctx: ExtractContext,
+): ts.Symbol | undefined {
+  try {
+    return ctx.checker.getAliasedSymbol(symbol);
+  } catch {
+    return symbol;
+  }
 }
 
 function dedupe(values: string[]): string[] {

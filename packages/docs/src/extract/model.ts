@@ -118,6 +118,14 @@ export interface RepositoryNode {
   name: string;
   entityTypeName: string;
   eventUnionTypeName: string;
+  /**
+   * Whether this is the port (an interface use cases depend on) or a concrete
+   * class. In a ports-and-adapters codebase the port is the one that matters:
+   * it is what appears in every use case signature.
+   */
+  isPort: boolean;
+  /** Concrete classes implementing this port, by name. */
+  implementations: string[];
   /** Methods beyond the base interface — the domain queries. */
   finders: Method[];
   location: SourceLocation;

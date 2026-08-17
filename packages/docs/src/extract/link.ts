@@ -65,7 +65,11 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
         }
       }
 
-      entity.invariants = resolveAll(entity.invariants, invariantsByName);
+      entity.invariants = resolveInvariants(
+        entity.invariants,
+        invariantsByName,
+        nodes,
+      );
 
       for (const target of entity.invariants) {
         edges.push({ from: node.id, to: target, kind: "protectedBy" });
@@ -120,6 +124,39 @@ function indexByName<T extends { id: NodeId; name: string }>(
   }
 
   return index;
+}
+
+/**
+ * Invariant references arrive qualified as `file#name` where the declaration
+ * could be reached, and as a bare name otherwise. The qualified form resolves
+ * exactly, which matters because sibling modules routinely declare invariants
+ * with identical names.
+ */
+function resolveInvariants(
+  references: string[],
+  byName: Map<string, NodeId | null>,
+  nodes: DomainNode[],
+): NodeId[] {
+  const resolved: NodeId[] = [];
+
+  for (const reference of references) {
+    if (reference.includes("#")) {
+      const exact = nodes.find(
+        (n) => n.kind === "invariant" && n.id === `invariant:${reference}`,
+      );
+
+      if (exact) {
+        resolved.push(exact.id);
+        continue;
+      }
+    }
+
+    const name = reference.split("#").pop() ?? reference;
+    const id = byName.get(name);
+    if (id) resolved.push(id);
+  }
+
+  return [...new Set(resolved)];
 }
 
 function resolveAll(
