@@ -1,8 +1,15 @@
 
 node_modules/
 dist/
-.claude
 html/
 coverage/
 .DS_Store
-scripts/
+
+# Personal scratch scripts kept alongside the package build output.
+# Scoped deliberately: a bare `scripts/` would also swallow website/scripts/,
+# which holds the committed llms.txt generator.
+packages/*/scripts/
+
+# Claude Code: keep skills and plugin config in version control, ignore only
+# the machine-local permission cache.
+.claude/settings.local.json
