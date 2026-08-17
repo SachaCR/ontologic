@@ -716,6 +716,118 @@ export const APP_SCRIPT = String.raw`
     return html;
   }
 
+  // ---------- graph ----------
+
+  var BOX_W = 172, BOX_H = 24;
+
+  var GRAPH_FILL = {
+    entity: "var(--accent-soft)",
+    subEntity: "var(--surface)",
+    valueObject: "var(--surface)",
+    event: "var(--surface-sunken)",
+    family: "var(--surface-sunken)"
+  };
+
+  var GRAPH_STROKE = {
+    entity: "var(--accent)",
+    subEntity: "var(--line-strong)",
+    valueObject: "var(--line-strong)",
+    event: "var(--accent)",
+    family: "var(--line-strong)"
+  };
+
+  function truncate(text, max) {
+    return text.length > max ? text.slice(0, max - 1) + "…" : text;
+  }
+
+  /**
+   * Draw a precomputed layout. All the decisions were made at generation time;
+   * this only turns coordinates into SVG.
+   */
+  function graphSvg(layout) {
+    var edges = "";
+    var boxes = "";
+
+    layout.edges.forEach(function (edge) {
+      var a = layout.nodes[edge.from];
+      var b = layout.nodes[edge.to];
+      if (!a || !b) return;
+
+      var x1 = a.x + BOX_W, y1 = a.y + BOX_H / 2;
+      var x2 = b.x, y2 = b.y + BOX_H / 2;
+      var mid = (x1 + x2) / 2;
+
+      edges += '<path d="M ' + x1 + " " + y1 + " C " + mid + " " + y1 + ", " +
+        mid + " " + y2 + ", " + x2 + " " + y2 +
+        '" fill="none" stroke="var(--line-strong)" stroke-width="1"/>';
+    });
+
+    layout.nodes.forEach(function (node) {
+      var label = node.kind === "family"
+        ? truncate(node.label, 18) + " ×" + node.count
+        : truncate(node.label, 22);
+
+      var box =
+        '<rect x="' + node.x + '" y="' + node.y + '" width="' + BOX_W +
+        '" height="' + BOX_H + '" rx="4" fill="' +
+        (GRAPH_FILL[node.kind] || "var(--surface)") + '" stroke="' +
+        (GRAPH_STROKE[node.kind] || "var(--line-strong)") + '" stroke-width="1"' +
+        (node.kind === "family" ? ' stroke-dasharray="3 2"' : "") + "/>" +
+        '<text x="' + (node.x + 9) + '" y="' + (node.y + 16) +
+        '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="' +
+        (node.kind === "event" ? "10.5" : "11.5") + '" fill="var(--ink)">' +
+        esc(label) + "</text>";
+
+      boxes += node.id
+        ? '<a href="#/explore/' + encodeURIComponent(node.id) + '">' + box + "</a>"
+        : box;
+    });
+
+    return '<svg viewBox="0 0 ' + layout.width + " " + layout.height +
+      '" width="' + layout.width + '" height="' + layout.height +
+      '" role="img" aria-label="Structure of ' + esc(layout.title) + '">' +
+      edges + boxes + "</svg>";
+  }
+
+  function viewGraph(target) {
+    var graphs = MODEL.graphs || [];
+
+    var html = '<h1 class="title title--prose">Graph</h1>' +
+      '<p class="subtitle">Each aggregate root with what it holds and the events those ' +
+      "produce. Errors are left out — this view is about structure.</p>";
+
+    if (graphs.length === 0) {
+      return html + '<div class="empty">No aggregates found.</div>';
+    }
+
+    var selected = graphs[0];
+    for (var i = 0; i < graphs.length; i++) {
+      if (graphs[i].rootId === target) selected = graphs[i];
+    }
+
+    if (graphs.length > 1) {
+      html += '<div class="flow" style="margin-bottom:16px">' + graphs.map(function (g) {
+        return '<a class="flow__item' +
+          (g.rootId === selected.rootId ? " flow__item--write" : "") +
+          '" href="#/graph/' + encodeURIComponent(g.rootId) + '">' +
+          esc(g.title) + "</a>";
+      }).join("") + "</div>";
+    }
+
+    html += '<div class="scroll" style="padding:6px">' + graphSvg(selected) + "</div>";
+
+    html += '<div class="section"><h2 class="section__head">Legend</h2><div class="flow">' +
+      '<span class="flow__item" style="border-color:var(--accent);background:var(--accent-soft)">aggregate</span>' +
+      '<span class="flow__item">entity or value object</span>' +
+      '<span class="flow__item" style="border-color:var(--accent)">event</span>' +
+      '<span class="flow__item" style="border-style:dashed">family — any one of N</span>' +
+      "</div>" +
+      '<p class="subtitle" style="margin-top:10px">Every box links into the Explorer.</p>' +
+      "</div>";
+
+    return html;
+  }
+
   // ---------- routing ----------
 
   var VIEWS = {
@@ -737,6 +849,8 @@ export const APP_SCRIPT = String.raw`
       html = viewOverview();
     } else if (parts[0] === "explore") {
       html = viewExplorer(decodeURIComponent(parts.slice(1).join("/") || ""));
+    } else if (parts[0] === "graph") {
+      html = viewGraph(decodeURIComponent(parts.slice(1).join("/") || ""));
     } else {
       var node = byId[decodeURIComponent(parts[1] || "")];
       var kind = routeToKind[parts[0]];

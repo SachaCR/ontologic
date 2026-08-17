@@ -13,6 +13,7 @@ import {
   linkContainment,
 } from "./extract/containment";
 import { computeFindings, keepEventUnions } from "./extract/findings";
+import { buildGraphLayouts } from "./render/graph";
 
 export type * from "./extract/model";
 export type { BuildProgramOptions } from "./extract/program";
@@ -57,12 +58,18 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
   const edges = [...linkModel(nodes), ...linkContainment(nodes)];
   const eventUnions = keepEventUnions(unions, nodes);
 
-  return {
+  const model: DomainModel = {
     root: ctx.root,
     nodes,
     edges,
     eventUnions,
     findings: computeFindings(nodes, eventUnions),
     aggregateRoots: aggregateRoots(nodes, edges),
+    graphs: [],
   };
+
+  // Needs the finished graph, so it runs last.
+  model.graphs = buildGraphLayouts(model);
+
+  return model;
 }

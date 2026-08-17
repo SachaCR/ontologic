@@ -33,6 +33,7 @@ export function renderHtml(model: DomainModel): string {
     <nav class="rail__fixed" aria-label="Views">
       <a class="navlink navlink--view" href="#/">Overview</a>
       <a class="navlink navlink--view" href="#/explore">Explorer</a>
+      <a class="navlink navlink--view" href="#/graph">Graph</a>
     </nav>
     <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
   </aside>

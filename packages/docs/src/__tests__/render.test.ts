@@ -73,6 +73,7 @@ describe("Given a codebase containing characters that are dangerous in HTML", ()
         eventUnions: [],
         findings: [],
         aggregateRoots: [],
+        graphs: [],
       });
 
       expect(html).not.toContain("<script>alert(1)</script>");
@@ -98,6 +99,7 @@ describe("Given a codebase containing characters that are dangerous in HTML", ()
         eventUnions: [],
         findings: [],
         aggregateRoots: [],
+        graphs: [],
       });
 
       // Still exactly two blocks: the payload did not close one early.

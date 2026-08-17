@@ -253,6 +253,29 @@ export interface EventUnion {
   location: SourceLocation;
 }
 
+/** A box in a Graph diagram, already positioned. */
+export interface GraphNode {
+  /** Absent for a collapsed family box, which stands for several nodes. */
+  id?: NodeId;
+  label: string;
+  kind: "entity" | "subEntity" | "valueObject" | "event" | "family";
+  /** How many members a family box stands for. */
+  count?: number;
+  x: number;
+  y: number;
+}
+
+/** One diagram: an aggregate root and everything beneath it. */
+export interface GraphLayout {
+  rootId: NodeId;
+  title: string;
+  nodes: GraphNode[];
+  /** Indices into `nodes`, so the embedded payload stays small. */
+  edges: { from: number; to: number }[];
+  width: number;
+  height: number;
+}
+
 export interface DomainModel {
   /** Absolute path the analysis was rooted at. */
   root: string;
@@ -266,6 +289,11 @@ export interface DomainModel {
    * root, not roots themselves.
    */
   aggregateRoots: NodeId[];
+  /**
+   * Precomputed diagrams, one per aggregate root. Laid out at generation time so
+   * the layout logic can be tested; the page only draws it.
+   */
+  graphs: GraphLayout[];
 }
 
 export function makeNodeId(kind: NodeKind, file: string, symbol: string): NodeId {
