@@ -5,6 +5,8 @@ import type {
   EventNode,
   EventUnion,
   Finding,
+  InvariantNode,
+  UseCaseNode,
 } from "./model";
 
 /**
@@ -21,7 +23,56 @@ export function computeFindings(
     ...eventsMissingFromUnions(nodes, eventUnions),
     ...errorsMissingSetPrototype(nodes),
     ...legacyInvariantAttachment(nodes),
+    ...invariantsNeverAttached(nodes),
+    ...useCasesWithErasedErrorUnion(nodes),
   ];
+}
+
+/**
+ * An invariant is declared but no entity attaches it, so the rule it encodes is
+ * never enforced. A declared-but-unused invariant looks like protection and
+ * provides none.
+ */
+function invariantsNeverAttached(nodes: DomainNode[]): Finding[] {
+  const attached = new Set(
+    nodes
+      .filter(
+        (n): n is EntityNode => n.kind === "entity" || n.kind === "valueObject",
+      )
+      .flatMap((entity) => entity.invariants),
+  );
+
+  return nodes
+    .filter((n): n is InvariantNode => n.kind === "invariant")
+    .filter((invariant) => !attached.has(invariant.id))
+    .map((invariant) => ({
+      code: "invariant-never-attached" as const,
+      message:
+        `${invariant.name} ("${invariant.description}") is declared but never ` +
+        `attached to an entity, so the rule is never enforced.`,
+      nodeId: invariant.id,
+      location: invariant.location,
+    }));
+}
+
+/**
+ * A use case whose error side is `Result<_, Error>` rather than a union of the
+ * failures it can actually produce. Callers cannot switch exhaustively on it,
+ * so `switchGuard` stops protecting them and a new failure mode added later
+ * goes unnoticed.
+ */
+function useCasesWithErasedErrorUnion(nodes: DomainNode[]): Finding[] {
+  return nodes
+    .filter((n): n is UseCaseNode => n.kind === "useCase")
+    .filter((useCase) => useCase.errorUnionErased)
+    .map((useCase) => ({
+      code: "use-case-error-union-erased" as const,
+      message:
+        `${useCase.name} declares Result<_, Error>, so callers cannot handle ` +
+        `its failures exhaustively. List the domain errors it can return.`,
+      nodeId: useCase.id,
+      location: useCase.location,
+    }));
 }
 
 /**

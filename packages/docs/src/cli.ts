@@ -10,7 +10,13 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { extractModel } from "./index";
-import type { DomainModel, EntityNode, Finding } from "./extract/model";
+import type {
+  DomainModel,
+  EntityNode,
+  Finding,
+  RepositoryNode,
+  UseCaseNode,
+} from "./extract/model";
 
 interface Options {
   paths: string[];
@@ -84,6 +90,9 @@ function printSummary(model: DomainModel): void {
     ["value objects", byKind("valueObject")],
     ["domain events", byKind("event")],
     ["domain errors", byKind("error")],
+    ["invariants", byKind("invariant")],
+    ["repositories", byKind("repository")],
+    ["use cases", byKind("useCase")],
     ["event unions", model.eventUnions.length],
   ];
 
@@ -96,9 +105,55 @@ function printSummary(model: DomainModel): void {
     printEntity(node as EntityNode, model);
   }
 
+  const repositories = model.nodes.filter(
+    (n): n is RepositoryNode => n.kind === "repository",
+  );
+
+  if (repositories.length > 0) {
+    console.log("\nRepositories");
+    for (const repository of repositories) {
+      const finders = repository.finders.map((f) => `${f.name}()`).join(", ");
+      console.log(
+        `  ${repository.name} <${repository.entityTypeName}>` +
+          (finders ? `  queries: ${finders}` : ""),
+      );
+    }
+  }
+
+  const useCases = model.nodes.filter(
+    (n): n is UseCaseNode => n.kind === "useCase",
+  );
+
+  if (useCases.length > 0) {
+    console.log("\nUse cases");
+    for (const useCase of useCases) printUseCase(useCase, model);
+  }
+
   if (model.findings.length > 0) {
     console.log(`\nFindings (${model.findings.length}):\n`);
     for (const finding of model.findings) printFinding(finding);
+  }
+}
+
+function printUseCase(useCase: UseCaseNode, model: DomainModel): void {
+  const nameOf = (id: string): string =>
+    model.nodes.find((n) => n.id === id)?.name ?? id;
+
+  // Reads and writes are the interesting part: a use case should read from as
+  // many aggregates as it needs and write to exactly one.
+  const flow = [
+    useCase.reads.length ? `reads ${useCase.reads.join(", ")}` : "",
+    useCase.writes.length ? `writes ${useCase.writes.join(", ")}` : "",
+  ]
+    .filter(Boolean)
+    .join("  ");
+
+  const uncertain = useCase.confidence === "high" ? "" : ` (${useCase.confidence} confidence)`;
+
+  console.log(`  ${useCase.name}${uncertain}`);
+  if (flow) console.log(`      ${flow}`);
+  if (useCase.canFail.length > 0) {
+    console.log(`      fails ${useCase.canFail.map(nameOf).join(", ")}`);
   }
 }
 
@@ -114,7 +169,7 @@ function printEntity(entity: EntityNode, model: DomainModel): void {
   );
 
   if (entity.invariants.length > 0) {
-    console.log(`  invariants: ${entity.invariants.join(", ")}`);
+    console.log(`  invariants: ${entity.invariants.map(nameOf).join(", ")}`);
   }
 
   for (const method of entity.methods) {

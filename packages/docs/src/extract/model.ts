@@ -131,6 +131,14 @@ export interface UseCaseNode {
   returnType: string;
   /** The success type inside `Result<T, E>`, when there is one. */
   returnsStateTypeName?: string;
+  /**
+   * The declared error side is `Error` (or equally uninformative), so callers
+   * cannot handle failures exhaustively. Recorded during extraction because it
+   * is a structural fact about the type node, not something to re-derive from
+   * the printed string — `Result<Array<{id: string} & LoanState>, Error>` does
+   * not survive a regex.
+   */
+  errorUnionErased: boolean;
   canFail: NodeId[];
   /** Repository identifiers this use case reads from / writes to. */
   reads: string[];

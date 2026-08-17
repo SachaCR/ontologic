@@ -4,7 +4,10 @@ import type {
   EntityNode,
   ErrorNode,
   EventNode,
+  InvariantNode,
   NodeId,
+  RepositoryNode,
+  UseCaseNode,
 } from "./model";
 
 /**
@@ -26,26 +29,75 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
     nodes.filter((n): n is ErrorNode => n.kind === "error"),
   );
 
+  const invariantsByName = indexByName(
+    nodes.filter((n): n is InvariantNode => n.kind === "invariant"),
+  );
+  const entitiesByName = indexByName(
+    nodes.filter(
+      (n): n is EntityNode => n.kind === "entity" || n.kind === "valueObject",
+    ),
+  );
+  const repositoriesByName = indexByName(
+    nodes.filter((n): n is RepositoryNode => n.kind === "repository"),
+  );
+
   const edges: Edge[] = [];
 
   for (const node of nodes) {
-    if (node.kind !== "entity" && node.kind !== "valueObject") continue;
+    if (node.kind === "entity" || node.kind === "valueObject") {
+      const entity = node as EntityNode;
 
-    for (const method of (node as EntityNode).methods) {
-      method.emits = resolveAll(method.emits, eventsByName);
-      method.canFail = resolveAll(method.canFail, errorsByName);
+      for (const method of entity.methods) {
+        method.emits = resolveAll(method.emits, eventsByName);
+        method.canFail = resolveAll(method.canFail, errorsByName);
 
-      for (const target of method.emits) {
-        edges.push({ from: node.id, to: target, kind: "emits", via: method.name });
+        for (const target of method.emits) {
+          edges.push({ from: node.id, to: target, kind: "emits", via: method.name });
+        }
+
+        for (const target of method.canFail) {
+          edges.push({
+            from: node.id,
+            to: target,
+            kind: "canFail",
+            via: method.name,
+          });
+        }
       }
 
-      for (const target of method.canFail) {
-        edges.push({
-          from: node.id,
-          to: target,
-          kind: "canFail",
-          via: method.name,
-        });
+      entity.invariants = resolveAll(entity.invariants, invariantsByName);
+
+      for (const target of entity.invariants) {
+        edges.push({ from: node.id, to: target, kind: "protectedBy" });
+      }
+
+      continue;
+    }
+
+    if (node.kind === "repository") {
+      const entityId = entitiesByName.get(node.entityTypeName);
+      if (entityId) {
+        edges.push({ from: node.id, to: entityId, kind: "persists" });
+      }
+      continue;
+    }
+
+    if (node.kind === "useCase") {
+      const useCase = node as UseCaseNode;
+      useCase.canFail = resolveAll(useCase.canFail, errorsByName);
+
+      for (const target of useCase.canFail) {
+        edges.push({ from: node.id, to: target, kind: "canFail" });
+      }
+
+      for (const repositoryName of useCase.reads) {
+        const target = repositoriesByName.get(repositoryName);
+        if (target) edges.push({ from: node.id, to: target, kind: "reads" });
+      }
+
+      for (const repositoryName of useCase.writes) {
+        const target = repositoriesByName.get(repositoryName);
+        if (target) edges.push({ from: node.id, to: target, kind: "writes" });
       }
     }
   }

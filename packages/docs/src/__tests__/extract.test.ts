@@ -7,6 +7,9 @@ import type {
   DomainModel,
   EntityNode,
   EventNode,
+  InvariantNode,
+  RepositoryNode,
+  UseCaseNode,
 } from "../extract/model";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..");
@@ -23,6 +26,20 @@ function event(model: DomainModel, name: string): EventNode {
   const found = model.nodes.find((n) => n.kind === "event" && n.name === name);
   if (!found) throw new Error(`no event named ${name}`);
   return found as EventNode;
+}
+
+function useCase(model: DomainModel, name: string): UseCaseNode {
+  const found = model.nodes.find((n) => n.kind === "useCase" && n.name === name);
+  if (!found) throw new Error(`no use case named ${name}`);
+  return found as UseCaseNode;
+}
+
+function repository(model: DomainModel, name: string): RepositoryNode {
+  const found = model.nodes.find(
+    (n) => n.kind === "repository" && n.name === name,
+  );
+  if (!found) throw new Error(`no repository named ${name}`);
+  return found as RepositoryNode;
 }
 
 /** Node ids are module-qualified; assert on the readable names they point at. */
@@ -132,7 +149,7 @@ describe("Given the library's own Order example", () => {
       const order = entity(model, "Order");
 
       expect(order.invariantAttachment).toBe("addInvariant");
-      expect(order.invariants).toEqual([
+      expect(namesOf(model, order.invariants)).toEqual([
         "orderHasAtLeastOneItemInvariant",
         "paidOrderHasInvoiceIdInvariant",
       ]);
@@ -170,6 +187,95 @@ describe("Given the library's own Order example", () => {
         "domain/entities/order/order.entity.ts",
       );
       expect(order.location.line).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("Given the Order example's application layer", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(REPO_ROOT, "src/examples/order")],
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then the invariants carry their human-readable description", () => {
+      const invariants = model.nodes.filter(
+        (n): n is InvariantNode => n.kind === "invariant",
+      );
+
+      expect(
+        invariants.map((i) => [i.name, i.description]).sort(),
+      ).toEqual([
+        ["orderHasAtLeastOneItemInvariant", "Order Has At Least One Item"],
+        ["paidOrderHasInvoiceIdInvariant", "Paid Order Has Invoice Id"],
+      ]);
+    });
+
+    it("Then an entity links to the invariants protecting it", () => {
+      const order = entity(model, "Order");
+
+      expect(namesOf(model, order.invariants)).toEqual([
+        "orderHasAtLeastOneItemInvariant",
+        "paidOrderHasInvoiceIdInvariant",
+      ]);
+    });
+
+    it("Then the repository is linked to the aggregate it persists", () => {
+      const orders = repository(model, "OrderRepository");
+      const order = entity(model, "Order");
+
+      expect(orders.entityTypeName).toBe("Order");
+      expect(model.edges).toContainEqual({
+        from: orders.id,
+        to: order.id,
+        kind: "persists",
+      });
+    });
+
+    it("Then a use case reports the aggregate it reads and writes", () => {
+      const pay = useCase(model, "payOrderUseCase");
+
+      expect(pay.confidence).toBe("high");
+      expect(pay.reads).toEqual(["OrderRepository"]);
+      expect(pay.writes).toEqual(["OrderRepository"]);
+      expect(namesOf(model, pay.canFail).sort()).toEqual([
+        "EntityNotFound",
+        "InvalidStatusTransition",
+      ]);
+    });
+
+    it("Then a use case with no Result return type is still found", () => {
+      // createOrderUseCase returns a bare Promise<OrderState>: it has no domain
+      // failure mode, so there is no Result to key on.
+      const create = useCase(model, "createOrderUseCase");
+
+      expect(create.confidence).toBe("medium");
+      expect(create.writes).toEqual(["OrderRepository"]);
+    });
+  });
+});
+
+describe("Given a codebase whose repository is a module-level singleton", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(REPO_ROOT, "src/examples/creditBalance")],
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then the repository edge is found even though it is not a parameter", () => {
+      const debit = useCase(model, "debitBalanceUseCase");
+
+      expect(debit.parameters.map((p) => p.type)).not.toContain(
+        "CreditBalanceRepository",
+      );
+      expect(debit.reads).toEqual(["CreditBalanceRepository"]);
+      expect(debit.writes).toEqual(["CreditBalanceRepository"]);
     });
   });
 });
@@ -283,7 +389,7 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         const loan = entity(model, "Loan");
 
         expect(loan.invariantAttachment).toBe("positionalArray");
-        expect(loan.invariants).toEqual([
+        expect(namesOf(model, loan.invariants)).toEqual([
           "dueDateAfterLoanDate",
           "returnDateAfterLoanDate",
         ]);
@@ -327,6 +433,47 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         expect(model.eventUnions.map((u) => u.name).sort()).toEqual([
           "BookEvent",
           "LoanEvent",
+        ]);
+      });
+
+      it("Then a cross-aggregate use case shows it reads two and writes one", () => {
+        const register = useCase(model, "registerLoan");
+
+        expect(register.reads.sort()).toEqual([
+          "LibraryCollection",
+          "LoanRegister",
+        ]);
+        expect(register.writes).toEqual(["LoanRegister"]);
+      });
+
+      it("Then the failures are recovered even though the error union is erased", () => {
+        const register = useCase(model, "registerLoan");
+
+        // The signature says Result<LoanState, Error>; the errors are only
+        // visible at the err(new X(...)) call sites.
+        expect(register.returnType).toContain("Error");
+        expect(namesOf(model, register.canFail).sort()).toEqual([
+          "BookAlreadyOnLoanError",
+          "BookLostCannotBeLoanedError",
+          "BookNotFoundError",
+          "MemberActiveLoanLimitExceededError",
+        ]);
+      });
+
+      it("Then every use case is flagged for erasing its error union", () => {
+        const flagged = model.findings.filter(
+          (f) => f.code === "use-case-error-union-erased",
+        );
+
+        expect(flagged).toHaveLength(6);
+      });
+
+      it("Then the repository domain queries are captured", () => {
+        const loans = repository(model, "LoanRegister");
+
+        expect(loans.finders.map((f) => f.name).sort()).toEqual([
+          "findActiveLoansForMember",
+          "findOutstandingLoanForBook",
         ]);
       });
     });
