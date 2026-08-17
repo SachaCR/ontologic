@@ -1,5 +1,9 @@
 import { randomUUID } from "node:crypto";
-import { WorkflowState, WorkflowStatus } from "../interfaces";
+import {
+  WorkflowChangeEvent,
+  WorkflowState,
+  WorkflowStatus,
+} from "../interfaces";
 import { Graph, renderGraph, RenderTreeOptions } from "./renderGraph";
 
 type ChildrenOutputs<C extends Record<string, WorkflowNode<any, any>>> = {
@@ -16,12 +20,7 @@ export class WorkflowNode<
   #context: WorkflowState<unknown>;
   #status: WorkflowStatus;
 
-  #onChanges: (
-    event:
-      | { step: string; status: "IN_PROGRESS" }
-      | { step: string; status: "DONE" }
-      | { step: string; status: "FAILED"; error: Error },
-  ) => void;
+  #onChanges: (event: WorkflowChangeEvent) => void;
 
   constructor(params: {
     name: string;
@@ -44,14 +43,7 @@ export class WorkflowNode<
     };
   }
 
-  onChanges(
-    handler: (
-      event:
-        | { step: string; status: "IN_PROGRESS" }
-        | { step: string; status: "DONE" }
-        | { step: string; status: "FAILED"; error: Error },
-    ) => void,
-  ) {
+  onChanges(handler: (event: WorkflowChangeEvent) => void) {
     this.#onChanges = handler;
 
     Object.entries(this.#children).map(async ([_name, child]) => {
