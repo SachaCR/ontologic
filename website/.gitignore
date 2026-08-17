@@ -8,6 +8,10 @@
 .docusaurus
 .cache-loader
 
+# Derived from docs/ by scripts/generate-llms-txt.mjs on every build.
+/static/llms.txt
+/static/llms-full.txt
+
 # Misc
 .DS_Store
 .env.local
