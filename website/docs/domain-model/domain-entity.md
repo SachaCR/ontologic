@@ -105,6 +105,29 @@ class BankAccount extends DomainEntity<BankAccountState> {
 }
 ```
 
+You can also pass them through the constructor's options, which enforces them from the very first moment:
+
+```typescript
+super(id, state, { invariants: [balanceIsPositive] });
+```
+
+:::warning Changed in 1.7.0
+The constructor's third parameter used to be the invariant array itself:
+
+```typescript
+super(id, state, [balanceIsPositive]); // 1.6.x and earlier — no longer valid
+```
+
+It is now an options object, so that `serialize` could be added alongside `invariants`.
+Upgrading from 1.6.x, the old form fails to compile with `TS2559: Type
+'BaseDomainInvariant<State>[]' has no properties in common with type
+'DomainEntityOptions<State, State>'`. The fix is to wrap it: `{ invariants: [...] }`, or
+call `addInvariant(...)` in the constructor body.
+
+The error is loud rather than silent, so a type-check after upgrading will find every
+occurrence.
+:::
+
 From this point on, **every time the state is read**, the invariant is checked. If the state is ever found in violation, a `CorruptedStateError` is thrown immediately — before any corrupted data can propagate through the system.
 
 ```typescript
