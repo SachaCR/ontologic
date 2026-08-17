@@ -16,11 +16,46 @@ export interface SourceLocation {
 export type NodeKind =
   | "entity"
   | "valueObject"
+  | "subEntity"
   | "event"
   | "error"
   | "invariant"
   | "repository"
   | "useCase";
+
+/**
+ * A field's type resolved back to its declaration.
+ *
+ * Recorded during extraction because the printed type is not enough: `OrderItem[]`
+ * and `OrderLine[]` are textually identical, yet one is a plain data interface
+ * and the other a live sub-entity. Only the declaration separates them.
+ */
+export interface TypeRef {
+  /** The declared symbol name. */
+  symbol: string;
+  /** Root-relative path of the declaration, so node ids match exactly. */
+  file: string;
+  /** Collections collapse to "many" — `Map<string, X>`, `X[]`, `Set<X>`. */
+  arity: "one" | "many";
+  /** Where the reference was found. */
+  via: "state" | "privateField";
+  /**
+   * The union alias this came from, when the field's type was one.
+   *
+   * A tool declares `#outputType: WorkflowNodeOutputType`, an alias over nine
+   * classes — so it resolves to nine references. Rendered as nine separate
+   * children that would be nine near-identical blocks per tool; rendered as one
+   * `WorkflowNodeOutputType` group it says what the code says: "any one of these".
+   */
+  family?: string;
+  /**
+   * What the declaration is. `domainClass` extends DomainEntity/ValueObject;
+   * `subEntityClass` is a plain class with `serialize()`/`static fromState` and
+   * no heritage — the library's own canonical sub-entity shape; `plain` is an
+   * interface or any other class, and never becomes a node.
+   */
+  declaration: "domainClass" | "subEntityClass" | "plain";
+}
 
 /**
  * A stable identifier of the form `<kind>:<module path>#<symbol>`.
@@ -35,6 +70,12 @@ export interface StateField {
   name: string;
   type: string;
   optional: boolean;
+  /**
+   * Declarations this field's type resolves to, after unwrapping collections and
+   * expanding unions. A union alias yields several — `tool: WorkflowNodeTool`
+   * resolves to all six tool value objects.
+   */
+  refs?: TypeRef[];
 }
 
 /** A behaviour method on an entity or value object. */
@@ -53,7 +94,7 @@ export interface Method {
 
 export interface EntityNode {
   id: NodeId;
-  kind: "entity" | "valueObject";
+  kind: "entity" | "valueObject" | "subEntity";
   name: string;
   /** The `State` type argument. */
   stateTypeName: string;
@@ -61,6 +102,13 @@ export interface EntityNode {
   serializedTypeName?: string;
   stateFields: StateField[];
   methods: Method[];
+  /**
+   * Types this object holds live, gathered from state fields and from private
+   * fields. Private fields matter because a value object may keep the live
+   * instance there while storing only its serialized form in state — which is
+   * where every value-object-to-value-object relationship hides.
+   */
+  containedRefs: TypeRef[];
   /** Invariants attached to this entity, as node ids. */
   invariants: NodeId[];
   /** How the invariants were attached — a fingerprint of the library version. */
@@ -170,7 +218,11 @@ export type EdgeKind =
   | "protectedBy"
   | "persists"
   | "reads"
-  | "writes";
+  | "writes"
+  /** The source holds the target. Drives the Explorer's hierarchy. */
+  | "contains"
+  /** The source names the target by id, without holding it. */
+  | "references";
 
 export interface Edge {
   from: NodeId;
@@ -208,6 +260,12 @@ export interface DomainModel {
   edges: Edge[];
   eventUnions: EventUnion[];
   findings: Finding[];
+  /**
+   * Entities nothing else contains — the Explorer's top level. Derived rather
+   * than assumed: most entities in a real bounded context are sub-entities of a
+   * root, not roots themselves.
+   */
+  aggregateRoots: NodeId[];
 }
 
 export function makeNodeId(kind: NodeKind, file: string, symbol: string): NodeId {

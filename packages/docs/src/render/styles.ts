@@ -135,6 +135,12 @@ a:hover { text-decoration-color: currentColor; }
 }
 .search::placeholder { color: var(--ink-faint); }
 
+.rail__fixed {
+  padding: 10px 10px 4px; display: flex; flex-direction: column; gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+.navlink--view { font-family: var(--sans); font-size: 13px; font-weight: 550; }
+
 .rail__nav { overflow-y: auto; padding: 10px 10px 28px; flex: 1; }
 
 .group { margin-top: 14px; }
@@ -287,6 +293,68 @@ pre {
   letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-faint);
 }
 .flow__item--write .flow__verb { color: var(--accent); }
+
+/* ---------- explorer ---------- */
+
+.trail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-bottom: 18px; font-size: 12.5px;
+}
+.trail a { font-family: var(--mono); text-decoration: none; }
+.trail a:hover { text-decoration: underline; }
+.trail__sep { color: var(--ink-faint); }
+.trail__here { font-family: var(--mono); font-weight: 600; }
+
+.blocks {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 10px;
+}
+
+.block {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 13px 15px; min-height: 84px;
+  background: var(--surface); border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  text-decoration: none; color: inherit;
+}
+.block:hover { border-color: var(--accent); }
+
+/* Terminal blocks are not links; make that legible rather than letting the
+   affordance lie about being clickable. */
+.block--terminal { border-style: dashed; border-color: var(--line); cursor: default; }
+.block--terminal:hover { border-color: var(--line); }
+
+.block__kind {
+  font-size: 10px; font-weight: 650; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.block__name {
+  font-family: var(--mono); font-size: 14px; font-weight: 600;
+  word-break: break-word; line-height: 1.3;
+}
+.block__meta { margin-top: auto; font-size: 11.5px; color: var(--ink-muted); }
+.block__count {
+  display: inline-block; padding: 0 6px; border-radius: 999px;
+  background: var(--accent-soft); color: var(--accent-ink);
+  font-size: 11px; font-weight: 650; font-variant-numeric: tabular-nums;
+}
+
+.block--event .block__kind { color: var(--accent); }
+.block--error .block__kind { color: var(--danger); }
+
+.block--ref {
+  min-height: 0; padding: 8px 13px; border-style: dashed;
+  flex-direction: row; align-items: baseline; gap: 8px;
+}
+
+.family {
+  padding: 11px 13px; background: var(--surface-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.family__label {
+  font-family: var(--mono); font-size: 11.5px; color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+.family__label b { color: var(--ink); font-weight: 600; }
 
 @media (max-width: 860px) {
   .shell { grid-template-columns: 1fr; }

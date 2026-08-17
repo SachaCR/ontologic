@@ -30,6 +30,10 @@ export function renderHtml(model: DomainModel): string {
       <input id="search" class="search" type="search" placeholder="Filter concepts…"
              aria-label="Filter concepts" autocomplete="off" spellcheck="false">
     </div>
+    <nav class="rail__fixed" aria-label="Views">
+      <a class="navlink navlink--view" href="#/">Overview</a>
+      <a class="navlink navlink--view" href="#/explore">Explorer</a>
+    </nav>
     <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
   </aside>
   <main id="main" class="main"></main>

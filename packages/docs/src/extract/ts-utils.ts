@@ -1,7 +1,7 @@
 import ts from "typescript";
 import { relative } from "node:path";
 
-import type { SourceLocation, StateField } from "./model";
+import type { SourceLocation, StateField, TypeRef } from "./model";
 
 /**
  * Shared AST helpers.
@@ -130,12 +130,201 @@ export function membersOfTypeNode(
     // the declared `?` is the more faithful signal.
     const optional = (symbol.flags & ts.SymbolFlags.Optional) !== 0;
 
-    return {
+    const field: StateField = {
       name: symbol.getName(),
       type: optional ? text.replace(/ \| undefined$/, "") : text,
       optional,
     };
+
+    try {
+      const refs = resolveTypeRefs(
+        ctx.checker.getTypeOfSymbolAtLocation(symbol, typeNode),
+        ctx,
+        "state",
+      );
+      if (refs.length > 0) field.refs = refs;
+    } catch {
+      /* leave refs absent */
+    }
+
+    return field;
   });
+}
+
+const COLLECTION_VALUE_ARGUMENT: Record<string, number> = {
+  Array: 0,
+  ReadonlyArray: 0,
+  Set: 0,
+  ReadonlySet: 0,
+  // A Map's domain content is the value side; the key is an id string.
+  Map: 1,
+  ReadonlyMap: 1,
+  Record: 1,
+};
+
+/**
+ * Resolve a type back to the declarations it ultimately refers to.
+ *
+ * Three transformations, each required by a real case:
+ *
+ * - **Unwrap collections.** `nodes: Map<string, WorkflowNode>` is containment of
+ *   `WorkflowNode`; the `string` key is not part of the domain.
+ * - **Expand unions.** `tool: WorkflowNodeTool` is an alias over six tool value
+ *   objects. This runs through the checker rather than the written syntax because
+ *   union aliases are not always written as plain references — one in the wild is
+ *   built from `ReturnType<LLMTool['readState']>`, which a syntactic walk reads
+ *   as the type `ReturnType`.
+ * - **Classify from the declaration.** The printed type cannot distinguish a
+ *   plain data interface from a live sub-entity.
+ */
+export function resolveTypeRefs(
+  type: ts.Type,
+  ctx: ExtractContext,
+  via: TypeRef["via"],
+): TypeRef[] {
+  const found: TypeRef[] = [];
+  const seen = new Set<ts.Type>();
+
+  const visit = (
+    current: ts.Type,
+    arity: TypeRef["arity"],
+    family: string | undefined,
+  ): void => {
+    if (seen.has(current)) return;
+    seen.add(current);
+
+    if (current.isUnion() || current.isIntersection()) {
+      // Remember the alias so the members can be presented as one family rather
+      // than as a row of near-identical siblings.
+      const aliasName = current.aliasSymbol?.getName();
+      const memberFamily =
+        family ?? (current.types.length > 1 ? aliasName : undefined);
+
+      for (const member of current.types) visit(member, arity, memberFamily);
+      return;
+    }
+
+    // Primitives, null and undefined carry no domain object.
+    if (
+      current.flags &
+      (ts.TypeFlags.StringLike |
+        ts.TypeFlags.NumberLike |
+        ts.TypeFlags.BooleanLike |
+        ts.TypeFlags.BigIntLike |
+        ts.TypeFlags.ESSymbolLike |
+        ts.TypeFlags.EnumLike |
+        ts.TypeFlags.Null |
+        ts.TypeFlags.Undefined |
+        ts.TypeFlags.Void |
+        ts.TypeFlags.Never |
+        ts.TypeFlags.Any |
+        ts.TypeFlags.Unknown)
+    ) {
+      return;
+    }
+
+    if (ctx.checker.isArrayType(current)) {
+      const element = ctx.checker.getTypeArguments(
+        current as ts.TypeReference,
+      )[0];
+      if (element) visit(element, "many", family);
+      return;
+    }
+
+    const symbol = current.aliasSymbol ?? current.getSymbol();
+    if (!symbol) return;
+
+    const name = symbol.getName();
+
+    const valueIndex = COLLECTION_VALUE_ARGUMENT[name];
+    if (valueIndex !== undefined) {
+      const args = safeTypeArguments(current, ctx);
+      const value = args[valueIndex];
+      if (value) visit(value, "many", family);
+      return;
+    }
+
+    const declaration = symbol.declarations?.[0];
+    if (!declaration) return;
+
+    const kind = classifyDeclaration(declaration);
+    if (!kind) return;
+
+    found.push({
+      symbol: name,
+      file: relativeToRoot(ctx.root, declaration.getSourceFile().fileName),
+      arity,
+      via,
+      declaration: kind,
+      ...(family !== undefined ? { family } : {}),
+    });
+  };
+
+  visit(type, "one", undefined);
+
+  return dedupeRefs(found);
+}
+
+/**
+ * What a declaration is, for containment purposes.
+ *
+ * `subEntityClass` covers the library's own canonical sub-entity: a plain class
+ * with `serialize()` and `static fromState`, and deliberately no heritage. It is
+ * the one shape the entity extractor cannot see, because that gates on
+ * `extends DomainEntity | ValueObject`.
+ */
+function classifyDeclaration(
+  declaration: ts.Declaration,
+): TypeRef["declaration"] | undefined {
+  if (ts.isInterfaceDeclaration(declaration)) return "plain";
+  if (!ts.isClassDeclaration(declaration)) return undefined;
+
+  const heritage = heritageOf(declaration);
+  if (
+    heritage &&
+    (heritage.baseName === "DomainEntity" || heritage.baseName === "ValueObject")
+  ) {
+    return "domainClass";
+  }
+
+  const sf = declaration.getSourceFile();
+  const memberNames = declaration.members.map((m) =>
+    m.name ? m.name.getText(sf) : "",
+  );
+
+  const looksLikeSubEntity =
+    memberNames.includes("serialize") || memberNames.includes("fromState");
+
+  return looksLikeSubEntity ? "subEntityClass" : "plain";
+}
+
+function safeTypeArguments(
+  type: ts.Type,
+  ctx: ExtractContext,
+): readonly ts.Type[] {
+  try {
+    return ctx.checker.getTypeArguments(type as ts.TypeReference);
+  } catch {
+    return [];
+  }
+}
+
+function dedupeRefs(refs: TypeRef[]): TypeRef[] {
+  const seen = new Set<string>();
+
+  return refs.filter((ref) => {
+    const key = `${ref.file}#${ref.symbol}|${ref.arity}|${ref.via}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+export function relativeToRoot(root: string, file: string): string {
+  const prefix = root.endsWith("/") ? root : `${root}/`;
+  return (file.startsWith(prefix) ? file.slice(prefix.length) : file)
+    .split("\\")
+    .join("/");
 }
 
 /**

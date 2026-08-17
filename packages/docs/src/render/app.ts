@@ -420,6 +420,302 @@ export const APP_SCRIPT = String.raw`
     return html;
   }
 
+  // ---------- explorer ----------
+
+  var KIND_LABEL = {
+    entity: "Aggregate",
+    subEntity: "Sub-entity",
+    valueObject: "Value object",
+    event: "Event",
+    error: "Error",
+    invariant: "Invariant",
+    repository: "Repository",
+    useCase: "Use case",
+    behaviour: "Behaviour"
+  };
+
+  function containedOf(id) {
+    return MODEL.edges.filter(function (e) { return e.from === id && e.kind === "contains"; });
+  }
+
+  function referencesOf(id) {
+    return MODEL.edges.filter(function (e) { return e.from === id && e.kind === "references"; });
+  }
+
+  /** Behaviours are addressed as '<entityId>::<method>' — they are not model nodes. */
+  function behaviourId(node, method) { return node.id + "::" + method.name; }
+
+  function behaviourOf(ref) {
+    var parts = ref.split("::");
+    var owner = byId[parts[0]];
+    if (!owner || !owner.methods) return null;
+
+    for (var i = 0; i < owner.methods.length; i++) {
+      if (owner.methods[i].name === parts[1]) {
+        return { owner: owner, method: owner.methods[i] };
+      }
+    }
+    return null;
+  }
+
+  /** How many blocks the next level would show — drives the count badge. */
+  function childCount(node) {
+    if (node.kind === "event" || node.kind === "error" || node.kind === "invariant") return 0;
+
+    var behaviours = (node.methods || []).filter(function (m) {
+      return m.emits.length > 0 || m.canFail.length > 0;
+    });
+
+    return containedOf(node.id).length + behaviours.length;
+  }
+
+  function blockHtml(node, extraClass) {
+    var count = childCount(node);
+    var terminal = count === 0;
+    var cls = "block block--" + node.kind + (extraClass ? " " + extraClass : "") +
+      (terminal ? " block--terminal" : "");
+
+    var inner =
+      '<span class="block__kind">' + esc(KIND_LABEL[node.kind] || node.kind) + "</span>" +
+      '<span class="block__name">' + esc(node.name) + "</span>" +
+      '<span class="block__meta">' +
+      (terminal
+        ? '<a class="mono" href="' + hrefOf(node) + '">details →</a>'
+        : '<span class="block__count">' + count + "</span> inside") +
+      "</span>";
+
+    // Terminal blocks are a div, not an anchor: nothing to drill into.
+    return terminal
+      ? '<div class="' + cls + '">' + inner + "</div>"
+      : '<a class="' + cls + '" href="#/explore/' + encodeURIComponent(node.id) + '">' + inner + "</a>";
+  }
+
+  function behaviourBlockHtml(node, method) {
+    var count = method.emits.length + method.canFail.length;
+
+    return '<a class="block block--behaviour" href="#/explore/' +
+      encodeURIComponent(behaviourId(node, method)) + '">' +
+      '<span class="block__kind">Behaviour</span>' +
+      '<span class="block__name">' + esc(method.name) + "()</span>" +
+      '<span class="block__meta"><span class="block__count">' + count +
+      "</span> outcome" + (count === 1 ? "" : "s") + "</span></a>";
+  }
+
+  /**
+   * Group children that came from the same union alias. A tool holds
+   * 'WorkflowNodeOutputType' — nine classes — and nine sibling blocks per tool
+   * says less than one labelled family does.
+   */
+  function groupedBlocks(edges) {
+    var families = {};
+    var loose = [];
+
+    edges.forEach(function (edge) {
+      var node = byId[edge.to];
+      if (!node) return;
+
+      var family = familyFor(edge.from, node);
+      if (family) {
+        (families[family] = families[family] || []).push(node);
+      } else {
+        loose.push(node);
+      }
+    });
+
+    var html = loose.length
+      ? '<div class="blocks">' + loose.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+      : "";
+
+    Object.keys(families).forEach(function (name) {
+      var members = families[name];
+      html += '<div class="family" style="margin-top:10px">' +
+        '<div class="family__label">any one of <b>' + esc(name) + "</b> · " +
+        members.length + " kinds</div>" +
+        '<div class="blocks">' +
+        members.map(function (n) { return blockHtml(n); }).join("") +
+        "</div></div>";
+    });
+
+    return html;
+  }
+
+  function familyFor(holderId, target) {
+    var holder = byId[holderId];
+    if (!holder || !holder.containedRefs) return null;
+
+    for (var i = 0; i < holder.containedRefs.length; i++) {
+      var ref = holder.containedRefs[i];
+      if (ref.symbol === target.name && ref.family) return ref.family;
+    }
+    return null;
+  }
+
+  function trailHtml(segments) {
+    var html = '<nav class="trail" aria-label="Explorer path">';
+
+    segments.forEach(function (segment, index) {
+      if (index > 0) html += '<span class="trail__sep">›</span>';
+
+      if (index === segments.length - 1) {
+        html += '<span class="trail__here">' + esc(segment.label) + "</span>";
+      } else {
+        html += '<a href="' + segment.href + '">' + esc(segment.label) + "</a>";
+      }
+    });
+
+    return html + "</nav>";
+  }
+
+  /** The chain from an aggregate root down to 'node', following contains edges. */
+  function pathTo(node) {
+    var chain = [node];
+    var guard = 0;
+
+    while (guard++ < 20) {
+      var parent = MODEL.edges.filter(function (e) {
+        return e.kind === "contains" && e.to === chain[0].id;
+      })[0];
+
+      if (!parent) break;
+      var parentNode = byId[parent.from];
+      if (!parentNode || chain.indexOf(parentNode) !== -1) break;
+      chain.unshift(parentNode);
+    }
+
+    return chain;
+  }
+
+  function viewExplorer(target) {
+    // Level 4: a behaviour, addressed as owner::method.
+    if (target && target.indexOf("::") !== -1) {
+      var found = behaviourOf(target);
+      if (found) return viewBehaviour(found.owner, found.method);
+    }
+
+    var node = byId[target];
+    if (!node) return viewExplorerRoots();
+
+    var segments = pathTo(node).map(function (n) {
+      return { label: n.name, href: "#/explore/" + encodeURIComponent(n.id) };
+    });
+    segments.unshift({ label: "Aggregates", href: "#/explore" });
+
+    var html = trailHtml(segments) +
+      '<div class="crumb"><span class="chip chip--accent">' +
+      esc(KIND_LABEL[node.kind] || node.kind) + "</span></div>" +
+      '<h1 class="title">' + esc(node.name) + "</h1>" +
+      '<p class="subtitle"><a href="' + hrefOf(node) + '">Full detail</a> · <code>' +
+      esc(node.location.file) + "</code></p>";
+
+    var contained = containedOf(node.id);
+    if (contained.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Contains</h2>' +
+        groupedBlocks(contained) + "</div>";
+    }
+
+    var behaviours = (node.methods || []).filter(function (m) {
+      return m.emits.length > 0 || m.canFail.length > 0;
+    });
+
+    if (behaviours.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Behaviours</h2><div class="blocks">' +
+        behaviours.map(function (m) { return behaviourBlockHtml(node, m); }).join("") +
+        "</div></div>";
+    }
+
+    var references = referencesOf(node.id);
+    if (references.length > 0) {
+      html += '<div class="section"><h2 class="section__head">References</h2>' +
+        '<p class="subtitle">Named by id, not held — following one leaves this aggregate.</p>' +
+        '<div class="blocks">' + references.map(function (edge) {
+          var to = byId[edge.to];
+          if (!to) return "";
+          return '<a class="block block--ref" href="#/explore/' + encodeURIComponent(to.id) + '">' +
+            '<span class="block__kind">via ' + esc(edge.via) + "</span>" +
+            '<span class="block__name">' + esc(to.name) + "</span></a>";
+        }).join("") + "</div></div>";
+    }
+
+    if (contained.length === 0 && behaviours.length === 0 && references.length === 0) {
+      html += '<div class="section"><div class="empty">Nothing below this — see ' +
+        '<a href="' + hrefOf(node) + '">its detail page</a> for state and payload.</div></div>';
+    }
+
+    return html;
+  }
+
+  function viewBehaviour(owner, method) {
+    var segments = pathTo(owner).map(function (n) {
+      return { label: n.name, href: "#/explore/" + encodeURIComponent(n.id) };
+    });
+    segments.unshift({ label: "Aggregates", href: "#/explore" });
+    segments.push({ label: method.name + "()", href: "#" });
+
+    var html = trailHtml(segments) +
+      '<div class="crumb"><span class="chip chip--accent">Behaviour</span></div>' +
+      '<h1 class="title">' + esc(owner.name) + "." + esc(method.name) + "()</h1>" +
+      '<p class="subtitle">Returns <code>' + esc(method.returnType) + "</code></p>";
+
+    if (method.emits.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Produces</h2><div class="blocks">' +
+        method.emits.map(function (id) {
+          var n = byId[id];
+          return n ? blockHtml(n) : "";
+        }).join("") + "</div></div>";
+    } else {
+      html += '<div class="section"><h2 class="section__head">Produces</h2>' +
+        '<div class="empty">No event is named in the signature. Some methods return a ' +
+        "wrapper carrying the aggregate's event union rather than a specific event, in " +
+        "which case what they emit is not determinable from the type alone.</div></div>";
+    }
+
+    if (method.canFail.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Can fail with</h2><div class="blocks">' +
+        method.canFail.map(function (id) {
+          var n = byId[id];
+          return n ? blockHtml(n) : "";
+        }).join("") + "</div></div>";
+    }
+
+    return html;
+  }
+
+  function viewExplorerRoots() {
+    var roots = (MODEL.aggregateRoots || []).map(function (id) { return byId[id]; })
+      .filter(Boolean);
+
+    // Fall back to every entity when nothing contains anything — a codebase with
+    // no sub-entities has no roots to distinguish.
+    if (roots.length === 0) roots = nodesOfKind("entity");
+
+    var html = trailHtml([{ label: "Aggregates", href: "#/explore" }]) +
+      '<h1 class="title title--prose">Explorer</h1>' +
+      '<p class="subtitle">Start at an aggregate and drill down: what it contains, then its ' +
+      "behaviours, then the events and errors each one produces.</p>";
+
+    html += '<div class="section">' +
+      (roots.length
+        ? '<div class="blocks">' + roots.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+        : '<div class="empty">No aggregates found.</div>') +
+      "</div>";
+
+    var orphans = nodesOfKind("valueObject").filter(function (vo) {
+      return MODEL.edges.filter(function (e) {
+        return e.kind === "contains" && e.to === vo.id;
+      }).length === 0;
+    });
+
+    if (orphans.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Unattached value objects</h2>' +
+        '<p class="subtitle">Nothing was found holding these. They may be built and used ' +
+        "transiently, or held in a way that cannot be seen statically.</p>" +
+        '<div class="blocks">' + orphans.map(function (n) { return blockHtml(n); }).join("") +
+        "</div></div>";
+    }
+
+    return html;
+  }
+
   // ---------- routing ----------
 
   var VIEWS = {
@@ -439,6 +735,8 @@ export const APP_SCRIPT = String.raw`
 
     if (!parts[0]) {
       html = viewOverview();
+    } else if (parts[0] === "explore") {
+      html = viewExplorer(decodeURIComponent(parts.slice(1).join("/") || ""));
     } else {
       var node = byId[decodeURIComponent(parts[1] || "")];
       var kind = routeToKind[parts[0]];

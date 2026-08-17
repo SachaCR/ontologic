@@ -1,6 +1,6 @@
 import ts from "typescript";
 
-import type { EntityNode, Method } from "./model";
+import type { EntityNode, Method, TypeRef } from "./model";
 import { makeNodeId } from "./model";
 import {
   collectNewExpressionNames,
@@ -9,6 +9,7 @@ import {
   isStatic,
   locationOf,
   membersOfTypeNode,
+  resolveTypeRefs,
   typeArgText,
   unionMembers,
   unwrapResult,
@@ -66,16 +67,18 @@ function toEntityNode(
   const serializedTypeName = typeArgText(heritage?.typeArguments, 1, sf);
 
   const { invariants, attachment } = findInvariantAttachment(node, ctx);
+  const stateFields = membersOfTypeNode(heritage?.typeArguments?.[0], ctx);
 
   const entity: EntityNode = {
     id: makeNodeId(kind, location.file, name),
     kind,
     name,
     stateTypeName,
-    stateFields: membersOfTypeNode(heritage?.typeArguments?.[0], ctx),
+    stateFields,
     methods: node.members
       .filter(ts.isMethodDeclaration)
       .map((m) => toMethod(m, ctx)),
+    containedRefs: collectContainedRefs(node, stateFields, ctx),
     invariants,
     invariantAttachment: attachment,
     location,
@@ -86,6 +89,53 @@ function toEntityNode(
   }
 
   return entity;
+}
+
+/**
+ * Everything this class holds live, from both places it can hide.
+ *
+ * State fields are the obvious source. Private fields are the essential one: a
+ * value object may keep the live instance in `#outputType` while storing only
+ * `outputType.readState()` in its state, so a state-only pass finds none of the
+ * value-object-to-value-object structure.
+ *
+ * Both are gated on resolving to a class or interface declaration, which is what
+ * keeps infrastructure out — one value object in the wild holds a `graphlib`
+ * `Graph` in a private field, and an ungated pass would render it as a domain
+ * concept.
+ */
+function collectContainedRefs(
+  node: ts.ClassDeclaration,
+  stateFields: EntityNode["stateFields"],
+  ctx: ExtractContext,
+): TypeRef[] {
+  const refs: TypeRef[] = stateFields.flatMap((field) => field.refs ?? []);
+
+  for (const member of node.members) {
+    if (!ts.isPropertyDeclaration(member)) continue;
+    if (!member.type) continue;
+
+    try {
+      refs.push(
+        ...resolveTypeRefs(
+          ctx.checker.getTypeAtLocation(member.type),
+          ctx,
+          "privateField",
+        ),
+      );
+    } catch {
+      /* skip fields whose type will not resolve */
+    }
+  }
+
+  const seen = new Set<string>();
+
+  return refs.filter((ref) => {
+    const key = `${ref.file}#${ref.symbol}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function toMethod(node: ts.MethodDeclaration, ctx: ExtractContext): Method {

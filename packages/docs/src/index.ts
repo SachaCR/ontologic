@@ -7,6 +7,11 @@ import { extractInvariants } from "./extract/invariants";
 import { extractRepositories } from "./extract/repositories";
 import { extractUseCases } from "./extract/useCases";
 import { linkModel } from "./extract/link";
+import {
+  aggregateRoots,
+  extractSubEntities,
+  linkContainment,
+} from "./extract/containment";
 import { computeFindings, keepEventUnions } from "./extract/findings";
 
 export type * from "./extract/model";
@@ -35,8 +40,13 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     repositoryNames: new Set(repositories.map((r) => r.name)),
   });
 
+  // Sub-entities are discovered through containment, so they can only be found
+  // once the entities that hold them have been extracted.
+  const subEntities = extractSubEntities(ctx, entities);
+
   const nodes = [
     ...entities,
+    ...subEntities,
     ...events,
     ...errors,
     ...invariants,
@@ -44,7 +54,7 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     ...useCases,
   ];
 
-  const edges = linkModel(nodes);
+  const edges = [...linkModel(nodes), ...linkContainment(nodes)];
   const eventUnions = keepEventUnions(unions, nodes);
 
   return {
@@ -53,5 +63,6 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     edges,
     eventUnions,
     findings: computeFindings(nodes, eventUnions),
+    aggregateRoots: aggregateRoots(nodes, edges),
   };
 }
