@@ -47,6 +47,17 @@ describe.skipIf(!existsSync(WORKFLOW_V2))(
     });
 
     describe("When containment is extracted", () => {
+      it("Then tooling directories are not read as domain code", () => {
+        // A project that has run `ontologic init-agents` carries reference
+        // aggregates under .claude/skills/. Documenting those invents concepts
+        // the codebase does not have — this repo really did grow a phantom
+        // "Subscription" aggregate that way.
+        expect(model.nodes.some((n) => n.location.file.startsWith("."))).toBe(
+          false,
+        );
+        expect(model.nodes.some((n) => n.name === "Subscription")).toBe(false);
+      });
+
       it("Then only the aggregate roots are top level", () => {
         // Three of the five entities are held by another entity, so opening the
         // Explorer on all five would present children as top-level concepts.

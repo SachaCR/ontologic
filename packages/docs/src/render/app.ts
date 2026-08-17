@@ -74,29 +74,85 @@ export const APP_SCRIPT = String.raw`
 
   // ---------- rail ----------
 
+  var activeKinds = {};   // empty means "everything"
+  var railItems = [];     // flat, in display order — the keyboard walks this
+  var cursor = -1;
+
+  function anyFilterOn() {
+    for (var key in activeKinds) if (activeKinds[key]) return true;
+    return false;
+  }
+
+  function passesFilter(node) {
+    return !anyFilterOn() || activeKinds[node.kind];
+  }
+
+  function navlinkHtml(node) {
+    var flagged = findingsByNode[node.id] ? " navlink--flagged" : "";
+
+    return '<a class="navlink' + flagged + '" data-kind="' + esc(node.kind) +
+      '" data-id="' + esc(node.id) + '" href="' + hrefOf(node) + '">' +
+      '<span class="navlink__dot"></span>' +
+      '<span class="navlink__text">' + esc(node.name) + "</span></a>";
+  }
+
+  function groupHtml(label, nodes, className) {
+    var html = '<div class="group ' + (className || "") + '">' +
+      '<div class="group__label"><span>' + esc(label) + "</span>" +
+      '<span class="group__count">' + nodes.length + "</span></div>";
+
+    nodes.forEach(function (node) {
+      railItems.push(node);
+      html += navlinkHtml(node);
+    });
+
+    return html + "</div>";
+  }
+
+  /**
+   * The rail is grouped by aggregate rather than by kind, so it reads as the
+   * domain rather than as a type index: everything belonging to an aggregate sits
+   * under it. Anything not reachable from a root falls into a trailing group.
+   */
   function renderRail(filter) {
     var needle = (filter || "").trim().toLowerCase();
+    railItems = [];
+
+    var matches = function (node) {
+      return passesFilter(node) &&
+        (!needle || node.name.toLowerCase().indexOf(needle) !== -1);
+    };
+
+    var claimed = {};
     var html = "";
 
-    KINDS.forEach(function (kind) {
-      var all = nodesOfKind(kind.key);
-      var shown = needle
-        ? all.filter(function (n) { return n.name.toLowerCase().indexOf(needle) !== -1; })
-        : all;
+    var roots = (MODEL.aggregateRoots || []).map(function (id) { return byId[id]; })
+      .filter(Boolean);
 
-      if (shown.length === 0) return;
+    if (roots.length === 0) roots = nodesOfKind("entity");
 
-      html += '<div class="group">';
-      html += '<div class="group__label"><span>' + esc(kind.label) + "</span>";
-      html += '<span class="group__count">' + shown.length + "</span></div>";
+    roots.forEach(function (root) {
+      var members = [root].concat(descendantsOf(root.id));
+      var shown = [];
 
-      shown.forEach(function (node) {
-        var flagged = findingsByNode[node.id] ? " navlink--flagged" : "";
-        html += '<a class="navlink' + flagged + '" data-id="' + esc(node.id) + '" href="' +
-          hrefOf(node) + '">' + esc(node.name) + "</a>";
+      members.forEach(function (node) {
+        if (claimed[node.id]) return;
+        claimed[node.id] = true;
+        if (matches(node)) shown.push(node);
       });
 
-      html += "</div>";
+      if (shown.length > 0) html += groupHtml(root.name, shown, "group--aggregate");
+    });
+
+    var rest = MODEL.nodes.filter(function (n) {
+      return !claimed[n.id] && matches(n);
+    });
+
+    KINDS.forEach(function (kind) {
+      var nodes = rest.filter(function (n) { return n.kind === kind.key; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+      if (nodes.length > 0) html += groupHtml(kind.label, nodes);
     });
 
     if (html === "") {
@@ -104,7 +160,52 @@ export const APP_SCRIPT = String.raw`
     }
 
     document.getElementById("nav").innerHTML = html;
+    cursor = -1;
     markCurrent();
+  }
+
+  /** Everything reachable from an aggregate by containment, plus what it emits. */
+  function descendantsOf(rootId) {
+    var seen = {};
+    var out = [];
+    var queue = [rootId];
+
+    while (queue.length > 0) {
+      var id = queue.shift();
+
+      MODEL.edges.forEach(function (edge) {
+        if (edge.from !== id) return;
+        if (edge.kind !== "contains" && edge.kind !== "emits" &&
+            edge.kind !== "protectedBy" && edge.kind !== "canFail") return;
+        if (seen[edge.to] || edge.to === rootId) return;
+
+        var node = byId[edge.to];
+        if (!node) return;
+
+        seen[edge.to] = true;
+        out.push(node);
+        queue.push(edge.to);
+      });
+    }
+
+    var order = { entity: 0, subEntity: 1, valueObject: 2, event: 3, invariant: 4, error: 5 };
+
+    return out.sort(function (a, b) {
+      var d = (order[a.kind] === undefined ? 9 : order[a.kind]) -
+        (order[b.kind] === undefined ? 9 : order[b.kind]);
+      return d !== 0 ? d : a.name.localeCompare(b.name);
+    });
+  }
+
+  function renderFilters() {
+    var html = KINDS.map(function (kind) {
+      var on = !!activeKinds[kind.key];
+      return '<button class="filter" type="button" data-kind="' + esc(kind.key) +
+        '" data-filter="' + esc(kind.key) + '" aria-pressed="' + on + '">' +
+        esc(kind.label) + "</button>";
+    }).join("");
+
+    document.getElementById("filters").innerHTML = html;
   }
 
   function markCurrent() {
@@ -117,6 +218,24 @@ export const APP_SCRIPT = String.raw`
       } else {
         links[i].removeAttribute("aria-current");
       }
+    }
+  }
+
+  /** Move the keyboard cursor through the visible rail results. */
+  function moveCursor(delta) {
+    if (railItems.length === 0) return;
+
+    cursor += delta;
+    if (cursor < 0) cursor = 0;
+    if (cursor >= railItems.length) cursor = railItems.length - 1;
+
+    var links = document.querySelectorAll(".navlink[data-id]");
+    for (var i = 0; i < links.length; i++) links[i].classList.remove("is-active");
+
+    var target = links[cursor];
+    if (target) {
+      target.classList.add("is-active");
+      target.scrollIntoView({ block: "nearest" });
     }
   }
 
@@ -162,7 +281,8 @@ export const APP_SCRIPT = String.raw`
   }
 
   function header(node, kindLabel, prose) {
-    return '<div class="crumb"><span class="chip chip--accent">' + esc(kindLabel) + "</span></div>" +
+    return '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(node.kind) +
+      '">' + esc(kindLabel) + "</span></div>" +
       '<h1 class="title' + (prose ? " title--prose" : "") + '">' + esc(node.name) + "</h1>" +
       whereFound(node);
   }
@@ -183,8 +303,15 @@ export const APP_SCRIPT = String.raw`
 
     if (behaviour.length > 0) {
       var rows = behaviour.map(function (m) {
-        return "<tr><td class=\"mono nowrap\">" + (m.isStatic ? '<span class="faint">static </span>' : "") +
-          esc(m.name) + "()</td>" +
+        var params = (m.parameters || []).map(function (p) {
+          return p.name + ": " + p.type;
+        }).join(", ");
+
+        return "<tr><td>" +
+          '<span class="mono nowrap">' +
+          (m.isStatic ? '<span class="faint">static </span>' : "") +
+          "<b>" + esc(m.name) + "</b>(" + esc(params) + ")</span>" +
+          '<span class="sig">→ ' + esc(m.returnType) + "</span></td>" +
           "<td>" + linkList(m.emits) + "</td>" +
           "<td>" + linkList(m.canFail) + "</td></tr>";
       }).join("");
@@ -270,7 +397,7 @@ export const APP_SCRIPT = String.raw`
   }
 
   function viewInvariant(node) {
-    var html = '<div class="crumb"><span class="chip chip--accent">Invariant</span></div>' +
+    var html = '<div class="crumb"><span class="chip chip--kind" data-kind="invariant">Invariant</span></div>' +
       '<h1 class="title title--prose">' + esc(node.description) + "</h1>" +
       '<p class="subtitle"><code>' + esc(node.name) + "</code> · <code>" +
       esc(node.location.file) + ":" + node.location.line + "</code></p>";
@@ -333,7 +460,7 @@ export const APP_SCRIPT = String.raw`
   }
 
   function viewUseCase(node) {
-    var html = '<div class="crumb"><span class="chip chip--accent">Use case</span>' +
+    var html = '<div class="crumb"><span class="chip chip--kind" data-kind="useCase">Use case</span>' +
       (node.confidence !== "high"
         ? '<span class="chip chip--warn">' + esc(node.confidence) + " confidence</span>"
         : "") + "</div>" +
@@ -393,7 +520,8 @@ export const APP_SCRIPT = String.raw`
     KINDS.forEach(function (kind) {
       var count = nodesOfKind(kind.key).length;
       if (count === 0) return;
-      html += '<div class="tile"><div class="tile__n">' + count + "</div>" +
+      html += '<div class="tile" data-kind="' + esc(kind.key) + '"><div class="tile__n">' +
+        count + "</div>" +
         '<div class="tile__k">' + esc(kind.label) + "</div></div>";
     });
     html += "</div></div>";
@@ -486,14 +614,15 @@ export const APP_SCRIPT = String.raw`
 
     // Terminal blocks are a div, not an anchor: nothing to drill into.
     return terminal
-      ? '<div class="' + cls + '">' + inner + "</div>"
-      : '<a class="' + cls + '" href="#/explore/' + encodeURIComponent(node.id) + '">' + inner + "</a>";
+      ? '<div class="' + cls + '" data-kind="' + esc(node.kind) + '">' + inner + "</div>"
+      : '<a class="' + cls + '" data-kind="' + esc(node.kind) + '" href="#/explore/' +
+        encodeURIComponent(node.id) + '">' + inner + "</a>";
   }
 
   function behaviourBlockHtml(node, method) {
     var count = method.emits.length + method.canFail.length;
 
-    return '<a class="block block--behaviour" href="#/explore/' +
+    return '<a class="block" data-kind="useCase" href="#/explore/' +
       encodeURIComponent(behaviourId(node, method)) + '">' +
       '<span class="block__kind">Behaviour</span>' +
       '<span class="block__name">' + esc(method.name) + "()</span>" +
@@ -601,7 +730,7 @@ export const APP_SCRIPT = String.raw`
     segments.unshift({ label: "Aggregates", href: "#/explore" });
 
     var html = trailHtml(segments) +
-      '<div class="crumb"><span class="chip chip--accent">' +
+      '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(node.kind) + '">' +
       esc(KIND_LABEL[node.kind] || node.kind) + "</span></div>" +
       '<h1 class="title">' + esc(node.name) + "</h1>" +
       '<p class="subtitle"><a href="' + hrefOf(node) + '">Full detail</a> · <code>' +
@@ -652,7 +781,7 @@ export const APP_SCRIPT = String.raw`
     segments.push({ label: method.name + "()", href: "#" });
 
     var html = trailHtml(segments) +
-      '<div class="crumb"><span class="chip chip--accent">Behaviour</span></div>' +
+      '<div class="crumb"><span class="chip chip--kind" data-kind="useCase">Behaviour</span></div>' +
       '<h1 class="title">' + esc(owner.name) + "." + esc(method.name) + "()</h1>" +
       '<p class="subtitle">Returns <code>' + esc(method.returnType) + "</code></p>";
 
@@ -716,23 +845,32 @@ export const APP_SCRIPT = String.raw`
     return html;
   }
 
+  function legendHtml(entries) {
+    return '<div class="legend">' + entries.map(function (entry) {
+      return '<span class="legend__item" data-kind="' + esc(entry[0]) + '">' +
+        '<span class="legend__swatch"></span>' + esc(entry[1]) + "</span>";
+    }).join("") + "</div>";
+  }
+
   // ---------- graph ----------
 
   var BOX_W = 172, BOX_H = 24;
 
+  // Same three-hue system as the rest of the page: structure, facts, application.
+  // Members of a family differ by fill weight, not by hue.
   var GRAPH_FILL = {
-    entity: "var(--accent-soft)",
-    subEntity: "var(--surface)",
+    entity: "var(--t-structure-soft)",
+    subEntity: "var(--t-structure-soft)",
     valueObject: "var(--surface)",
-    event: "var(--surface-sunken)",
+    event: "var(--t-fact-soft)",
     family: "var(--surface-sunken)"
   };
 
   var GRAPH_STROKE = {
-    entity: "var(--accent)",
-    subEntity: "var(--line-strong)",
-    valueObject: "var(--line-strong)",
-    event: "var(--accent)",
+    entity: "var(--t-structure)",
+    subEntity: "var(--t-structure)",
+    valueObject: "var(--t-structure)",
+    event: "var(--t-fact)",
     family: "var(--line-strong)"
   };
 
@@ -816,12 +954,13 @@ export const APP_SCRIPT = String.raw`
 
     html += '<div class="scroll" style="padding:6px">' + graphSvg(selected) + "</div>";
 
-    html += '<div class="section"><h2 class="section__head">Legend</h2><div class="flow">' +
-      '<span class="flow__item" style="border-color:var(--accent);background:var(--accent-soft)">aggregate</span>' +
-      '<span class="flow__item">entity or value object</span>' +
-      '<span class="flow__item" style="border-color:var(--accent)">event</span>' +
-      '<span class="flow__item" style="border-style:dashed">family — any one of N</span>' +
-      "</div>" +
+    html += '<div class="section"><h2 class="section__head">Legend</h2>' +
+      legendHtml([
+        ["entity", "aggregate or sub-entity"],
+        ["valueObject", "value object"],
+        ["event", "event"],
+        ["family", "family — any one of N"]
+      ]) +
       '<p class="subtitle" style="margin-top:10px">Every box links into the Explorer.</p>' +
       "</div>";
 
@@ -870,12 +1009,56 @@ export const APP_SCRIPT = String.raw`
     markCurrent();
   }
 
-  document.getElementById("search").addEventListener("input", function (event) {
+  var searchBox = document.getElementById("search");
+
+  searchBox.addEventListener("input", function (event) {
     renderRail(event.target.value);
+  });
+
+  document.getElementById("filters").addEventListener("click", function (event) {
+    var button = event.target.closest("[data-filter]");
+    if (!button) return;
+
+    var kind = button.getAttribute("data-filter");
+    activeKinds[kind] = !activeKinds[kind];
+
+    renderFilters();
+    renderRail(searchBox.value);
+  });
+
+  document.addEventListener("keydown", function (event) {
+    // "/" focuses the filter box from anywhere, the way search boxes usually do.
+    if (event.key === "/" && event.target !== searchBox) {
+      event.preventDefault();
+      searchBox.focus();
+      searchBox.select();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      searchBox.value = "";
+      activeKinds = {};
+      renderFilters();
+      renderRail("");
+      searchBox.blur();
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveCursor(event.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+
+    if (event.key === "Enter" && cursor >= 0 && railItems[cursor]) {
+      event.preventDefault();
+      location.hash = hrefOf(railItems[cursor]);
+    }
   });
 
   window.addEventListener("hashchange", render);
 
+  renderFilters();
   renderRail("");
   render();
 })();

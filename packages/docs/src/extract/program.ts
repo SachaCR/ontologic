@@ -28,9 +28,20 @@ const SKIP_DIRECTORIES = new Set([
   "dist",
   "build",
   "coverage",
-  ".git",
   "__tests__",
 ]);
+
+/**
+ * Dot-directories are tooling, not domain code.
+ *
+ * This matters more than it looks: a project that has run `ontologic
+ * init-agents` carries reference aggregates under `.claude/skills/`, and
+ * documenting those alongside the real model invents aggregates the codebase
+ * does not have. `.git`, `.next`, `.turbo` and friends fall out of the same rule.
+ */
+function isSkippedDirectory(name: string): boolean {
+  return name.startsWith(".") || SKIP_DIRECTORIES.has(name);
+}
 
 export interface BuildProgramOptions {
   /** A tsconfig.json to honour, or a directory/file list to walk. */
@@ -112,7 +123,10 @@ function collectTypeScriptFiles(dir: string, includeTests: boolean): string[] {
       const full = join(current, entry.name);
 
       if (entry.isDirectory()) {
-        if (SKIP_DIRECTORIES.has(entry.name) && !(includeTests && entry.name === "__tests__")) {
+        if (
+          isSkippedDirectory(entry.name) &&
+          !(includeTests && entry.name === "__tests__")
+        ) {
           continue;
         }
         walk(full);
