@@ -11,6 +11,7 @@ import { computeFindings, keepEventUnions } from "./extract/findings";
 
 export type * from "./extract/model";
 export type { BuildProgramOptions } from "./extract/program";
+export { renderHtml } from "./render/html";
 
 /**
  * Analyse an Ontologic codebase and return its domain model.

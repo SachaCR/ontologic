@@ -9,7 +9,7 @@
 import { writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
-import { extractModel } from "./index";
+import { extractModel, renderHtml } from "./index";
 import type {
   DomainModel,
   EntityNode,
@@ -21,6 +21,7 @@ import type {
 interface Options {
   paths: string[];
   project?: string;
+  out?: string;
   json?: string;
   includeTests: boolean;
 }
@@ -28,6 +29,7 @@ interface Options {
 function parseArgs(argv: string[]): Options {
   const paths: string[] = [];
   let project: string | undefined;
+  let out: string | undefined;
   let json: string | undefined;
   let includeTests = false;
 
@@ -39,6 +41,10 @@ function parseArgs(argv: string[]): Options {
       project = argv[++i];
     } else if (arg.startsWith("--project=")) {
       project = arg.slice("--project=".length);
+    } else if (arg === "--out" || arg === "-o") {
+      out = argv[++i];
+    } else if (arg.startsWith("--out=")) {
+      out = arg.slice("--out=".length);
     } else if (arg === "--json") {
       json = argv[++i];
     } else if (arg.startsWith("--json=")) {
@@ -52,6 +58,7 @@ function parseArgs(argv: string[]): Options {
 
   const options: Options = { paths, includeTests };
   if (project !== undefined) options.project = project;
+  if (out !== undefined) options.out = out;
   if (json !== undefined) options.json = json;
 
   return options;
@@ -66,15 +73,16 @@ Usage:
   ontologic-docs --project <tsconfig.json> [options]
 
 Options:
+  -o, --out <file>       Write self-contained HTML documentation
   -p, --project <file>   Analyse the files of a tsconfig instead of scanning paths
       --json <file>      Write the extracted model as JSON
       --include-tests    Include __tests__ directories (excluded by default)
   -h, --help             Show this message
 
 Examples:
-  ontologic-docs ./src/domain
-  ontologic-docs ./src --json model.json
-  ontologic-docs --project ./tsconfig.json
+  ontologic-docs ./src/domain --out domain.html
+  ontologic-docs --project ./tsconfig.json --out domain.html
+  ontologic-docs ./src/domain --json model.json
 `);
 }
 
@@ -241,10 +249,20 @@ function main(): number {
 
   printSummary(model);
 
+  if (options.out) {
+    const target = resolve(options.out);
+    writeFileSync(target, renderHtml(model), "utf8");
+    console.log(`\nDocumentation written to ${displayPath(target)}`);
+  }
+
   if (options.json) {
     const target = resolve(options.json);
     writeFileSync(target, `${JSON.stringify(model, null, 2)}\n`, "utf8");
-    console.log(`\nModel written to ${displayPath(target)}`);
+    console.log(`Model written to ${displayPath(target)}`);
+  }
+
+  if (!options.out && !options.json) {
+    console.log("\nPass --out <file.html> to generate the documentation page.");
   }
 
   return 0;
