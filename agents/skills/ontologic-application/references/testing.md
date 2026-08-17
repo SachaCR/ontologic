@@ -1,88 +1,157 @@
 # Testing use cases (vitest)
 
 Use a **real** `InMemoryRepository` subclass, not a mock. It stores `entity.readState()`
-and the events, so it exercises the same invariant checks and the same serialization path
-as production — with none of the setup.
+and the events, so it exercises the same invariant checks and serialization path as
+production — with none of the setup.
+
+Tests live in `__tests__/` beside the use case. Titles follow the same Gherkin structure
+as domain tests: `describe` carries **Given** and **When** as full sentences, every `it`
+starts with **Then** and states the outcome in the domain's language.
 
 ```typescript
 import { describe, it, expect, beforeEach } from "vitest";
 
-describe("activateSubscriptionUseCase", () => {
-  let repository: SubscriptionRepository;
+describe("Given a customer with a pending subscription", () => {
+  let subscriptions: SubscriptionRepository;
+  let subscriptionId: string;
 
-  beforeEach(() => {
-    repository = new SubscriptionRepository(); // fresh instance per test
+  beforeEach(async () => {
+    subscriptions = new SubscriptionRepository();
+    subscriptionId = await openPendingSubscription(subscriptions);
   });
 
-  it("activates a pending subscription", async () => {
-    const id = await setupPendingSubscription(repository);
+  describe("When the subscription is activated", () => {
+    let outcome: Awaited<ReturnType<typeof activateSubscriptionUseCase>>;
 
-    const result = await activateSubscriptionUseCase(repository, id, NOW);
+    beforeEach(async () => {
+      outcome = await activateSubscriptionUseCase(
+        { id: subscriptionId, activatedAt: "2026-01-01T00:00:00.000Z" },
+        { subscriptions },
+      );
+    });
 
-    expect(result._unsafeUnwrap().status).toBe("ACTIVE");
+    it("Then the subscription becomes active", () => {
+      expect(outcome.isOk()).toBe(true);
+      if (outcome.isOk()) {
+        expect(outcome.value.status).toBe("ACTIVE");
+      }
+    });
   });
 });
 ```
+
+`Awaited<ReturnType<typeof someUseCase>>` is the idiom for typing the captured outcome
+without restating the `Result` union.
 
 ## Reaching the precondition
 
 Compose the earlier use cases in a named setup helper rather than reaching into the
 repository by hand. The helper doubles as documentation of how the state is legitimately
-reached:
+reached, and returns the id:
 
 ```typescript
-async function setupPendingSubscription(
-  repository: SubscriptionRepository,
+async function openPendingSubscription(
+  subscriptions: SubscriptionRepository,
+  overrides: Partial<{ customerId: string; planId: string }> = {},
 ): Promise<string> {
-  const created = await createSubscriptionUseCase(repository, "cust-1", "plan-basic");
-  return created._unsafeUnwrap().id;
+  const fields = { customerId: "cust-1", planId: "plan-basic", ...overrides };
+  const { subscription, creationEvent } = Subscription.create(fields);
+
+  const saved = await subscriptions.saveWithEvents(subscription, creationEvent);
+  if (saved.isErr()) throw saved.error;
+
+  return subscription.id();
 }
+```
+
+Put shared helpers in `__tests__/helpers.ts`. Give each scenario distinct identifying
+values so cases cannot collide.
+
+**Assert your setup actually worked** when a Given has several steps — a guard assertion
+inside `beforeEach` turns a confusing Then failure into an obvious setup failure:
+
+```typescript
+beforeEach(async () => {
+  for (const planId of plans) {
+    const r = await subscribeToPlanUseCase({ customerId, planId }, { subscriptions, plans: planRepo });
+    expect(r.isOk()).toBe(true);
+  }
+});
 ```
 
 ## One call per test
 
-Each test calls the use case **once** and asserts on that call. Seed everything else in
-the setup helper.
+The **When** block calls the use case **once**. Everything else goes in the **Given**.
 
 Use cases and workflows cache and memoize; a test that calls the same function repeatedly
-and asserts between calls is relying on state carried across invocations, and when it
-fails you cannot tell which call broke it. Put the prior calls in setup, keep one in the
-body.
+and asserts between calls relies on state carried across invocations, and when it fails
+you cannot tell which call broke it.
 
 ## The four things worth asserting
 
-Pick the one that matches what the test is about:
+Pick the one that matches what the scenario is about, and say so in the Then:
 
 ```typescript
 // 1. The returned Result
-expect(result._unsafeUnwrap().status).toBe("ACTIVE");
+it("Then the customer is told the subscription is active", () => { ... });
 
 // 2. The persisted state
-const stored = (await repository.getById(id))._unsafeUnwrap();
-expect(stored?.readState().status).toBe("ACTIVE");
+it("Then the subscription is stored as active", async () => {
+  const stored = (await subscriptions.getById(id))._unsafeUnwrap();
+  expect(stored?.readState().status).toBe("ACTIVE");
+});
 
 // 3. The emitted events
-const events = (await repository.getEvents(id))._unsafeUnwrap();
-expect(events.map((e) => e.event.name)).toEqual([
-  "SUBSCRIPTION_CREATED",
-  "SUBSCRIPTION_ACTIVATED",
-]);
+it("Then the activation is recorded in the subscription's history", async () => {
+  const events = (await subscriptions.getEvents(id))._unsafeUnwrap();
+  expect(events.map((e) => e.event.name)).toEqual([
+    "SUBSCRIPTION_CREATED",
+    "SUBSCRIPTION_ACTIVATED",
+  ]);
+});
 
-// 4. The failure
-expect(result.isErr()).toBe(true);
-if (result.isErr()) {
-  expect(result.error.name).toBe("INVALID_STATUS_TRANSITION");
-}
+// 4. The refusal
+it("Then the subscription refuses a second activation", () => {
+  expect(outcome.isErr()).toBe(true);
+  if (outcome.isErr()) {
+    expect(outcome.error.name).toBe("INVALID_STATUS_TRANSITION");
+  }
+});
 ```
 
 Asserting the **event sequence** is the highest-value use-case test — it is the part the
-rest of the system depends on and the part most easily broken by a refactor.
+rest of the system depends on, and the part most easily broken by a refactor.
+
+## Testing a cross-aggregate rule
+
+A rule living in a use case is tested through the use case, with both repositories real:
+
+```typescript
+describe("Given a plan that is no longer offered", () => {
+  describe("When a customer tries to subscribe to it", () => {
+    it("Then the subscription is refused", () => {
+      expect(outcome.isErr()).toBe(true);
+      if (outcome.isErr()) {
+        expect(outcome.error.name).toBe("PLAN_NO_LONGER_OFFERED");
+      }
+    });
+
+    it("Then no subscription is recorded for the customer", async () => {
+      const stored = (await subscriptions.list({ limit: 10, offset: 0 }))._unsafeUnwrap();
+      expect(stored.data).toHaveLength(0);
+    });
+  });
+});
+```
+
+The second Then is the one worth writing: a refusal that still wrote something is the
+failure mode that matters.
 
 ## Notes
 
 - `getEvents` returns `EventWithMetadata<Event>[]`, so reach through `.event` — the
   metadata (`id`, `createdAt`, optional `offset`) sits alongside it.
-- `_unsafeUnwrap()` is acceptable in tests and throws on the wrong variant. In assertions
+- `_unsafeUnwrap()` is acceptable in tests and throws on the wrong variant. For assertions
   about failures, prefer the `isErr()` narrowing idiom so `result.error` types correctly.
 - `InMemoryRepository` does not implement optimistic locking, so it cannot be used to test
   `ConcurrentWriteError` handling. That needs a repository that actually versions rows.
