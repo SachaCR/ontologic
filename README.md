@@ -38,6 +38,26 @@ A full-featured library management application built with NestJS, demonstrating 
 
 Focused examples (entity, invariants, events, use cases) are in the [`src/examples/`](https://github.com/SachaCR/ontologic/tree/main/src/examples) directory — a credit balance aggregate and an order lifecycle.
 
+## Using Ontologic with AI coding agents
+
+Ontologic ships conventions that AI coding agents can read directly, so they write
+idiomatic domain code instead of guessing at the API.
+
+```bash
+npx ontologic init-agents
+```
+
+This drops an `AGENTS.md` and a set of skills into your project — covering the folder
+layout, the entity/event/error/invariant patterns, the return-vs-throw error rule, and
+the mistakes agents most often make with this library. It is read by Claude Code, Cursor,
+Codex, and anything else that honours `AGENTS.md`.
+
+For tools that consume documentation over the network, the full docs are published in
+[llms.txt](https://llmstxt.org) format:
+
+- <https://ontologic.site/llms.txt> — index
+- <https://ontologic.site/llms-full.txt> — complete documentation in one file
+
 ## License
 
 MIT

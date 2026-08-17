@@ -1,0 +1,25 @@
+// Type-checks the reference templates that ship inside the agent skills
+// (agents/templates). They are real, compiling TypeScript on purpose: if a
+// public signature in src/ changes, this build fails and the guidance handed to
+// AI agents cannot silently rot.
+//
+// Run with: pnpm check:agents
+{
+  "extends": "./tsconfig.json",
+  "include": ["./agents/skills/ontologic-templates/templates"],
+  "compilerOptions": {
+    "rootDir": ".",
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+
+    // Templates are written the way a consumer writes them — importing from the
+    // package root. Resolve that to local source so the check runs against the
+    // working tree rather than a published build.
+    "baseUrl": ".",
+    "paths": {
+      "ontologic": ["./src/index.ts"]
+    }
+  }
+}

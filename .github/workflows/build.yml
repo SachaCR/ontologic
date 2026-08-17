@@ -25,3 +25,8 @@ jobs:
 
       - name: Build
         run: pnpm build
+
+      # The reference templates shipped in the agent skills are real TypeScript.
+      # This fails if a public API changes and the AI-facing guidance goes stale.
+      - name: Type-check agent skill templates
+        run: pnpm check:agents
