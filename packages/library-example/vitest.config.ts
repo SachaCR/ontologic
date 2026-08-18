@@ -17,7 +17,7 @@ export default defineConfig({
       enabled: true,
       provider: "v8",
       reporter: ["html"],
-      reportsDirectory: "./coverage",
+      reportsDirectory: "./reports/coverage",
       include: ["src/**/*.ts"],
       exclude: [
         '**/node_modules/**',

@@ -13,7 +13,8 @@
   "scripts": {
     "build": "tsc",
     "build:release": "tsc --project tsconfig-release.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:report": "vitest run && vite preview --outDir reports"
   },
   "keywords": [
     "ontologic",
@@ -40,7 +41,9 @@
   "devDependencies": {
     "@types/node": "^25.4.0",
     "typescript": "^5.9.3",
-    "vitest": "^4.1.3"
+    "vitest": "^4.1.3",
+    "@vitest/ui": "^4.1.3",
+    "@vitest/coverage-v8": "^4.1.3"
   },
   "publishConfig": {
     "access": "public"

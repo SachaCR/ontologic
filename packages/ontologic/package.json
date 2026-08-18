@@ -18,7 +18,8 @@
     "build:release": "tsc --project tsconfig-release.json",
     "check:agents": "tsc --project tsconfig-agents.json",
     "example:step": "pnpx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
-    "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts"
+    "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts",
+    "test:report": "vitest run && vite preview --outDir reports"
   },
   "keywords": [
     "DDD",

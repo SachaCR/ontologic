@@ -10,7 +10,7 @@
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage",
-    "test:report": "vite preview --outDir html",
+    "test:report": "vitest run && vite preview --outDir reports",
     "build:release": "nest build"
   },
   "keywords": [],
