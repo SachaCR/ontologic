@@ -5,18 +5,6 @@ authors: [sacha]
 tags: [typescript, architecture, release]
 ---
 
-Here is a line from the library example I point people at when they ask what an Ontologic entity looks like:
-
-```ts
-super(id, state, [dueDateAfterLoanDate, returnDateAfterLoanDate]);
-```
-
-It does not compile. It stopped compiling the day 1.7.0 shipped, when invariants moved from a positional array to an options object. The example sat in its own repository, on `"ontologic": "^1.6.2"`, and nothing ever built the two together — so nothing failed, and I did not notice. The example kept being the first real code people read, and it kept being wrong.
-
-That is what the monorepo is for.
-
-<!-- truncate -->
-
 ## One repository, three packages
 
 Ontologic now lives in a pnpm workspace with turbo on top:
