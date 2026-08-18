@@ -13,3 +13,7 @@ packages/*/scripts/
 # Claude Code: keep skills and plugin config in version control, ignore only
 # the machine-local permission cache.
 .claude/settings.local.json
+
+# turbo local cache and per-package test output
+.turbo/
+reports/

@@ -1,0 +1,60 @@
+{
+  "name": "ontologic",
+  "version": "1.7.1",
+  "description": "Model What Matters: Domain Entities, Invariant, Domain Events, and much more.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "ontologic": "./dist/cli/index.js"
+  },
+  "files": [
+    "/dist",
+    "/agents",
+    "AGENTS.md"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "build": "tsc",
+    "build:release": "tsc --project tsconfig-release.json",
+    "check:agents": "tsc --project tsconfig-agents.json",
+    "example:step": "pnpx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
+    "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts"
+  },
+  "keywords": [
+    "DDD",
+    "domain-driven-design",
+    "domain",
+    "entity",
+    "invariants",
+    "domain-events",
+    "event-bus",
+    "outbox",
+    "repository",
+    "result-pattern",
+    "workflow",
+    "clean-code",
+    "typescript"
+  ],
+  "author": "SachaCR",
+  "license": "MIT",
+  "homepage": "https://ontologic.site",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SachaCR/ontologic.git",
+    "directory": "packages/ontologic"
+  },
+  "bugs": {
+    "url": "https://github.com/SachaCR/ontologic/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "@types/node": "^25.4.0",
+    "@vitest/coverage-v8": "^4.1.3",
+    "@vitest/ui": "^4.1.3",
+    "prettier": "^3.8.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.1.3"
+  }
+}

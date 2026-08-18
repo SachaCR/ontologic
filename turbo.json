@@ -1,0 +1,59 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "build": {
+      "env": [
+        "NODE_ENV"
+      ],
+      "inputs": [
+        "src/**",
+        "tsconfig*.json"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "build:release": {
+      "env": [
+        "NODE_ENV"
+      ],
+      "inputs": [
+        "src/**",
+        "tsconfig*.json"
+      ],
+      "outputs": [
+        "dist/**",
+        "build/**"
+      ],
+      "dependsOn": [
+        "^build:release"
+      ]
+    },
+    "test": {
+      "env": [
+        "NODE_ENV"
+      ],
+      "inputs": [
+        "src/**"
+      ],
+      "outputs": [
+        "reports/**"
+      ],
+      "dependsOn": [
+        "^build"
+      ]
+    },
+    "check:agents": {
+      "inputs": [
+        "src/**",
+        "agents/**",
+        "tsconfig-agents.json"
+      ],
+      "outputs": []
+    }
+  }
+}

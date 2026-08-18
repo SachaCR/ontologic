@@ -3,32 +3,42 @@ name: Release package
 on:
   workflow_dispatch:
     inputs:
+      package:
+        description: Package to release
+        type: choice
+        required: true
+        default: "ontologic"
+        options:
+          - "ontologic"
+          - "@ontologic/domain-explorer"
+
       release_type:
         description: Release type
-        required: true
         type: choice
+        required: true
+        default: "patch"
         options:
-          - patch
-          - minor
-          - major
+          - "patch"
+          - "minor"
+          - "major"
 
 permissions:
-  id-token: write # Required for OIDC
+  id-token: write
   contents: read
 
 jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # required for npm trusted publisher OIDC
-      contents: write # required to push the version commit and tag
+      id-token: write # npm trusted publisher OIDC
+      contents: write # push the version commit and tag
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v4
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v4
 
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v4
         with:
           node-version: 24
           cache: pnpm
@@ -37,19 +47,33 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Cache turbo build setup
+        uses: actions/cache@v5
+        with:
+          path: .turbo
+          key: ${{ runner.os }}-turbo-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
       - name: Configure git
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+      # Bump the selected package, not the workspace root. Running `pnpm version`
+      # at the root bumps the private root manifest and leaves the package being
+      # published on its old version.
       - name: Bump version
-        run: pnpm version ${{ github.event.inputs.release_type }}
+        run: pnpm --filter "${{ github.event.inputs.package }}" exec npm version ${{ github.event.inputs.release_type }}
 
       - name: Build
-        run: pnpm tsc --project tsconfig-release.json
+        run: pnpm release --filter "${{ github.event.inputs.package }}"
 
-      - name: Push version commit and tag
-        run: git push --follow-tags
+      - name: Commit and tag
+        run: |
+          git add -A
+          git commit -m "release ${{ github.event.inputs.package }} (${{ github.event.inputs.release_type }})"
+          git push
 
       - name: Publish to NPM
-        run: pnpm publish --no-git-checks --access public
+        run: pnpm publish --no-git-checks --filter "${{ github.event.inputs.package }}"
