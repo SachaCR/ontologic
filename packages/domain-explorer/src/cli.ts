@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * `ontologic-docs` — generate documentation from an Ontologic codebase.
+ * `domain-explorer` — generate documentation from an Ontologic codebase.
  *
  * Follows the same conventions as the core package's CLI: no arg-parsing
  * library, `main()` returns an exit code, and nothing calls `process.exit()`.
@@ -66,11 +66,11 @@ function parseArgs(argv: string[]): Options {
 
 function printUsage(): void {
   console.log(`
-ontologic-docs — document an Ontologic domain model
+domain-explorer — document an Ontologic domain model
 
 Usage:
-  ontologic-docs <path...> [options]
-  ontologic-docs --project <tsconfig.json> [options]
+  domain-explorer <path...> [options]
+  domain-explorer --project <tsconfig.json> [options]
 
 Options:
   -o, --out <file>       Write self-contained HTML documentation
@@ -80,9 +80,9 @@ Options:
   -h, --help             Show this message
 
 Examples:
-  ontologic-docs ./src/domain --out domain.html
-  ontologic-docs --project ./tsconfig.json --out domain.html
-  ontologic-docs ./src/domain --json model.json
+  domain-explorer ./src/domain --out domain.html
+  domain-explorer --project ./tsconfig.json --out domain.html
+  domain-explorer ./src/domain --json model.json
 `);
 }
 
@@ -218,7 +218,7 @@ function main(): number {
   const options = parseArgs(argv);
 
   if (!options.project && options.paths.length === 0) {
-    console.error("ontologic-docs: provide a source path or --project");
+    console.error("domain-explorer: provide a source path or --project");
     printUsage();
     return 1;
   }
@@ -235,14 +235,14 @@ function main(): number {
     model = extractModel(extractOptions);
   } catch (error) {
     console.error(
-      `ontologic-docs: ${error instanceof Error ? error.message : String(error)}`,
+      `domain-explorer: ${error instanceof Error ? error.message : String(error)}`,
     );
     return 1;
   }
 
   if (model.nodes.length === 0) {
     console.error(
-      "ontologic-docs: no Ontologic concepts found. Is this an Ontologic codebase?",
+      "domain-explorer: no Ontologic concepts found. Is this an Ontologic codebase?",
     );
     return 1;
   }

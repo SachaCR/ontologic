@@ -1,0 +1,106 @@
+# @ontologic/domain-explorer
+
+Reads a codebase built on [Ontologic](https://ontologic.site) and generates a single
+self-contained HTML page documenting its domain model.
+
+```bash
+npx @ontologic/domain-explorer ./src/domain --out domain.html
+```
+
+One file. Stylesheet, script and data are all inlined, so it opens from disk, survives
+being emailed, and works in a sandbox that blocks every external host.
+
+## What it finds
+
+Detection keys on base classes and type arguments, never on filenames — so it works
+regardless of whether you keep use cases in `useCases/` or `use-cases/`, declare your event
+union in its own file or inline, or put one error per file or ten.
+
+| Concept | Detected by |
+| --- | --- |
+| Aggregates and sub-entities | `extends DomainEntity<State>` |
+| Value objects | `extends ValueObject<State>` |
+| Domain events | `extends DomainEvent<Name, Version, Payload>` |
+| Typed errors | `extends DomainError<Name, Context>` |
+| Invariants | `new BaseDomainInvariant<State>(description, predicate)` |
+| Repositories | `extends InMemoryRepository<E, Ev>`, or an interface extending `Repository<E, Ev>` |
+| Use cases | exported functions returning `Promise<Result<T, E>>` — see *confidence* below |
+
+It also resolves the relationships between them: which method emits which event, which
+errors a behaviour can return, what an aggregate contains, and which repositories a use case
+reads from versus writes to.
+
+## Three views
+
+**Overview** — counts, findings, and the event unions.
+
+**Explorer** — drill down one level at a time: aggregate roots, then what each holds, then
+its behaviours, then the events and errors each behaviour produces.
+
+**Graph** — one diagram per aggregate root: the root, what hangs off it, and the events
+those produce. Errors are left out; this view is about structure.
+
+## Findings
+
+The same pass that builds the model reports where a codebase contradicts itself:
+
+| Code | Meaning |
+| --- | --- |
+| `error-missing-set-prototype` | A `DomainError` subclass whose constructor omits `Object.setPrototypeOf`, so `instanceof` is `false` for it at runtime |
+| `event-missing-from-union` | An event that is emitted but absent from any event union type, making it invisible to repositories and listeners typed on that union |
+| `invariant-never-attached` | An invariant declared but wired to no entity — it looks like protection and provides none |
+| `use-case-error-union-erased` | A use case declaring `Result<_, Error>`, so callers cannot handle its failures exhaustively |
+| `legacy-invariant-attachment` | Invariants passed as a positional third constructor argument, the pre-1.7 API |
+
+## Usage
+
+```
+domain-explorer <path...> [options]
+domain-explorer --project <tsconfig.json> [options]
+
+  -o, --out <file>       Write self-contained HTML documentation
+  -p, --project <file>   Analyse the files of a tsconfig instead of scanning paths
+      --json <file>      Write the extracted model as JSON
+      --include-tests    Include __tests__ directories (excluded by default)
+  -h, --help             Show this message
+```
+
+`--project` gives the fullest picture, since it analyses exactly what your build does.
+Passing paths instead scans them directly, which is useful for documenting one bounded
+context out of a larger repository.
+
+`--json` writes the extracted model as plain data, if you would rather feed it to something
+other than the bundled renderer.
+
+## Programmatic use
+
+```ts
+import { extractModel, renderHtml } from "@ontologic/domain-explorer";
+
+const model = extractModel({ paths: ["./src/domain"] });
+console.log(model.findings);
+
+writeFileSync("domain.html", renderHtml(model));
+```
+
+Extraction and rendering are deliberately separate: the model is plain serialisable data,
+so it can be asserted on in tests, diffed between versions, or rendered some other way.
+
+## Notes
+
+**It does not need your dependencies installed.** Detection matches on written syntax and
+only enriches with the type checker where that resolves, so a codebase with no
+`node_modules` still produces a complete model.
+
+**Use-case detection is a heuristic**, and says so. Unlike every other concept there is no
+base class to key on, so each use case carries a confidence level and the page shows it
+when it is not `high`. A helper that merely looks like a use case is reported as a guess
+rather than a fact.
+
+**Tooling directories are skipped.** Anything under a dot-directory is ignored, so a
+project that has run `ontologic init-agents` does not get the shipped reference aggregates
+documented as its own domain.
+
+## License
+
+MIT

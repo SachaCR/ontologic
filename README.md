@@ -1,62 +1,61 @@
 # Ontologic
 
-A TypeScript toolkit for building software that speaks your domain's language.
-Model your business rules, protect your invariants, and make failures explicit.
+Monorepo for [Ontologic](https://ontologic.site), a TypeScript toolkit for building
+software that speaks your domain's language, and the tools built around it.
 
-## Documentation
+## Packages
 
-Full documentation, guides, and examples are available at:
+| Package | Published as | What it is |
+| --- | --- | --- |
+| [`packages/ontologic`](packages/ontologic) | [`ontologic`](https://www.npmjs.com/package/ontologic) | The library. Domain entities, invariants, domain events, the Result pattern, repositories, the event bus and outbox relay, and typed resumable workflows. Zero runtime dependencies. |
+| [`packages/domain-explorer`](packages/domain-explorer) | `@ontologic/domain-explorer` | Reads an Ontologic codebase and generates a single self-contained HTML page documenting its domain model — aggregates, value objects, events, typed errors, invariants, repositories and use cases. |
+| [`packages/library-example`](packages/library-example) | not published | A NestJS library-management app demonstrating the library on a real domain, and the source for the articles under its `docs/`. |
+| [`website`](website) | ontologic.site | The documentation site (Docusaurus), including the `llms.txt` generated from it. |
 
-**[ontologic.site](http://ontologic.site)**
+Start with [`packages/ontologic`](packages/ontologic) if you are here for the library
+itself, or [ontologic.site](https://ontologic.site) for the guides.
 
-## Quick start
+## Working in this repo
 
-```bash
-npm install ontologic
-```
-
-## What's inside
-
-- **Domain Entity** — Entities that own their state and enforce their own rules
-- **Invariants** — Business rules checked on every state read, not just after specific operations
-- **Domain Events** — Immutable, versioned facts about what happened in your domain
-- **Result Pattern** — Typed domain failures as return values, not hidden exceptions
-- **Repository** — Persistence interface that saves entity state and events atomically
-- **Event Bus** — Types event bus that allows to publish and listen to your domain events
-- **Message Relay** — Built-in Outbox Pattern with in-memory component for fast prototyping
-- **Workflows** — Typed, resumable pipelines for multi-step business processes
-
-## Examples
-
-### Library Management App
-
-A full-featured library management application built with NestJS, demonstrating all Ontologic features on a real-world use case:
-
-**[sachacr/library-examples](https://github.com/sachacr/library-examples)**
-
-### Smaller examples
-
-Focused examples (entity, invariants, events, use cases) are in the [`src/examples/`](https://github.com/SachaCR/ontologic/tree/main/src/examples) directory — a credit balance aggregate and an order lifecycle.
-
-## Using Ontologic with AI coding agents
-
-Ontologic ships conventions that AI coding agents can read directly, so they write
-idiomatic domain code instead of guessing at the API.
+pnpm workspaces driven by [turbo](https://turbo.build). Everything runs from the root:
 
 ```bash
-npx ontologic init-agents
+pnpm install
+pnpm build          # every package, in dependency order
+pnpm test           # every suite
+pnpm check:agents   # type-checks the agent skill templates against the library
 ```
 
-This drops an `AGENTS.md` and a set of skills into your project — covering the folder
-layout, the entity/event/error/invariant patterns, the return-vs-throw error rule, and
-the mistakes agents most often make with this library. It is read by Claude Code, Cursor,
-Codex, and anything else that honours `AGENTS.md`.
+Scope a command to one package with `--filter`:
 
-For tools that consume documentation over the network, the full docs are published in
-[llms.txt](https://llmstxt.org) format:
+```bash
+pnpm --filter ontologic test
+pnpm --filter @ontologic/domain-explorer build
+pnpm --filter website build
+```
 
-- <https://ontologic.site/llms.txt> — index
-- <https://ontologic.site/llms-full.txt> — complete documentation in one file
+Each package writes its test report to `reports/index.html`; `pnpm --filter <pkg> test:report`
+runs the suite and serves it.
+
+## Conventions
+
+[`packages/ontologic/AGENTS.md`](packages/ontologic/AGENTS.md) documents how to write code
+*with* the library — the folder layout, the entity and event patterns, and the rule that
+domain failures are returned while technical failures are thrown. It ships inside the npm
+package, so it describes the library's conventions rather than this repository's.
+
+Two things differ between packages and are deliberate:
+
+- `packages/library-example` writes its tests as Gherkin scenarios (`describe("Given …")`,
+  `it("Then …")`); the library's own tests do not.
+- `packages/domain-explorer` runs without coverage, because its tests drive the TypeScript
+  compiler and instrumenting it costs far more than the coverage is worth.
+
+## Releasing
+
+The **Release package** workflow (`workflow_dispatch`) bumps and publishes a single
+package. It takes the package name and a release type, so `ontologic` and
+`@ontologic/domain-explorer` release independently.
 
 ## License
 
