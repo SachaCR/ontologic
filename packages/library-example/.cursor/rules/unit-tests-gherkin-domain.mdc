@@ -1,0 +1,28 @@
+---
+description: Unit tests — Gherkin Given/When/Then structure, domain language, __tests__ layout (Vitest)
+globs: "packages/library-example/**/__tests__/**/*.ts,packages/library-example/**/*.test.ts"
+alwaysApply: true
+---
+
+# Unit tests (packages/library-example)
+
+When adding or editing unit tests, follow these rules.
+
+## Layout
+
+- Put tests in **`__tests__`** next to the module under test (e.g. `src/.../book/__tests__/book.entity.test.ts`).
+- Use `*.test.ts`. Keep `vitest.config.ts` `include` aligned with `src/**/__tests__/**/*.test.ts`.
+
+## Gherkin structure
+
+- **`describe`**: only **Given** and **When**. One string per block = keyword + full sentence (e.g. `Given I have…`, `When I register…`).
+- **`it`**: every **Then** — title must start with **`Then`** and describe the outcome in **domain** terms (ubiquitous language, user/librarian perspective). No `describe` for Then-only groups.
+
+## Style
+
+- Prefer library/domain wording over internal jargon in titles unless the test is intentionally low-level.
+- Shared setup lives under **Given** (`beforeEach` when several **Then** cases need the same fresh state).
+
+## Imports
+
+- From `__tests__`, import the subject with a relative path up one level (e.g. `../book.entity`).
