@@ -1,35 +1,50 @@
+import { Result, UseCase, ok } from "../../../..";
+
 import { CreditBalanceRepository } from "../../creditBalance.repository";
-import { CreditBalance } from "../entities/creditBalance/creditBalance.entity";
+import {
+  CreditBalance,
+  CreditBalanceState,
+} from "../entities/creditBalance/creditBalance.entity";
 import { CreditBalanceEvent } from "../entities/creditBalance/events/creditBalancesEvents";
+import { CreateBalanceWithCreditsCommand } from "./commands/createBalanceWithCredits.command";
 
-const creditBalanceRepository = new CreditBalanceRepository();
+/**
+ * Two events, one atomic save — `saveWithEvents` is the unit of work, so the
+ * creation and the opening credit are persisted together or not at all.
+ */
+export class CreateBalanceWithCreditsUseCase implements UseCase<
+  CreateBalanceWithCreditsCommand,
+  CreditBalanceState,
+  never
+> {
+  constructor(private readonly creditBalances: CreditBalanceRepository) {}
 
-export async function createBalanceWithCredits(
-  organizationId: string,
-  amount: number,
-) {
-  const domainEvents: CreditBalanceEvent[] = [];
+  async execute(
+    command: CreateBalanceWithCreditsCommand,
+  ): Promise<Result<CreditBalanceState, never>> {
+    const { organizationId, amount } = command.payload;
 
-  const { creditBalance, creationEvent } = CreditBalance.create({
-    organizationId,
-  });
+    const domainEvents: CreditBalanceEvent[] = [];
 
-  domainEvents.push(creationEvent);
+    const { creditBalance, creationEvent } = CreditBalance.create({
+      organizationId,
+    });
 
-  const creditEvent = creditBalance.credit({
-    amount,
-  });
+    domainEvents.push(creationEvent);
 
-  domainEvents.push(creditEvent);
+    const creditEvent = creditBalance.credit({ amount });
 
-  const result = await creditBalanceRepository.saveWithEvents(
-    creditBalance,
-    domainEvents,
-  );
+    domainEvents.push(creditEvent);
 
-  if (result.isErr()) {
-    throw result.error;
+    const result = await this.creditBalances.saveWithEvents(
+      creditBalance,
+      domainEvents,
+    );
+
+    if (result.isErr()) {
+      throw result.error;
+    }
+
+    return ok(creditBalance.readState());
   }
-
-  return creditBalance.readState();
 }

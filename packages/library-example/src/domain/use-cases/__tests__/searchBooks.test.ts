@@ -1,13 +1,16 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { searchBooks } from "../searchBooks.use-case";
+import { SearchBooksUseCase } from "../searchBooks.use-case";
+import { SearchBooksQuery } from "../queries/searchBooks.query";
 import { LibraryCollection } from "../../repositories/libraryCollection.repository";
 import { addCopyToCatalog } from "./helpers";
 
 describe("Given the catalog lists several copies with different titles", () => {
   let collection: LibraryCollection;
+  let searchBooks: SearchBooksUseCase;
 
   beforeEach(async () => {
     collection = new LibraryCollection();
+    searchBooks = new SearchBooksUseCase(collection);
     await addCopyToCatalog(collection, {
       title: "Alpha Guide",
       author: "Alex A.",
@@ -21,12 +24,11 @@ describe("Given the catalog lists several copies with different titles", () => {
   });
 
   describe("When I search the catalog by title through the use case", () => {
-    let outcome: Awaited<ReturnType<typeof searchBooks>>;
+    let outcome: Awaited<ReturnType<SearchBooksUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await searchBooks(
-        { title: "alpha" },
-        { libraryCollection: collection },
+      outcome = await searchBooks.execute(
+        new SearchBooksQuery({ title: "alpha" }),
       );
     });
 
@@ -42,17 +44,19 @@ describe("Given the catalog lists several copies with different titles", () => {
 
 describe("Given the catalog has at least one copy", () => {
   let collection: LibraryCollection;
+  let searchBooks: SearchBooksUseCase;
 
   beforeEach(async () => {
     collection = new LibraryCollection();
+    searchBooks = new SearchBooksUseCase(collection);
     await addCopyToCatalog(collection, { isbn: "978-cccccccccc" });
   });
 
   describe("When I run a search with no real title or author text", () => {
-    let outcome: Awaited<ReturnType<typeof searchBooks>>;
+    let outcome: Awaited<ReturnType<SearchBooksUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await searchBooks({}, { libraryCollection: collection });
+      outcome = await searchBooks.execute(new SearchBooksQuery({}));
     });
 
     it("Then I get an empty result list from the use case", () => {

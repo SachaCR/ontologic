@@ -33,6 +33,9 @@ templates/src/domain/
 └── useCases/
     ├── activateSubscription.use-case.ts         # single-aggregate: the canonical sequence
     ├── subscribeToPlan.use-case.ts              # CROSS-aggregate: reads Plan, writes Subscription
+    ├── readSubscription.use-case.ts             # a READ: declared over a Query, writes nothing
+    ├── commands/activateSubscription.command.ts, commands/subscribeToPlan.command.ts
+    ├── queries/readSubscription.query.ts
     └── errors/entityNotFound.error.ts
 ```
 
@@ -40,6 +43,10 @@ templates/src/domain/
 subscription may only be created for a plan that is still offered" needs the `Plan`
 aggregate, so it cannot be a `Subscription` invariant — it lives in the use case, the
 `Plan` is read and never written, and the write goes to exactly one aggregate.
+
+Read `activateSubscription.use-case.ts` and `readSubscription.use-case.ts` side by side to
+see the command/query split: the bodies differ only in that one saves, and the type
+argument says which before you read either body.
 
 Imports are written the way a consumer writes them — `from "ontologic"` — so a copied
 file works unchanged in an application.

@@ -156,9 +156,12 @@ function printUseCase(useCase: UseCaseNode, model: DomainModel): void {
     .filter(Boolean)
     .join("  ");
 
-  const uncertain = useCase.confidence === "high" ? "" : ` (${useCase.confidence} confidence)`;
+  // The action is the headline: it says what the use case is asked to do, and
+  // whether that is a change or a read.
+  const action = useCase.actionName ?? useCase.actionTypeName;
+  const kind = useCase.actionKind === "unknown" ? "action" : useCase.actionKind;
 
-  console.log(`  ${useCase.name}${uncertain}`);
+  console.log(`  ${useCase.name}  ${kind} ${action}`);
   if (flow) console.log(`      ${flow}`);
   if (useCase.canFail.length > 0) {
     console.log(`      fails ${useCase.canFail.map(nameOf).join(", ")}`);
@@ -195,7 +198,9 @@ function printEntity(entity: EntityNode, model: DomainModel): void {
 }
 
 function printFinding(finding: Finding): void {
-  console.log(`  [${finding.code}] ${finding.location.file}:${finding.location.line}`);
+  console.log(
+    `  [${finding.code}] ${finding.location.file}:${finding.location.line}`,
+  );
   console.log(`      ${finding.message}`);
 }
 

@@ -1,45 +1,82 @@
 # Use case reference
 
-There is no `UseCase` class or interface in the library. A use case is a convention:
-an exported async function in a `<verbNoun>.use-case.ts` file, exporting `<verbNoun>UseCase`,
-taking the caller's **input** first and a named **dependencies** bag second.
+`UseCase` is an interface in the library. A use case is a class in a
+`<verbNoun>.use-case.ts` file, exporting `<VerbNoun>UseCase`, implementing it:
+
+```typescript
+export interface UseCase<
+  Action extends ActionInterface,
+  Output,
+  Errors extends DomainError<string, unknown>,
+> {
+  execute(action: Action): Promise<Result<Output, Errors>>;
+}
+```
+
+Three type arguments, and each one is a contract: what it is **asked** to do, what it
+**produces**, and which domain failures a caller **must handle**.
+
+## The action is a `Command` or a `Query`
+
+The first type argument is never a loose object. It is a `Command` — an intent to change
+something, which the domain may refuse — or a `Query` — a request to read, which cannot.
+Both are declared exactly the way a `DomainEvent` is:
+
+```typescript
+// useCases/commands/subscribeToPlan.command.ts
+export class SubscribeToPlanCommand extends Command<
+  "SUBSCRIBE_TO_PLAN",
+  { customerId: string; planId: string }
+> {
+  constructor(payload: { customerId: string; planId: string }) {
+    super({ name: "SUBSCRIBE_TO_PLAN", payload });
+  }
+}
+
+// useCases/queries/readSubscription.query.ts
+export class ReadSubscriptionQuery extends Query<"READ_SUBSCRIPTION", { id: string }> {
+  constructor(payload: { id: string }) {
+    super({ name: "READ_SUBSCRIPTION", payload });
+  }
+}
+```
+
+Pick by what the use case does with its aggregates: if it calls `save` or `saveWithEvents`,
+it is a command; if it only reads, it is a query. This is not documentation — the two
+classes each hold private fields, so a `Query` is not assignable where a `Command` is
+expected even when the payloads are identical.
+
+Access the payload with `action.payload`, and destructure it once at the top of `execute`:
+every read returns a fresh `structuredClone`, so repeated reads are repeated copies.
 
 ## Dependency injection
 
-Two parameters, both objects: what the caller is asking for, and what the use case needs
-to do it. Never instantiate a repository at module scope — that makes the use case
-untestable and couples it to one implementation.
+Constructor parameters, one per collaborator. Never instantiate a repository at module
+scope — that makes the use case untestable and couples it to one implementation.
 
 ```typescript
 // Good — scales to any number of collaborators
-export async function subscribeToPlanUseCase(
-  input: { customerId: string; planId: string },
-  dependencies: { subscriptions: SubscriptionRepository; plans: PlanRepository },
-) { /* ... */ }
-
-// Avoid — a second aggregate has nowhere to go, and positional args get ambiguous
-export async function subscribeToPlanUseCase(
-  repository: SubscriptionRepository,
-  customerId: string,
-  planId: string,
-) { /* ... */ }
+export class SubscribeToPlanUseCase
+  implements UseCase<SubscribeToPlanCommand, SubscriptionState, SubscribeToPlanError>
+{
+  constructor(
+    private readonly subscriptions: SubscriptionRepository,
+    private readonly plans: PlanRepository,
+  ) {}
+}
 
 // Avoid — untestable, single implementation forever
 const repository = new SubscriptionRepository();
-export async function subscribeToPlanUseCase(customerId: string) { /* ... */ }
+export class SubscribeToPlanUseCase { /* ... */ }
 ```
 
-Destructure both at the top of the body, so the rest of the function reads the same as a
-positional one:
+The constructor is also what keeps a cross-aggregate use case honest: the parameters say
+which aggregates are in play, so a reviewer can see at a glance that `subscribeToPlan`
+touches two. Read from as many as you need; **write to exactly one**.
 
-```typescript
-const { customerId, planId } = input;
-const { subscriptions, plans } = dependencies;
-```
-
-The bag is also what keeps a cross-aggregate use case honest: the names say which
-aggregates are in play, so a reviewer can see at a glance that `subscribeToPlan` touches
-two. Read from as many as you need; **write to exactly one**.
+Keep the class free of framework decorators. Wiring a use case into a DI container is the
+composition root's job — register it with a factory there rather than putting
+`@Injectable()` on a domain class.
 
 ## The return type is a contract
 
@@ -48,8 +85,15 @@ Promise<Result<SubscriptionState, InvalidStatusTransition | EntityNotFound>>
 ```
 
 The error side is an explicit **union of every domain failure the caller must handle**.
-Widening it to `DomainError` or `Error` throws away the exhaustiveness checking that
-makes `switchGuard` useful. Add to the union when you add a failure mode.
+It is also **enforced**: `Errors` is constrained to `DomainError`, and `Error` does not
+satisfy that constraint — it has no `context` property. `Result<T, Error>` will not
+compile. A use case with no domain failure mode declares `never`:
+
+```typescript
+export class AddBookUseCase implements UseCase<AddBookCommand, BookState, never> {
+```
+
+Add to the union when you add a failure mode.
 
 The success side is the **state**, not the entity. Handing an entity to a controller lets
 the transport layer call domain methods.
@@ -104,7 +148,7 @@ if (activated.isErr()) {
 }
 domainEvents.push(activated.value);
 
-const saveResult = await subscriptions.saveWithEvents(subscription, domainEvents);
+const saveResult = await this.subscriptions.saveWithEvents(subscription, domainEvents);
 if (saveResult.isErr()) throw saveResult.error;
 ```
 

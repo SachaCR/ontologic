@@ -1,43 +1,56 @@
-import { err, ok, Result } from "ontologic";
+import { Result, UseCase, err, ok } from "ontologic";
+
 import { BookState } from "../entities/book";
-import { BookNotFoundError } from "../entities/book/errors/book.errors";
+import {
+  BookAlreadyDeclaredLostError,
+  BookNotFoundError,
+} from "../entities/book/errors/book.errors";
 import { LibraryCollection } from "../repositories/libraryCollection.repository";
+import { DeclareBookLostCommand } from "./commands/declareBookLost.command";
 
-export async function declareBookLost(
-  lostDeclaration: { bookId: string },
-  dependencies: { libraryCollection: LibraryCollection },
-): Promise<Result<BookState, Error>> {
-  const { bookId } = lostDeclaration;
-  const { libraryCollection } = dependencies;
+export class DeclareBookLostUseCase implements UseCase<
+  DeclareBookLostCommand,
+  BookState,
+  BookNotFoundError | BookAlreadyDeclaredLostError
+> {
+  constructor(private readonly libraryCollection: LibraryCollection) {}
 
-  const bookLookup = await libraryCollection.getById(bookId);
+  async execute(
+    command: DeclareBookLostCommand,
+  ): Promise<
+    Result<BookState, BookNotFoundError | BookAlreadyDeclaredLostError>
+  > {
+    const { bookId } = command.payload;
 
-  if (bookLookup.isErr()) {
-    return err(bookLookup.error);
+    const bookLookup = await this.libraryCollection.getById(bookId);
+
+    if (bookLookup.isErr()) {
+      throw bookLookup.error;
+    }
+
+    const book = bookLookup.value;
+
+    if (book === undefined) {
+      return err(new BookNotFoundError(bookId));
+    }
+
+    const lostOutcome = book.declareLost();
+
+    if (lostOutcome.isErr()) {
+      return err(lostOutcome.error);
+    }
+
+    const bookLostEvent = lostOutcome.value;
+
+    const persistence = await this.libraryCollection.saveWithEvents(
+      book,
+      bookLostEvent,
+    );
+
+    if (persistence.isErr()) {
+      throw persistence.error;
+    }
+
+    return ok(book.readState());
   }
-
-  const book = bookLookup.value;
-
-  if (book === undefined) {
-    return err(new BookNotFoundError(bookId));
-  }
-
-  const lostOutcome = book.declareLost();
-  
-  if (lostOutcome.isErr()) {
-    return err(lostOutcome.error);
-  }
-
-  const bookLostEvent = lostOutcome.value;
-
-  const persistence = await libraryCollection.saveWithEvents(
-    book,
-    bookLostEvent,
-  );
-
-  if (persistence.isErr()) {
-    return err(persistence.error);
-  }
-
-  return ok(book.readState());
 }

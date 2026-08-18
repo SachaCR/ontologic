@@ -13,20 +13,24 @@ import { describe, it, expect, beforeEach } from "vitest";
 
 describe("Given a customer with a pending subscription", () => {
   let subscriptions: SubscriptionRepository;
+  let activateSubscription: ActivateSubscriptionUseCase;
   let subscriptionId: string;
 
   beforeEach(async () => {
     subscriptions = new SubscriptionRepository();
+    activateSubscription = new ActivateSubscriptionUseCase(subscriptions);
     subscriptionId = await openPendingSubscription(subscriptions);
   });
 
   describe("When the subscription is activated", () => {
-    let outcome: Awaited<ReturnType<typeof activateSubscriptionUseCase>>;
+    let outcome: Awaited<ReturnType<ActivateSubscriptionUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await activateSubscriptionUseCase(
-        { id: subscriptionId, activatedAt: "2026-01-01T00:00:00.000Z" },
-        { subscriptions },
+      outcome = await activateSubscription.execute(
+        new ActivateSubscriptionCommand({
+          id: subscriptionId,
+          activatedAt: "2026-01-01T00:00:00.000Z",
+        }),
       );
     });
 
@@ -40,8 +44,12 @@ describe("Given a customer with a pending subscription", () => {
 });
 ```
 
-`Awaited<ReturnType<typeof someUseCase>>` is the idiom for typing the captured outcome
+`Awaited<ReturnType<SomeUseCase["execute"]>>` is the idiom for typing the captured outcome
 without restating the `Result` union.
+
+Build the use case in the same `beforeEach` that builds its repositories, and give the
+variable the use case's own name — the **When** block then reads as
+`await activateSubscription.execute(new ActivateSubscriptionCommand({ ... }))`.
 
 ## Reaching the precondition
 
@@ -72,8 +80,12 @@ inside `beforeEach` turns a confusing Then failure into an obvious setup failure
 
 ```typescript
 beforeEach(async () => {
+  const subscribeToPlan = new SubscribeToPlanUseCase(subscriptions, planRepo);
+
   for (const planId of plans) {
-    const r = await subscribeToPlanUseCase({ customerId, planId }, { subscriptions, plans: planRepo });
+    const r = await subscribeToPlan.execute(
+      new SubscribeToPlanCommand({ customerId, planId }),
+    );
     expect(r.isOk()).toBe(true);
   }
 });
@@ -83,9 +95,9 @@ beforeEach(async () => {
 
 The **When** block calls the use case **once**. Everything else goes in the **Given**.
 
-Use cases and workflows cache and memoize; a test that calls the same function repeatedly
-and asserts between calls relies on state carried across invocations, and when it fails
-you cannot tell which call broke it.
+Use cases and workflows cache and memoize; a test that calls `execute` repeatedly and
+asserts between calls relies on state carried across invocations, and when it fails you
+cannot tell which call broke it. Seed the earlier state in the **Given** instead.
 
 ## The four things worth asserting
 
@@ -157,3 +169,5 @@ failure mode that matters.
   `ConcurrentWriteError` handling. That needs a repository that actually versions rows.
 - Test the event bus with `InMemoryConnectors`, which pairs a publisher and listener over
   a single emitter.
+- A use case declared with `never` on the error side cannot be tested for a domain failure
+  — there is none. Assert its state and events instead.

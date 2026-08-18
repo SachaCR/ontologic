@@ -1,3 +1,4 @@
+import type { UnmarkedUseCase } from "./useCases";
 import type {
   DomainNode,
   EntityNode,
@@ -18,6 +19,7 @@ import type {
 export function computeFindings(
   nodes: DomainNode[],
   eventUnions: EventUnion[],
+  unmarkedUseCases: UnmarkedUseCase[] = [],
 ): Finding[] {
   return [
     ...eventsMissingFromUnions(nodes, eventUnions),
@@ -25,7 +27,29 @@ export function computeFindings(
     ...legacyInvariantAttachment(nodes),
     ...invariantsNeverAttached(nodes),
     ...useCasesWithErasedErrorUnion(nodes),
+    ...useCasesNotMarked(unmarkedUseCases),
   ];
+}
+
+/**
+ * A function that reads and writes aggregates the way a use case does, but does
+ * not declare `implements UseCase<…>`.
+ *
+ * Without this the report would simply not list it, which reads as "this
+ * codebase has no use cases" rather than "these use cases are invisible to the
+ * type system". The marker is what makes the action — and therefore whether the
+ * operation is a command or a query — knowable.
+ */
+function useCasesNotMarked(unmarked: UnmarkedUseCase[]): Finding[] {
+  return unmarked.map((candidate) => ({
+    code: "use-case-not-marked" as const,
+    message:
+      `${candidate.name} reads and writes aggregates like a use case but does ` +
+      `not implement UseCase<Action, Output, Errors>, so its action — and ` +
+      `whether it is a command or a query — cannot be determined.`,
+    nodeId: `useCase:${candidate.location.file}#${candidate.name}`,
+    location: candidate.location,
+  }));
 }
 
 /**

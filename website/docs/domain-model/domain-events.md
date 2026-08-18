@@ -230,19 +230,33 @@ class ReferralAccountOpened extends DomainEvent<
   }
 }
 
-async function openAccountViaReferral(newUserId: string, referrerId: string) {
-  const REFERRAL_BONUS = 50;
+const REFERRAL_BONUS = 50;
 
-  const account = BankAccount.create({ ownerId: newUserId });
-  account.deposit(REFERRAL_BONUS);
+class OpenAccountViaReferralUseCase
+  implements UseCase<OpenAccountViaReferralCommand, AccountState, never>
+{
+  constructor(private readonly accounts: BankAccountRepository) {}
 
-  const referralEvent = new ReferralAccountOpened(account.id(), {
-    newAccountId: account.id(),
-    referrerId,
-    bonusAmount: REFERRAL_BONUS,
-  });
+  async execute(command: OpenAccountViaReferralCommand) {
+    const { newUserId, referrerId } = command.payload;
 
-  await repository.saveWithEvents(account, [referralEvent]);
+    const account = BankAccount.create({ ownerId: newUserId });
+    account.deposit(REFERRAL_BONUS);
+
+    const referralEvent = new ReferralAccountOpened(account.id(), {
+      newAccountId: account.id(),
+      referrerId,
+      bonusAmount: REFERRAL_BONUS,
+    });
+
+    const saved = await this.accounts.saveWithEvents(account, [referralEvent]);
+
+    if (saved.isErr()) {
+      throw saved.error;
+    }
+
+    return ok(account.readState());
+  }
 }
 ```
 

@@ -112,7 +112,8 @@ export interface EntityNode {
   /** Invariants attached to this entity, as node ids. */
   invariants: NodeId[];
   /** How the invariants were attached — a fingerprint of the library version. */
-  invariantAttachment: "addInvariant" | "optionsObject" | "positionalArray" | "none";
+  invariantAttachment:
+    "addInvariant" | "optionsObject" | "positionalArray" | "none";
   location: SourceLocation;
 }
 
@@ -183,7 +184,20 @@ export interface UseCaseNode {
   id: NodeId;
   kind: "useCase";
   name: string;
-  parameters: { name: string; type: string }[];
+  /** The action type argument as written, e.g. `PayOrderCommand`. */
+  actionTypeName: string;
+  /**
+   * Whether the action is a `Command` or a `Query` — resolved by finding the
+   * action class and reading which base it extends.
+   *
+   * `"unknown"` means the action is declared outside the analysed root, so the
+   * base class could not be seen. It does not mean the use case is unmarked.
+   */
+  actionKind: "command" | "query" | "unknown";
+  /** The literal name bound by the action, e.g. `PAY_ORDER`. */
+  actionName?: string;
+  /** Constructor parameters — the aggregates and services it was given. */
+  dependencies: { name: string; type: string }[];
   returnType: string;
   /** The success type inside `Result<T, E>`, when there is one. */
   returnsStateTypeName?: string;
@@ -199,8 +213,6 @@ export interface UseCaseNode {
   /** Repository identifiers this use case reads from / writes to. */
   reads: string[];
   writes: string[];
-  /** How confident the detection was — use cases have no base class. */
-  confidence: "high" | "medium" | "low";
   location: SourceLocation;
 }
 
@@ -239,6 +251,7 @@ export interface Finding {
     | "error-missing-set-prototype"
     | "invariant-never-attached"
     | "use-case-error-union-erased"
+    | "use-case-not-marked"
     | "legacy-invariant-attachment";
   message: string;
   /** The node the finding is attached to. */
@@ -296,6 +309,10 @@ export interface DomainModel {
   graphs: GraphLayout[];
 }
 
-export function makeNodeId(kind: NodeKind, file: string, symbol: string): NodeId {
+export function makeNodeId(
+  kind: NodeKind,
+  file: string,
+  symbol: string,
+): NodeId {
   return `${kind}:${file}#${symbol}`;
 }

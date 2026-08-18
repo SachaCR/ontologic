@@ -460,11 +460,27 @@ export const APP_SCRIPT = String.raw`
   }
 
   function viewUseCase(node) {
+    var actionLabel = node.actionKind === "unknown" ? "action" : node.actionKind;
+
     var html = '<div class="crumb"><span class="chip chip--kind" data-kind="useCase">Use case</span>' +
-      (node.confidence !== "high"
-        ? '<span class="chip chip--warn">' + esc(node.confidence) + " confidence</span>"
+      '<span class="chip">' + esc(actionLabel) + "</span>" +
+      (node.actionKind === "unknown"
+        ? '<span class="chip chip--warn">action declared outside this codebase</span>'
         : "") + "</div>" +
       '<h1 class="title">' + esc(node.name) + "</h1>" + whereFound(node);
+
+    html += '<div class="section"><h2 class="section__head">Asked to</h2>' +
+      '<p class="subtitle">' +
+      (node.actionKind === "query"
+        ? "A <strong>query</strong>: it reads and writes nothing. The action type says so — " +
+          "nobody has to scan the body for a <code>save</code>."
+        : node.actionKind === "command"
+          ? "A <strong>command</strong>: an intent to change state, which the domain may refuse."
+          : "The action type could not be resolved to a <code>Command</code> or a " +
+            "<code>Query</code> — it is declared outside the analysed codebase.") +
+      '</p><p class="mono">' +
+      (node.actionName ? "<strong>" + esc(node.actionName) + "</strong> &middot; " : "") +
+      "<code>" + esc(node.actionTypeName) + "</code></p></div>";
 
     var reads = edgesFrom(node.id, "reads");
     var writes = edgesFrom(node.id, "writes");
@@ -485,14 +501,14 @@ export const APP_SCRIPT = String.raw`
       html += "</div></div>";
     }
 
-    var rows = node.parameters.map(function (p) {
+    var rows = node.dependencies.map(function (p) {
       return '<tr><td class="mono nowrap">' + esc(p.name) + "</td>" +
         '<td class="mono muted">' + esc(p.type) + "</td></tr>";
     }).join("");
 
-    html += '<div class="section"><h2 class="section__head">Signature</h2>' +
-      '<div class="scroll"><table><thead><tr><th>Parameter</th><th>Type</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="2" class="dash">No parameters</td></tr>') +
+    html += '<div class="section"><h2 class="section__head">Dependencies</h2>' +
+      '<div class="scroll"><table><thead><tr><th>Constructor parameter</th><th>Type</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="2" class="dash">No dependencies</td></tr>') +
       "</tbody></table></div>" +
       '<p class="subtitle" style="margin-top:10px">Returns <code>' + esc(node.returnType) + "</code></p></div>";
 

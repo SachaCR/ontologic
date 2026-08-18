@@ -427,18 +427,34 @@ Consider creating a new account and immediately crediting it in one operation. T
 In that case, the use case itself is responsible for producing the event:
 
 ```typescript
-async function openAccountWithDeposit(ownerId: string, initialDeposit: number) {
-  const events: DomainEventInterface[] = [];
+class OpenAccountWithDepositUseCase
+  implements UseCase<OpenAccountWithDepositCommand, AccountState, never>
+{
+  constructor(private readonly accounts: BankAccountRepository) {}
 
-  const { account, creationEvent } = BankAccount.create({ ownerId });
-  events.push(creationEvent);
+  async execute(command: OpenAccountWithDepositCommand) {
+    const { ownerId, initialDeposit } = command.payload;
+    const events: DomainEventInterface[] = [];
 
-  const depositEvent = account.deposit({ amount: initialDeposit });
-  events.push(depositEvent);
+    const { account, creationEvent } = BankAccount.create({ ownerId });
+    events.push(creationEvent);
 
-  await repository.saveWithEvents(account, events);
+    const depositEvent = account.deposit({ amount: initialDeposit });
+    events.push(depositEvent);
+
+    const saved = await this.accounts.saveWithEvents(account, events);
+
+    if (saved.isErr()) {
+      throw saved.error;
+    }
+
+    return ok(account.readState());
+  }
 }
 ```
+
+See [Use Case](../application/use-case.md) for the full shape, including why the error side
+is `never` here.
 
 The rule of thumb: if the event can be produced with only the entity's internal state, let the entity produce it. If the event requires knowledge that only the use case has (other entities, input parameters, business context), produce it in the use case.
 

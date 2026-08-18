@@ -24,11 +24,12 @@ union in its own file or inline, or put one error per file or ten.
 | Typed errors | `extends DomainError<Name, Context>` |
 | Invariants | `new BaseDomainInvariant<State>(description, predicate)` |
 | Repositories | `extends InMemoryRepository<E, Ev>`, or an interface extending `Repository<E, Ev>` |
-| Use cases | exported functions returning `Promise<Result<T, E>>` — see *confidence* below |
+| Use cases | `implements UseCase<Action, Output, Errors>` |
+| Commands and queries | `extends Command<Name, Payload>` / `extends Query<Name, Payload>` |
 
 It also resolves the relationships between them: which method emits which event, which
-errors a behaviour can return, what an aggregate contains, and which repositories a use case
-reads from versus writes to.
+errors a behaviour can return, what an aggregate contains, which repositories a use case
+reads from versus writes to, and whether a use case is driven by a command or a query.
 
 ## Three views
 
@@ -50,6 +51,7 @@ The same pass that builds the model reports where a codebase contradicts itself:
 | `event-missing-from-union` | An event that is emitted but absent from any event union type, making it invisible to repositories and listeners typed on that union |
 | `invariant-never-attached` | An invariant declared but wired to no entity — it looks like protection and provides none |
 | `use-case-error-union-erased` | A use case declaring `Result<_, Error>`, so callers cannot handle its failures exhaustively |
+| `use-case-not-marked` | A function that reads and writes aggregates like a use case but does not implement `UseCase<…>`, so its action cannot be determined |
 | `legacy-invariant-attachment` | Invariants passed as a positional third constructor argument, the pre-1.7 API |
 
 ## Usage
@@ -92,10 +94,16 @@ so it can be asserted on in tests, diffed between versions, or rendered some oth
 only enriches with the type checker where that resolves, so a codebase with no
 `node_modules` still produces a complete model.
 
-**Use-case detection is a heuristic**, and says so. Unlike every other concept there is no
-base class to key on, so each use case carries a confidence level and the page shows it
-when it is not `high`. A helper that merely looks like a use case is reported as a guess
-rather than a fact.
+**Use cases are identified exactly, not guessed.** A use case declares
+`implements UseCase<Action, Output, Errors>`, which is a written heritage clause carrying
+its own type arguments — read the same way repository ports are. The action is then
+resolved to the `Command` or `Query` it extends, so whether an operation changes state is
+taken from the type system rather than inferred from whether the body happens to call
+`save`.
+
+Codebases predating that interface are not silently reported as having no use cases:
+functions that look like one are surfaced as `use-case-not-marked` findings, with the file
+and line to migrate.
 
 **Tooling directories are skipped.** Anything under a dot-directory is ignored, so a
 project that has run `ontologic init-agents` does not get the shipped reference aggregates
