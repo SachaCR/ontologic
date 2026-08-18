@@ -81,6 +81,8 @@ export interface StateField {
 /** A behaviour method on an entity or value object. */
 export interface Method {
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   isStatic: boolean;
   /** The written return type, kept verbatim — it reads better than a re-print. */
   returnType: string;
@@ -96,6 +98,8 @@ export interface EntityNode {
   id: NodeId;
   kind: "entity" | "valueObject" | "subEntity";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The `State` type argument. */
   stateTypeName: string;
   /** Present when declared as `DomainEntity<State, Serialized>`. */
@@ -112,7 +116,8 @@ export interface EntityNode {
   /** Invariants attached to this entity, as node ids. */
   invariants: NodeId[];
   /** How the invariants were attached — a fingerprint of the library version. */
-  invariantAttachment: "addInvariant" | "optionsObject" | "positionalArray" | "none";
+  invariantAttachment:
+    "addInvariant" | "optionsObject" | "positionalArray" | "none";
   location: SourceLocation;
 }
 
@@ -121,6 +126,8 @@ export interface EventNode {
   kind: "event";
   /** The class name. */
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The wire name, from the first type argument. */
   eventName: string;
   version: number;
@@ -133,6 +140,8 @@ export interface ErrorNode {
   id: NodeId;
   kind: "error";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The discriminant, from the first type argument. */
   errorName: string;
   contextTypeName: string;
@@ -164,6 +173,8 @@ export interface RepositoryNode {
   id: NodeId;
   kind: "repository";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   entityTypeName: string;
   eventUnionTypeName: string;
   /**
@@ -183,7 +194,27 @@ export interface UseCaseNode {
   id: NodeId;
   kind: "useCase";
   name: string;
-  parameters: { name: string; type: string }[];
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
+  /** The action type argument as written, e.g. `PayOrderCommand`. */
+  actionTypeName: string;
+  /**
+   * Whether the action is a `Command` or a `Query` — resolved by finding the
+   * action class and reading which base it extends.
+   *
+   * `"unknown"` means the action is declared outside the analysed root, so the
+   * base class could not be seen. It does not mean the use case is unmarked.
+   */
+  actionKind: "command" | "query" | "unknown";
+  /** The literal name bound by the action, e.g. `PAY_ORDER`. */
+  actionName?: string;
+  /**
+   * The action's payload members, resolved from its second type argument —
+   * what a caller supplies to invoke this use case.
+   */
+  actionFields: StateField[];
+  /** Constructor parameters — the aggregates and services it was given. */
+  dependencies: { name: string; type: string }[];
   returnType: string;
   /** The success type inside `Result<T, E>`, when there is one. */
   returnsStateTypeName?: string;
@@ -199,8 +230,6 @@ export interface UseCaseNode {
   /** Repository identifiers this use case reads from / writes to. */
   reads: string[];
   writes: string[];
-  /** How confident the detection was — use cases have no base class. */
-  confidence: "high" | "medium" | "low";
   location: SourceLocation;
 }
 
@@ -239,6 +268,7 @@ export interface Finding {
     | "error-missing-set-prototype"
     | "invariant-never-attached"
     | "use-case-error-union-erased"
+    | "use-case-not-marked"
     | "legacy-invariant-attachment";
   message: string;
   /** The node the finding is attached to. */
@@ -296,6 +326,10 @@ export interface DomainModel {
   graphs: GraphLayout[];
 }
 
-export function makeNodeId(kind: NodeKind, file: string, symbol: string): NodeId {
+export function makeNodeId(
+  kind: NodeKind,
+  file: string,
+  symbol: string,
+): NodeId {
   return `${kind}:${file}#${symbol}`;
 }

@@ -1,22 +1,24 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { addBook } from "../addBook.use-case";
+import { AddBookUseCase } from "../addBook.use-case";
+import { AddBookCommand } from "../commands/addBook.command";
 import { LibraryCollection } from "../../repositories/libraryCollection.repository";
 import { sampleCatalogueEntry } from "./helpers";
 
 describe("Given I have the bibliographic details for a new copy to list in the catalog", () => {
   let collection: LibraryCollection;
+  let addBook: AddBookUseCase;
 
   beforeEach(() => {
     collection = new LibraryCollection();
+    addBook = new AddBookUseCase(collection);
   });
 
   describe("When I add that copy through the add-book use case", () => {
-    let outcome: Awaited<ReturnType<typeof addBook>>;
+    let outcome: Awaited<ReturnType<AddBookUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await addBook(
-        { ...sampleCatalogueEntry, isbn: "978-1111111111" },
-        { libraryCollection: collection },
+      outcome = await addBook.execute(
+        new AddBookCommand({ ...sampleCatalogueEntry, isbn: "978-1111111111" }),
       );
     });
 

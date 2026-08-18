@@ -47,52 +47,64 @@ When you are unsure, ask: **can this rule be decided from `this.state` alone?**
 Registering a loan has four rules. Notice that only one of them is on an entity:
 
 ```typescript
-export async function registerLoan(
-  input: { bookId: string; memberId: string },
-  dependencies: { libraryCollection: LibraryCollection; loanRegister: LoanRegister },
-): Promise<Result<LoanState, RegisterLoanError>> {
-  const { bookId, memberId } = input;
-  const { libraryCollection, loanRegister } = dependencies;
+export class RegisterLoanUseCase
+  implements UseCase<RegisterLoanCommand, LoanState, RegisterLoanError>
+{
+  // One constructor parameter per aggregate this use case touches.
+  constructor(
+    private readonly libraryCollection: LibraryCollection,
+    private readonly loanRegister: LoanRegister,
+  ) {}
 
-  const bookLookup = await libraryCollection.getById(bookId);
-  if (bookLookup.isErr()) throw bookLookup.error;          // infrastructure → throw
+  async execute(
+    command: RegisterLoanCommand,
+  ): Promise<Result<LoanState, RegisterLoanError>> {
+    const { bookId, memberId } = command.payload;
 
-  const book = bookLookup.value;
+    const bookLookup = await this.libraryCollection.getById(bookId);
+    if (bookLookup.isErr()) throw bookLookup.error;        // infrastructure → throw
 
-  // RULE 1 — existence. Needs a lookup, so: use case.
-  if (book === undefined) {
-    return err(new BookNotFound("This book does not exist", { bookId }));
+    const book = bookLookup.value;
+
+    // RULE 1 — existence. Needs a lookup, so: use case.
+    if (book === undefined) {
+      return err(new BookNotFound("This book does not exist", { bookId }));
+    }
+
+    // RULE 2 — a lost book cannot be lent. Reads ANOTHER aggregate's state, so: use case.
+    // Note the Book is read-only here; it is a fact source, not something we mutate.
+    if (book.readState().lost) {
+      return err(new BookLostCannotBeLoaned("...", { bookId }));
+    }
+
+    // RULE 3 — one active loan per copy. Needs a query, so: use case.
+    const outstanding = await this.loanRegister.findOutstandingLoanForBook(bookId);
+    if (outstanding.isErr()) throw outstanding.error;
+    if (outstanding.value !== undefined) {
+      return err(new BookAlreadyOnLoan("...", { bookId }));
+    }
+
+    // RULE 4 — at most three active loans. Needs a COUNT, so: use case.
+    const active = await this.loanRegister.findActiveLoansForMember(memberId);
+    if (active.isErr()) throw active.error;
+    if (active.value.length >= MAX_ACTIVE_LOANS_PER_MEMBER) {
+      return err(new MemberActiveLoanLimitExceeded("...", { memberId }));
+    }
+
+    // The entity enforces its OWN rules — that the dates cohere — via its invariants.
+    const { loan, creationEvent } = Loan.create({ bookId, memberId });
+
+    const saveResult = await this.loanRegister.saveWithEvents(loan, creationEvent);
+    if (saveResult.isErr()) throw saveResult.error;
+
+    return ok(loan.readState());
   }
-
-  // RULE 2 — a lost book cannot be lent. Reads ANOTHER aggregate's state, so: use case.
-  // Note the Book is read-only here; it is a fact source, not something we mutate.
-  if (book.readState().lost) {
-    return err(new BookLostCannotBeLoaned("...", { bookId }));
-  }
-
-  // RULE 3 — one active loan per copy. Needs a query, so: use case.
-  const outstanding = await loanRegister.findOutstandingLoanForBook(bookId);
-  if (outstanding.isErr()) throw outstanding.error;
-  if (outstanding.value !== undefined) {
-    return err(new BookAlreadyOnLoan("...", { bookId }));
-  }
-
-  // RULE 4 — at most three active loans. Needs a COUNT, so: use case.
-  const active = await loanRegister.findActiveLoansForMember(memberId);
-  if (active.isErr()) throw active.error;
-  if (active.value.length >= MAX_ACTIVE_LOANS_PER_MEMBER) {
-    return err(new MemberActiveLoanLimitExceeded("...", { memberId }));
-  }
-
-  // The entity enforces its OWN rules — that the dates cohere — via its invariants.
-  const { loan, creationEvent } = Loan.create({ bookId, memberId });
-
-  const saveResult = await loanRegister.saveWithEvents(loan, creationEvent);
-  if (saveResult.isErr()) throw saveResult.error;
-
-  return ok(loan.readState());
 }
 ```
+
+`RegisterLoanCommand` is a `Command`, not a plain object — this use case writes. A use case
+that only reads is declared over a `Query` instead, and that choice is the type-level
+record of whether the operation changes anything.
 
 The `Loan` entity knows nothing about books being lost or members having limits. It holds
 `bookId: string` and `memberId: string` — ids, not references — and its only rules are

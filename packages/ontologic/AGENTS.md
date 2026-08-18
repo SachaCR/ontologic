@@ -73,7 +73,9 @@ src/domain/
 │   │   └── orderHasAtLeastOneItem.ts
 │   └── __tests__/order.entity.test.ts
 ├── useCases/
-│   ├── payOrder.use-case.ts         # exports payOrderUseCase
+│   ├── payOrder.use-case.ts         # exports PayOrderUseCase
+│   ├── commands/payOrder.command.ts # exports PayOrderCommand
+│   ├── queries/readOrder.query.ts   # exports ReadOrderQuery, for read use cases
 │   ├── errors/entityNotFound.error.ts
 │   └── __tests__/payOrder.use-case.test.ts
 └── order.repository.ts
@@ -239,56 +241,95 @@ They are not input validation, which belongs at the system boundary.
 
 ---
 
-## Use case
+## Action — `Command` or `Query`
 
-A use case is a plain exported async function taking the **input** first, then a named
-**dependencies** bag. There is no `UseCase` base class. The bag scales to use cases that
-need several repositories, which a positional repository argument cannot.
+A use case is asked to do something, and that something is an **action**: a `Command` when
+it changes state, a `Query` when it only reads. Both mirror `DomainEvent` — a literal name
+bound once in the subclass, and a payload that is cloned on the way in and out.
 
 ```typescript
-export async function payOrderUseCase(
-  input: { id: string; invoiceId: string },
-  dependencies: { orders: OrderRepository },
-): Promise<Result<OrderState, InvalidStatusTransition | EntityNotFound>> {
-  const { id, invoiceId } = input;
-  const { orders } = dependencies;
-
-  const resultGetById = await orders.getById(id);
-
-  if (resultGetById.isErr()) {
-    throw resultGetById.error; // technical failure → throw
+export class PayOrderCommand extends Command<
+  "PAY_ORDER",
+  { id: string; invoiceId: string }
+> {
+  constructor(payload: { id: string; invoiceId: string }) {
+    super({ name: "PAY_ORDER", payload });
   }
+}
 
-  const order = resultGetById.value;
-
-  if (order === undefined) {
-    return err(new EntityNotFound("This order does not exist", { entityId: id }));
+export class ReadOrderQuery extends Query<"READ_ORDER", { id: string }> {
+  constructor(payload: { id: string }) {
+    super({ name: "READ_ORDER", payload });
   }
+}
+```
 
-  const result = order.pay({ invoiceId });
+They are not interchangeable: each holds private fields, so a `Query` is never assignable
+where a `Command` is expected, even with an identical payload.
 
-  if (result.isErr()) {
-    switch (result.error.name) {
-      case "INVALID_STATUS_TRANSITION":
-        return err(result.error);
-      default:
-        switchGuard(result.error.name); // compile error if a case is missed
+---
+
+## Use case
+
+A use case is a **class implementing `UseCase<Action, Output, Errors>`**, with its
+dependencies as constructor parameters — one per aggregate it touches.
+
+```typescript
+export class PayOrderUseCase
+  implements UseCase<
+    PayOrderCommand,
+    OrderState,
+    InvalidStatusTransition | EntityNotFound
+  >
+{
+  constructor(private readonly orders: OrderRepository) {}
+
+  async execute(
+    command: PayOrderCommand,
+  ): Promise<Result<OrderState, InvalidStatusTransition | EntityNotFound>> {
+    const { id, invoiceId } = command.payload;
+
+    const resultGetById = await this.orders.getById(id);
+
+    if (resultGetById.isErr()) {
+      throw resultGetById.error; // technical failure → throw
     }
+
+    const order = resultGetById.value;
+
+    if (order === undefined) {
+      return err(new EntityNotFound("This order does not exist", { entityId: id }));
+    }
+
+    const result = order.pay({ invoiceId });
+
+    if (result.isErr()) {
+      switch (result.error.name) {
+        case "INVALID_STATUS_TRANSITION":
+          return err(result.error);
+        default:
+          switchGuard(result.error.name); // compile error if a case is missed
+      }
+    }
+
+    const saveResult = await this.orders.saveWithEvents(order, result.value);
+
+    if (saveResult.isErr()) {
+      throw saveResult.error;
+    }
+
+    return ok(order.readState()); // return state, never the entity
   }
-
-  const saveResult = await orders.saveWithEvents(order, result.value);
-
-  if (saveResult.isErr()) {
-    throw saveResult.error;
-  }
-
-  return ok(order.readState()); // return state, never the entity
 }
 ```
 
 Note that `getById` returns `ok(undefined)` for a missing entity — absence is a domain
 decision for the caller, not an infrastructure error. When several events are produced,
 collect them in an array and pass it to `saveWithEvents`.
+
+The `Errors` argument is constrained to `DomainError`, so `Result<T, Error>` does not
+compile — `Error` has no `context` property. Name the domain failures, or declare `never`
+when there are none.
 
 ---
 
@@ -344,6 +385,9 @@ violations with `expect(() => entity.readState()).toThrow("Corrupted state detec
 | `invariant.isSatisfiedBy(state)` | `invariant.complyWith(state).isCompliant` |
 | `graphWorkflow.toTree()` | `graphWorkflow.getGraph().toString(opts)` |
 | Returning the entity from a use case | Return `entity.readState()` |
+| `Promise<Result<T, Error>>` on a use case | Name the domain errors, or use `never` |
+| A `Command` for a use case that only reads | Use a `Query` |
+| Passing a plain object to `execute` | Wrap it in the use case's `Command` or `Query` |
 | Wrapping `CorruptedStateError` in a `Result` | Let it throw; it signals a bug |
 | Throwing a domain failure from an entity method | Return `err(...)` |
 | `switch` on `error.name` with no `default: switchGuard(...)` | Add it — that is what makes the switch exhaustive |

@@ -398,7 +398,7 @@ export const APP_SCRIPT = String.raw`
 
   function viewInvariant(node) {
     var html = '<div class="crumb"><span class="chip chip--kind" data-kind="invariant">Invariant</span></div>' +
-      '<h1 class="title title--prose">' + esc(node.description) + "</h1>" +
+      '<h1 class="title">' + esc(node.description) + "</h1>" +
       '<p class="subtitle"><code>' + esc(node.name) + "</code> · <code>" +
       esc(node.location.file) + ":" + node.location.line + "</code></p>";
 
@@ -459,52 +459,229 @@ export const APP_SCRIPT = String.raw`
     return html + findingsFor(node.id);
   }
 
+  /** Screen 5 — every command and query in the model. */
+  function viewUseCases() {
+    var all = nodesOfKind("useCase");
+    var commands = all.filter(function (n) { return n.actionKind !== "query"; });
+    var queries = all.filter(function (n) { return n.actionKind === "query"; });
+
+    var html = trailHtml([{ label: "Use Cases", href: "#/use-cases" }]) +
+      '<h1 class="title">Use Cases</h1>' +
+      '<p class="subtitle">All commands and queries in your domain. Click to see what each ' +
+      "use case touches.</p>" +
+      legendHtml([
+        ["command", "Command"],
+        ["query", "Query"],
+        ["entity", "Aggregate"],
+        ["event", "Event"],
+        ["error", "Error"]
+      ]);
+
+    if (all.length === 0) {
+      return html + '<div class="empty">No use cases found. A use case declares itself with ' +
+        "<code>implements UseCase&lt;Action, Output, Errors&gt;</code>; without that marker its " +
+        "action cannot be determined. See the Overview for anything flagged as unmarked.</div>";
+    }
+
+    if (commands.length) {
+      html += '<div class="section"><h2 class="section__head">Commands</h2>' +
+        '<div class="cards cards--wide">' +
+        commands.map(useCaseCard).join("") + "</div></div>";
+    }
+
+    if (queries.length) {
+      html += '<div class="section"><h2 class="section__head">Queries</h2>' +
+        '<div class="cards cards--wide">' +
+        queries.map(useCaseCard).join("") + "</div></div>";
+    }
+
+    return html;
+  }
+
+  /** The aggregates a use case touches, as the design's outlined tags. */
+  function touchTags(node) {
+    var seen = {};
+    var tags = [];
+
+    edgesFrom(node.id, "writes").concat(edgesFrom(node.id, "reads")).forEach(function (edge) {
+      aggregatesBehind(edge.to).forEach(function (entity) {
+        if (seen[entity.id]) return;
+        seen[entity.id] = true;
+        tags.push('<span class="tag">' + esc(entity.name) + "</span>");
+      });
+    });
+
+    return tags.join("");
+  }
+
+  /**
+   * A use case names repositories, not aggregates. The design shows aggregates,
+   * so follow the port to what it persists.
+   */
+  function aggregatesBehind(repositoryId) {
+    return edgesFrom(repositoryId, "persists")
+      .map(function (edge) { return byId[edge.to]; })
+      .filter(Boolean);
+  }
+
+  function useCaseCard(node) {
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      tags: touchTags(node),
+      href: hrefOf(node)
+    });
+  }
+
+  /** Screen 6 — one use case in full. */
   function viewUseCase(node) {
-    var html = '<div class="crumb"><span class="chip chip--kind" data-kind="useCase">Use case</span>' +
-      (node.confidence !== "high"
-        ? '<span class="chip chip--warn">' + esc(node.confidence) + " confidence</span>"
+    var isQuery = node.actionKind === "query";
+
+    var html = trailHtml([
+      { label: "Use Cases", href: "#/use-cases" },
+      { label: node.name, href: "#" }
+    ]) +
+      '<div class="crumb"><span class="badge" data-kind="' + esc(kindAttr(node)) + '">' +
+      esc(badgeOf(node)) + "</span>" +
+      (node.actionKind === "unknown"
+        ? '<span class="chip chip--warn">action declared outside this codebase</span>'
         : "") + "</div>" +
-      '<h1 class="title">' + esc(node.name) + "</h1>" + whereFound(node);
+      '<h1 class="title">' + esc(node.name) + "</h1>" +
+      '<p class="subtitle">' + esc(node.description ||
+        (isQuery
+          ? "A query: it reads and writes nothing."
+          : "A command: an intent to change state, which the domain may refuse.")) +
+      "</p>";
 
-    var reads = edgesFrom(node.id, "reads");
+    // The action, as the shape a caller has to supply.
+    html += '<div class="section"><h2 class="section__head">' +
+      (isQuery ? "Query input" : "Command input") + "</h2><pre>" +
+      '<span class="k">' + esc(node.actionTypeName) + "</span> {" +
+      (node.actionFields.length
+        ? node.actionFields.map(function (f) {
+            return "\n  " + esc(f.name) + (f.optional ? "?" : "") +
+              ': <span class="t">' + esc(f.type) + "</span>";
+          }).join(",") + "\n"
+        : "") +
+      "}</pre>" +
+      (node.actionName
+        ? '<p class="subtitle" style="margin-top:10px">Dispatched as <code>' +
+          esc(node.actionName) + "</code></p>"
+        : "") +
+      "</div>";
+
     var writes = edgesFrom(node.id, "writes");
+    var reads = edgesFrom(node.id, "reads");
 
-    if (reads.length > 0 || writes.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Aggregates touched</h2>' +
-        '<p class="subtitle">A use case should read from as many aggregates as it needs and write to exactly one — ' +
-        "<code>saveWithEvents</code> is the only atomic unit.</p><div class=\"flow\">";
+    // An aggregate that is both read and written appears once, as written —
+    // several use cases load through the same repository they save to.
+    var touched = [];
+    var touchedBy = {};
 
-      writes.concat(reads).forEach(function (e) {
-        var to = byId[e.to];
-        html += '<a class="flow__item flow__item--' + (e.kind === "writes" ? "write" : "read") +
-          '" href="' + (to ? hrefOf(to) : "#") + '">' +
-          '<span class="flow__verb">' + esc(e.kind) + "</span>" +
-          esc(to ? to.name : e.to) + "</a>";
+    writes.concat(reads).forEach(function (edge) {
+      aggregatesBehind(edge.to).forEach(function (entity) {
+        if (touchedBy[entity.id]) return;
+        touchedBy[entity.id] = true;
+        touched.push({
+          entity: entity,
+          kind: edge.kind,
+          via: byId[edge.to] ? byId[edge.to].name : "a repository"
+        });
+      });
+    });
+
+    if (touched.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Aggregates &amp; entities involved</h2>' +
+        '<p class="subtitle">A use case reads from as many aggregates as it needs and writes to ' +
+        "exactly one \u2014 <code>saveWithEvents</code> is the only atomic unit.</p>" +
+        '<div class="cards">';
+
+      touched.forEach(function (t) {
+        html += cardHtml({
+          kind: kindAttr(t.entity),
+          name: t.entity.name,
+          mono: true,
+          badge: badgeOf(t.entity),
+          desc: (t.kind === "writes" ? "Written through " : "Read through ") + t.via + ".",
+          href: "#/domain/" + encodeURIComponent(t.entity.id)
+        });
       });
 
       html += "</div></div>";
     }
 
-    var rows = node.parameters.map(function (p) {
-      return '<tr><td class="mono nowrap">' + esc(p.name) + "</td>" +
-        '<td class="mono muted">' + esc(p.type) + "</td></tr>";
-    }).join("");
+    // Events are the aggregate's, not this use case's — the extractor does not
+    // correlate a use-case body with the entity methods it calls.
+    var events = {};
+    writes.forEach(function (edge) {
+      aggregatesBehind(edge.to).forEach(function (entity) {
+        edgesFrom(entity.id, "emits").forEach(function (e) { events[e.to] = true; });
+        containedTree(entity.id).forEach(function (child) {
+          edgesFrom(child.id, "emits").forEach(function (e) { events[e.to] = true; });
+        });
+      });
+    });
 
-    html += '<div class="section"><h2 class="section__head">Signature</h2>' +
-      '<div class="scroll"><table><thead><tr><th>Parameter</th><th>Type</th></tr></thead><tbody>' +
-      (rows || '<tr><td colspan="2" class="dash">No parameters</td></tr>') +
-      "</tbody></table></div>" +
-      '<p class="subtitle" style="margin-top:10px">Returns <code>' + esc(node.returnType) + "</code></p></div>";
-
-    html += '<div class="section"><h2 class="section__head">Can fail with</h2><p>' +
-      linkList(node.canFail, "No domain failures — this use case cannot be refused.") + "</p>";
-
-    if (node.errorUnionErased) {
-      html += '<p class="subtitle" style="margin-top:8px">Recovered from the <code>err(new …)</code> ' +
-        "call sites: the declared return type erases them to <code>Error</code>.</p>";
+    var eventIds = Object.keys(events);
+    if (eventIds.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Events its aggregate can emit</h2>' +
+        '<p class="subtitle">Every event the written aggregate declares \u2014 not only the ones ' +
+        "this use case causes. Which of them a given call produces is not determinable from " +
+        "the types alone.</p><div class=\"cards\">" +
+        eventIds.map(function (id) {
+          var n = byId[id];
+          return n ? detailCard(n) : "";
+        }).join("") + "</div></div>";
     }
 
+    html += '<div class="section"><h2 class="section__head">Errors raised</h2>';
+    html += node.canFail.length
+      ? '<div class="cards">' + node.canFail.map(function (id) {
+          var n = byId[id];
+          return n ? detailCard(n) : "";
+        }).join("") + "</div>"
+      : '<div class="empty">No domain failures \u2014 this use case cannot be refused.</div>';
+
+    if (node.errorUnionErased) {
+      html += '<p class="subtitle" style="margin-top:10px">Recovered from the ' +
+        "<code>err(new \u2026)</code> call sites: the declared return type erases them to " +
+        "<code>Error</code>.</p>";
+    }
     html += "</div>";
+
+    // The flow strip: command, then each aggregate, then what comes out.
+    html += '<div class="section"><h2 class="section__head">Flow</h2><div class="flow">' +
+      '<span class="flow__item" data-kind="' + esc(kindAttr(node)) + '">' +
+      esc(node.actionName || node.actionTypeName) + "</span>";
+
+    touched.forEach(function (t) {
+      html += '<span class="flow__arrow">&#8594;</span>' +
+        '<a class="flow__item' + (t.kind === "reads" ? " flow__item--read" : "") +
+        '" data-kind="' + esc(kindAttr(t.entity)) + '" href="#/domain/' +
+        encodeURIComponent(t.entity.id) + '">' +
+        '<span class="flow__verb">' + esc(t.kind) + "</span>" + esc(t.entity.name) + "</a>";
+    });
+
+    if (node.returnsStateTypeName) {
+      html += '<span class="flow__arrow">&#8594;</span>' +
+        '<span class="flow__item" data-kind="event">' + esc(node.returnsStateTypeName) + "</span>";
+    }
+
+    html += "</div></div>";
+
+    var rows = node.dependencies.map(function (dep) {
+      return '<tr><td class="mono nowrap">' + esc(dep.name) + "</td>" +
+        '<td class="mono muted">' + esc(dep.type) + "</td></tr>";
+    }).join("");
+
+    html += '<div class="section"><h2 class="section__head">Dependencies</h2>' +
+      '<div class="scroll"><table><thead><tr><th>Constructor parameter</th><th>Type</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="2" class="dash">No dependencies</td></tr>') +
+      "</tbody></table></div>" +
+      '<p class="subtitle" style="margin-top:10px">Returns <code>' +
+      esc(node.returnType) + "</code></p></div>";
 
     return html + findingsFor(node.id);
   }
@@ -513,7 +690,7 @@ export const APP_SCRIPT = String.raw`
 
   function viewOverview() {
     var html = '<div class="crumb"><span>Domain model</span></div>' +
-      '<h1 class="title title--prose">Overview</h1>' +
+      '<h1 class="title">Overview</h1>' +
       '<p class="subtitle">Extracted from <code>' + esc(MODEL.root) + "</code></p>";
 
     html += '<div class="section"><div class="tiles">';
@@ -562,8 +739,115 @@ export const APP_SCRIPT = String.raw`
     behaviour: "Behaviour"
   };
 
+  /** Short badge, the way the design labels a card. */
+  var KIND_BADGE = {
+    entity: "AGG",
+    subEntity: "ENT",
+    valueObject: "VO",
+    event: "EVENT",
+    error: "ERROR",
+    invariant: "INV",
+    repository: "REPO",
+    behaviour: "FN"
+  };
+
+  /**
+   * The colour channel for a node. Use cases split by what they are asked to do,
+   * so a command and a query never share a colour.
+   */
+  function kindAttr(node) {
+    if (node.kind === "useCase") {
+      return node.actionKind === "query" ? "query" : "command";
+    }
+    return node.kind;
+  }
+
+  function badgeOf(node) {
+    if (node.kind === "useCase") {
+      return node.actionKind === "query" ? "QRY" : "CMD";
+    }
+    return KIND_BADGE[node.kind] || "";
+  }
+
+  /**
+   * One card. Every grid on the page is built from this.
+   *
+   * The description slot collapses when the codebase has no doc comment, which
+   * is the common case rather than the exception — the name, badge and stats row
+   * have to carry the card on their own.
+   */
+  function cardHtml(o) {
+    var cls = "card" +
+      (o.tinted ? " card--tinted" : "") +
+      (o.extra ? " " + o.extra : "");
+
+    var inner =
+      '<div class="card__top">' +
+      '<span class="card__name' + (o.mono ? " card__name--mono" : "") + '">' +
+      esc(o.name) + "</span>" +
+      (o.badge ? '<span class="badge">' + esc(o.badge) + "</span>" : "") +
+      (o.href ? '<span class="card__go">Explore &#8594;</span>' : "") +
+      "</div>" +
+      (o.desc ? '<p class="card__desc">' + esc(o.desc) + "</p>" : "") +
+      (o.tags ? '<div class="tags">' + o.tags + "</div>" : "") +
+      (o.stats && o.stats.length
+        ? '<div class="card__stats"><span class="card__stat">' +
+          esc(o.stats.join(" \u00b7 ")) + "</span></div>"
+        : "");
+
+    return o.href
+      ? '<a class="' + cls + '" data-kind="' + esc(o.kind) + '" href="' + o.href + '">' +
+        inner + "</a>"
+      : '<div class="' + cls + '" data-kind="' + esc(o.kind) + '">' + inner + "</div>";
+  }
+
   function containedOf(id) {
     return MODEL.edges.filter(function (e) { return e.from === id && e.kind === "contains"; });
+  }
+
+  /** Everything an aggregate holds, transitively. */
+  function containedTree(id, seen) {
+    seen = seen || {};
+    var out = [];
+
+    containedOf(id).forEach(function (edge) {
+      if (seen[edge.to]) return;
+      seen[edge.to] = true;
+
+      var node = byId[edge.to];
+      if (!node) return;
+
+      out.push(node);
+      out = out.concat(containedTree(node.id, seen));
+    });
+
+    return out;
+  }
+
+  /** "6 behaviours · 4 events · 3 errors", counted across the whole aggregate. */
+  function statsOf(node) {
+    var all = [node].concat(containedTree(node.id));
+    var behaviours = 0;
+    var events = {};
+    var errors = {};
+
+    all.forEach(function (n) {
+      (n.methods || []).forEach(function (m) {
+        if (m.emits.length > 0 || m.canFail.length > 0) behaviours++;
+        m.emits.forEach(function (id) { events[id] = true; });
+        m.canFail.forEach(function (id) { errors[id] = true; });
+      });
+    });
+
+    var eventCount = Object.keys(events).length;
+    var errorCount = Object.keys(errors).length;
+    var parts = [];
+
+    if (behaviours) parts.push(behaviours + " behaviour" + (behaviours === 1 ? "" : "s"));
+    if (eventCount) parts.push(eventCount + " event" + (eventCount === 1 ? "" : "s"));
+    if (errorCount) parts.push(errorCount + " error" + (errorCount === 1 ? "" : "s"));
+
+    return parts;
   }
 
   function referencesOf(id) {
@@ -598,36 +882,42 @@ export const APP_SCRIPT = String.raw`
   }
 
   function blockHtml(node, extraClass) {
-    var count = childCount(node);
-    var terminal = count === 0;
-    var cls = "block block--" + node.kind + (extraClass ? " " + extraClass : "") +
-      (terminal ? " block--terminal" : "");
+    var terminal = childCount(node) === 0;
 
-    var inner =
-      '<span class="block__kind">' + esc(KIND_LABEL[node.kind] || node.kind) + "</span>" +
-      '<span class="block__name">' + esc(node.name) + "</span>" +
-      '<span class="block__meta">' +
-      (terminal
-        ? '<a class="mono" href="' + hrefOf(node) + '">details →</a>'
-        : '<span class="block__count">' + count + "</span> inside") +
-      "</span>";
-
-    // Terminal blocks are a div, not an anchor: nothing to drill into.
-    return terminal
-      ? '<div class="' + cls + '" data-kind="' + esc(node.kind) + '">' + inner + "</div>"
-      : '<a class="' + cls + '" data-kind="' + esc(node.kind) + '" href="#/explore/' +
-        encodeURIComponent(node.id) + '">' + inner + "</a>";
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      mono: true,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      stats: statsOf(node),
+      tinted: true,
+      extra: extraClass,
+      // Terminal cards link to the detail page; the rest drill down.
+      href: terminal
+        ? hrefOf(node)
+        : "#/domain/" + encodeURIComponent(node.id)
+    });
   }
 
   function behaviourBlockHtml(node, method) {
-    var count = method.emits.length + method.canFail.length;
+    var stats = [];
+    if (method.emits.length) {
+      stats.push(method.emits.length + " event" + (method.emits.length === 1 ? "" : "s"));
+    }
+    if (method.canFail.length) {
+      stats.push(method.canFail.length + " error" + (method.canFail.length === 1 ? "" : "s"));
+    }
 
-    return '<a class="block" data-kind="useCase" href="#/explore/' +
-      encodeURIComponent(behaviourId(node, method)) + '">' +
-      '<span class="block__kind">Behaviour</span>' +
-      '<span class="block__name">' + esc(method.name) + "()</span>" +
-      '<span class="block__meta"><span class="block__count">' + count +
-      "</span> outcome" + (count === 1 ? "" : "s") + "</span></a>";
+    return cardHtml({
+      kind: "behaviour",
+      name: method.name + "()",
+      mono: true,
+      desc: method.description || "",
+      stats: stats,
+      tinted: true,
+      href: "#/domain/" + encodeURIComponent(behaviourId(node, method))
+    });
   }
 
   /**
@@ -652,15 +942,15 @@ export const APP_SCRIPT = String.raw`
     });
 
     var html = loose.length
-      ? '<div class="blocks">' + loose.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+      ? '<div class="cards">' + loose.map(function (n) { return blockHtml(n); }).join("") + "</div>"
       : "";
 
     Object.keys(families).forEach(function (name) {
       var members = families[name];
-      html += '<div class="family" style="margin-top:10px">' +
-        '<div class="family__label">any one of <b>' + esc(name) + "</b> · " +
+      html += '<div class="family" style="margin-top:12px">' +
+        '<div class="family__label">any one of <b>' + esc(name) + "</b> \u00b7 " +
         members.length + " kinds</div>" +
-        '<div class="blocks">' +
+        '<div class="cards">' +
         members.map(function (n) { return blockHtml(n); }).join("") +
         "</div></div>";
     });
@@ -722,94 +1012,209 @@ export const APP_SCRIPT = String.raw`
     }
 
     var node = byId[target];
-    if (!node) return viewExplorerRoots();
+    if (!node) return viewDomainRoots();
 
     var segments = pathTo(node).map(function (n) {
-      return { label: n.name, href: "#/explore/" + encodeURIComponent(n.id) };
+      return { label: n.name, href: "#/domain/" + encodeURIComponent(n.id) };
     });
-    segments.unshift({ label: "Aggregates", href: "#/explore" });
+    segments.unshift({ label: "Domain Model", href: "#/domain" });
 
-    var html = trailHtml(segments) +
-      '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(node.kind) + '">' +
-      esc(KIND_LABEL[node.kind] || node.kind) + "</span></div>" +
-      '<h1 class="title">' + esc(node.name) + "</h1>" +
-      '<p class="subtitle"><a href="' + hrefOf(node) + '">Full detail</a> · <code>' +
-      esc(node.location.file) + "</code></p>";
-
-    var contained = containedOf(node.id);
-    if (contained.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Contains</h2>' +
-        groupedBlocks(contained) + "</div>";
-    }
+    var body = trailHtml(segments) +
+      '<h1 class="title">' + esc(node.name) + " " +
+      esc(KIND_LABEL[node.kind] || node.kind) + "</h1>" +
+      '<p class="subtitle">' + esc(node.description ||
+        "Behaviours, entities and value objects inside " + node.name + ".") + "</p>" +
+      legendHtml(DOMAIN_LEGEND);
 
     var behaviours = (node.methods || []).filter(function (m) {
       return m.emits.length > 0 || m.canFail.length > 0;
     });
 
     if (behaviours.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Behaviours</h2><div class="blocks">' +
+      body += '<div class="section"><h2 class="section__head">Behaviours</h2>' +
+        '<div class="cards">' +
         behaviours.map(function (m) { return behaviourBlockHtml(node, m); }).join("") +
         "</div></div>";
     }
 
+    // The design separates what an aggregate holds by kind rather than listing
+    // it as one mixed grid.
+    var contained = containedOf(node.id);
+    var entityEdges = contained.filter(function (e) {
+      var to = byId[e.to];
+      return to && to.kind !== "valueObject";
+    });
+    var valueEdges = contained.filter(function (e) {
+      var to = byId[e.to];
+      return to && to.kind === "valueObject";
+    });
+
+    if (entityEdges.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Entities</h2>' +
+        groupedBlocks(entityEdges) + "</div>";
+    }
+
+    if (valueEdges.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Value objects (immutable)</h2>' +
+        groupedBlocks(valueEdges) + "</div>";
+    }
+
     var references = referencesOf(node.id);
     if (references.length > 0) {
-      html += '<div class="section"><h2 class="section__head">References</h2>' +
-        '<p class="subtitle">Named by id, not held — following one leaves this aggregate.</p>' +
-        '<div class="blocks">' + references.map(function (edge) {
+      body += '<div class="section"><h2 class="section__head">References</h2>' +
+        '<p class="subtitle">Named by id, not held \u2014 following one leaves this aggregate.</p>' +
+        '<div class="cards">' + references.map(function (edge) {
           var to = byId[edge.to];
           if (!to) return "";
-          return '<a class="block block--ref" href="#/explore/' + encodeURIComponent(to.id) + '">' +
-            '<span class="block__kind">via ' + esc(edge.via) + "</span>" +
-            '<span class="block__name">' + esc(to.name) + "</span></a>";
+          return cardHtml({
+            kind: kindAttr(to),
+            name: to.name,
+            mono: true,
+            badge: badgeOf(to),
+            desc: "Referenced by id via " + edge.via + ".",
+            href: "#/domain/" + encodeURIComponent(to.id)
+          });
         }).join("") + "</div></div>";
     }
 
     if (contained.length === 0 && behaviours.length === 0 && references.length === 0) {
-      html += '<div class="section"><div class="empty">Nothing below this — see ' +
+      body += '<div class="section"><div class="empty">Nothing below this \u2014 see ' +
         '<a href="' + hrefOf(node) + '">its detail page</a> for state and payload.</div></div>';
     }
 
-    return html;
+    // Screen 3: the fields inspector, for anything that carries state.
+    var fields = node.stateFields || [];
+    if (fields.length === 0) return body;
+
+    return '<div class="main--split"><div class="main__body">' + body + "</div>" +
+      inspectorHtml({
+        name: node.name,
+        kind: kindAttr(node),
+        badge: badgeOf(node),
+        desc: node.description || "",
+        label: "Fields &amp; metadata",
+        fields: fields.map(function (f) {
+          return {
+            name: f.name,
+            type: f.type,
+            note: f.optional ? "Optional" : ""
+          };
+        })
+      }) + "</div>";
   }
 
+  /** The right-hand detail panel from screens 3 and 4. */
+  function inspectorHtml(o) {
+    var html = '<aside class="inspector" data-kind="' + esc(o.kind) + '">' +
+      '<div class="inspector__top">' +
+      '<span class="inspector__name">' + esc(o.name) + "</span>" +
+      (o.badge ? '<span class="badge badge--soft">' + esc(o.badge) + "</span>" : "") +
+      "</div>";
+
+    if (o.desc) html += '<p class="card__desc">' + esc(o.desc) + "</p>";
+
+    html += '<div class="inspector__label">' + o.label + "</div>";
+
+    html += o.fields.length
+      ? o.fields.map(function (f) {
+          return '<div class="field"><div class="field__top">' +
+            '<span class="field__name">' + esc(f.name) + "</span>" +
+            '<span class="field__type">' + esc(f.type) + "</span></div>" +
+            (f.note ? '<p class="field__note">' + esc(f.note) + "</p>" : "") +
+            "</div>";
+        }).join("")
+      : '<div class="empty">None declared.</div>';
+
+    return html + "</aside>";
+  }
+
+  /** Screen 4 — the events and errors one behaviour produces. */
   function viewBehaviour(owner, method) {
     var segments = pathTo(owner).map(function (n) {
-      return { label: n.name, href: "#/explore/" + encodeURIComponent(n.id) };
+      return { label: n.name, href: "#/domain/" + encodeURIComponent(n.id) };
     });
-    segments.unshift({ label: "Aggregates", href: "#/explore" });
+    segments.unshift({ label: "Domain Model", href: "#/domain" });
     segments.push({ label: method.name + "()", href: "#" });
 
-    var html = trailHtml(segments) +
-      '<div class="crumb"><span class="chip chip--kind" data-kind="useCase">Behaviour</span></div>' +
-      '<h1 class="title">' + esc(owner.name) + "." + esc(method.name) + "()</h1>" +
-      '<p class="subtitle">Returns <code>' + esc(method.returnType) + "</code></p>";
+    var body = trailHtml(segments) +
+      '<h1 class="title title--mono">' + esc(method.name) + "() \u2014 Events &amp; Errors</h1>" +
+      '<p class="subtitle">' + esc(method.description ||
+        "Domain events published and errors raised by this behaviour.") + "</p>" +
+      legendHtml([["event", "Domain event"], ["error", "Error"]]);
 
-    if (method.emits.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Produces</h2><div class="blocks">' +
-        method.emits.map(function (id) {
+    body += '<div class="section"><h2 class="section__head">Events emitted</h2>';
+    body += method.emits.length
+      ? '<div class="cards cards--one">' + method.emits.map(function (id) {
           var n = byId[id];
-          return n ? blockHtml(n) : "";
-        }).join("") + "</div></div>";
-    } else {
-      html += '<div class="section"><h2 class="section__head">Produces</h2>' +
-        '<div class="empty">No event is named in the signature. Some methods return a ' +
+          return n ? detailCard(n) : "";
+        }).join("") + "</div>"
+      : '<div class="empty">No event is named in the signature. Some methods return a ' +
         "wrapper carrying the aggregate's event union rather than a specific event, in " +
-        "which case what they emit is not determinable from the type alone.</div></div>";
-    }
+        "which case what they emit is not determinable from the type alone.</div>";
+    body += "</div>";
 
     if (method.canFail.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Can fail with</h2><div class="blocks">' +
-        method.canFail.map(function (id) {
+      body += '<div class="section"><h2 class="section__head">Errors raised</h2>' +
+        '<div class="cards cards--one">' + method.canFail.map(function (id) {
           var n = byId[id];
-          return n ? blockHtml(n) : "";
+          return n ? detailCard(n) : "";
         }).join("") + "</div></div>";
     }
 
-    return html;
+    body += '<div class="section"><h2 class="section__head">Behaviour signature</h2>' +
+      "<pre>" + signatureHtml(method) + "</pre></div>";
+
+    return '<div class="main--split"><div class="main__body">' + body + "</div>" +
+      inspectorHtml({
+        name: method.name + "()",
+        kind: "behaviour",
+        badge: "FN",
+        desc: method.description || "",
+        label: "Parameters",
+        fields: method.parameters.map(function (param) {
+          return { name: param.name, type: param.type, note: "" };
+        }).concat([{ name: "returns", type: method.returnType, note: "Return type" }])
+      }) + "</div>";
   }
 
-  function viewExplorerRoots() {
+  /** A card for an event or error, where the payload matters more than a count. */
+  function detailCard(node) {
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      mono: true,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      tinted: true,
+      href: hrefOf(node)
+    });
+  }
+
+  /** name(param: Type, ...): Return, lightly coloured. */
+  function signatureHtml(method) {
+    var params = method.parameters.map(function (param) {
+      return '<span class="p">' + esc(param.name) + '</span>: <span class="t">' +
+        esc(param.type) + "</span>";
+    }).join(", ");
+
+    return '<span class="k">' + esc(method.name) + "</span>(" + params +
+      '): <span class="t">' + esc(method.returnType) + "</span>";
+  }
+
+  /** The legend bar the design puts under every Domain Model header. */
+  var DOMAIN_LEGEND = [
+    ["entity", "Aggregate"],
+    ["subEntity", "Entity"],
+    ["valueObject", "Value object"],
+    ["behaviour", "Behaviour"],
+    ["event", "Event"],
+    ["error", "Error"],
+    ["invariant", "Invariant"],
+    ["repository", "Repository"]
+  ];
+
+  /** Screen 1 — every aggregate and root entity in the model. */
+  function viewDomainRoots() {
     var roots = (MODEL.aggregateRoots || []).map(function (id) { return byId[id]; })
       .filter(Boolean);
 
@@ -817,14 +1222,15 @@ export const APP_SCRIPT = String.raw`
     // no sub-entities has no roots to distinguish.
     if (roots.length === 0) roots = nodesOfKind("entity");
 
-    var html = trailHtml([{ label: "Aggregates", href: "#/explore" }]) +
-      '<h1 class="title title--prose">Explorer</h1>' +
-      '<p class="subtitle">Start at an aggregate and drill down: what it contains, then its ' +
-      "behaviours, then the events and errors each one produces.</p>";
+    var html = trailHtml([{ label: "Domain Model", href: "#/domain" }]) +
+      '<h1 class="title">Aggregates &amp; Entities</h1>' +
+      '<p class="subtitle">All aggregates and root entities in your domain model. ' +
+      "Click to explore behaviours, events, and errors.</p>" +
+      legendHtml(DOMAIN_LEGEND);
 
     html += '<div class="section">' +
       (roots.length
-        ? '<div class="blocks">' + roots.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+        ? '<div class="cards">' + roots.map(function (n) { return blockHtml(n); }).join("") + "</div>"
         : '<div class="empty">No aggregates found.</div>') +
       "</div>";
 
@@ -838,7 +1244,7 @@ export const APP_SCRIPT = String.raw`
       html += '<div class="section"><h2 class="section__head">Unattached value objects</h2>' +
         '<p class="subtitle">Nothing was found holding these. They may be built and used ' +
         "transiently, or held in a way that cannot be seen statically.</p>" +
-        '<div class="blocks">' + orphans.map(function (n) { return blockHtml(n); }).join("") +
+        '<div class="cards">' + orphans.map(function (n) { return blockHtml(n); }).join("") +
         "</div></div>";
     }
 
@@ -856,21 +1262,21 @@ export const APP_SCRIPT = String.raw`
 
   var BOX_W = 172, BOX_H = 24;
 
-  // Same three-hue system as the rest of the page: structure, facts, application.
-  // Members of a family differ by fill weight, not by hue.
+  // The same concept colours as the cards. Kept as a second mapping because SVG
+  // attributes cannot read the [data-kind] custom properties.
   var GRAPH_FILL = {
-    entity: "var(--t-structure-soft)",
-    subEntity: "var(--t-structure-soft)",
-    valueObject: "var(--surface)",
-    event: "var(--t-fact-soft)",
+    entity: "var(--c-aggregate-soft)",
+    subEntity: "var(--c-entity-soft)",
+    valueObject: "var(--c-value-soft)",
+    event: "var(--c-event-soft)",
     family: "var(--surface-sunken)"
   };
 
   var GRAPH_STROKE = {
-    entity: "var(--t-structure)",
-    subEntity: "var(--t-structure)",
-    valueObject: "var(--t-structure)",
-    event: "var(--t-fact)",
+    entity: "var(--c-aggregate)",
+    subEntity: "var(--c-entity)",
+    valueObject: "var(--c-value)",
+    event: "var(--c-event)",
     family: "var(--line-strong)"
   };
 
@@ -930,7 +1336,7 @@ export const APP_SCRIPT = String.raw`
   function viewGraph(target) {
     var graphs = MODEL.graphs || [];
 
-    var html = '<h1 class="title title--prose">Graph</h1>' +
+    var html = '<h1 class="title">Graph</h1>' +
       '<p class="subtitle">Each aggregate root with what it holds and the events those ' +
       "produce. Errors are left out — this view is about structure.</p>";
 
@@ -986,8 +1392,12 @@ export const APP_SCRIPT = String.raw`
 
     if (!parts[0]) {
       html = viewOverview();
-    } else if (parts[0] === "explore") {
+    } else if (parts[0] === "domain" || parts[0] === "explore") {
+      // "explore" is the pre-redesign address, kept so saved links still work.
       html = viewExplorer(decodeURIComponent(parts.slice(1).join("/") || ""));
+    } else if (parts[0] === "use-cases") {
+      var useCaseId = decodeURIComponent(parts.slice(1).join("/") || "");
+      html = byId[useCaseId] ? viewUseCase(byId[useCaseId]) : viewUseCases();
     } else if (parts[0] === "graph") {
       html = viewGraph(decodeURIComponent(parts.slice(1).join("/") || ""));
     } else {
@@ -997,7 +1407,7 @@ export const APP_SCRIPT = String.raw`
       if (node && VIEWS[node.kind]) {
         html = VIEWS[node.kind](node);
       } else {
-        html = '<h1 class="title title--prose">Not found</h1>' +
+        html = '<h1 class="title">Not found</h1>' +
           '<p class="subtitle">No ' + esc(kind || parts[0]) +
           ' matches this address. <a href="#/">Back to the overview</a>.</p>';
       }

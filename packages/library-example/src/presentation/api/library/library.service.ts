@@ -8,12 +8,29 @@ import {
   LibraryCollection,
 } from "../../../domain/repositories/libraryCollection.repository";
 import { LoanRegister } from "../../../domain/repositories/loanRegister.repository";
-import { addBook as addBookUseCase } from "../../../domain/use-cases/addBook.use-case";
-import { declareBookLost as declareBookLostUseCase } from "../../../domain/use-cases/declareBookLost.use-case";
-import { recordBookReturn as recordBookReturnUseCase } from "../../../domain/use-cases/recordBookReturn.use-case";
-import { listOutstandingLoansForMember as listOutstandingLoansForMemberUseCase } from "../../../domain/use-cases/listOutstandingLoansForMember.use-case";
-import { registerLoan as registerLoanUseCase } from "../../../domain/use-cases/registerLoan.use-case";
-import { searchBooks as searchBooksUseCase } from "../../../domain/use-cases/searchBooks.use-case";
+import { AddBookUseCase } from "../../../domain/use-cases/addBook.use-case";
+import { DeclareBookLostUseCase } from "../../../domain/use-cases/declareBookLost.use-case";
+import { RecordBookReturnUseCase } from "../../../domain/use-cases/recordBookReturn.use-case";
+import { ListOutstandingLoansForMemberUseCase } from "../../../domain/use-cases/listOutstandingLoansForMember.use-case";
+import {
+  RegisterLoanError,
+  RegisterLoanUseCase,
+} from "../../../domain/use-cases/registerLoan.use-case";
+import { SearchBooksUseCase } from "../../../domain/use-cases/searchBooks.use-case";
+import { AddBookCommand } from "../../../domain/use-cases/commands/addBook.command";
+import { DeclareBookLostCommand } from "../../../domain/use-cases/commands/declareBookLost.command";
+import { RecordBookReturnCommand } from "../../../domain/use-cases/commands/recordBookReturn.command";
+import { RegisterLoanCommand } from "../../../domain/use-cases/commands/registerLoan.command";
+import { SearchBooksQuery } from "../../../domain/use-cases/queries/searchBooks.query";
+import { ListOutstandingLoansForMemberQuery } from "../../../domain/use-cases/queries/listOutstandingLoansForMember.query";
+import {
+  BookAlreadyDeclaredLostError,
+  BookNotFoundError,
+} from "../../../domain/entities/book/errors/book.errors";
+import {
+  LoanAlreadyReturnedError,
+  LoanNotFoundError,
+} from "../../../domain/entities/loan/errors/loan.errors";
 
 import { FIFTY_REAL_BOOKS } from "./seed-books.data";
 
@@ -24,6 +41,12 @@ export class LibraryService implements OnModuleInit {
   constructor(
     private readonly libraryCollection: LibraryCollection,
     private readonly loanRegister: LoanRegister,
+    private readonly addBookUseCase: AddBookUseCase,
+    private readonly declareBookLostUseCase: DeclareBookLostUseCase,
+    private readonly searchBooksUseCase: SearchBooksUseCase,
+    private readonly registerLoanUseCase: RegisterLoanUseCase,
+    private readonly recordBookReturnUseCase: RecordBookReturnUseCase,
+    private readonly listOutstandingLoansForMemberUseCase: ListOutstandingLoansForMemberUseCase,
   ) {}
 
   onModuleInit() {
@@ -57,44 +80,43 @@ export class LibraryService implements OnModuleInit {
     isbn: string;
     category: string;
     tags: string[];
-  }): Promise<Result<BookState, Error>> {
-    return addBookUseCase(bookData, {
-      libraryCollection: this.libraryCollection,
-    });
+  }): Promise<Result<BookState, never>> {
+    return this.addBookUseCase.execute(new AddBookCommand(bookData));
   }
 
   declareBookLost(lostDeclaration: {
     bookId: string;
-  }): Promise<Result<BookState, Error>> {
-    return declareBookLostUseCase(lostDeclaration, {
-      libraryCollection: this.libraryCollection,
-    });
+  }): Promise<
+    Result<BookState, BookNotFoundError | BookAlreadyDeclaredLostError>
+  > {
+    return this.declareBookLostUseCase.execute(
+      new DeclareBookLostCommand(lostDeclaration),
+    );
   }
 
   searchBooks(
     catalogueQuery: BookSearchCriteria,
-  ): Promise<Result<BookState[], Error>> {
-    return searchBooksUseCase(catalogueQuery, {
-      libraryCollection: this.libraryCollection,
-    });
+  ): Promise<Result<BookState[], never>> {
+    return this.searchBooksUseCase.execute(
+      new SearchBooksQuery(catalogueQuery),
+    );
   }
 
   registerLoan(lendingRequest: {
     bookId: string;
     memberId: string;
-  }): Promise<Result<LoanState, Error>> {
-    return registerLoanUseCase(lendingRequest, {
-      libraryCollection: this.libraryCollection,
-      loanRegister: this.loanRegister,
-    });
+  }): Promise<Result<LoanState, RegisterLoanError>> {
+    return this.registerLoanUseCase.execute(
+      new RegisterLoanCommand(lendingRequest),
+    );
   }
 
   recordBookReturn(returnReceipt: {
     loanId: string;
-  }): Promise<Result<LoanState, Error>> {
-    return recordBookReturnUseCase(returnReceipt, {
-      loanRegister: this.loanRegister,
-    });
+  }): Promise<Result<LoanState, LoanNotFoundError | LoanAlreadyReturnedError>> {
+    return this.recordBookReturnUseCase.execute(
+      new RecordBookReturnCommand(returnReceipt),
+    );
   }
 
   async listBooks(params: { limit: number; offset: number }): Promise<
@@ -150,12 +172,11 @@ export class LibraryService implements OnModuleInit {
   ): Promise<
     Result<
       { memberId: string; loans: Array<{ id: string } & LoanState> },
-      Error
+      never
     >
   > {
-    const result = await listOutstandingLoansForMemberUseCase(
-      { memberId },
-      { loanRegister: this.loanRegister },
+    const result = await this.listOutstandingLoansForMemberUseCase.execute(
+      new ListOutstandingLoansForMemberQuery({ memberId }),
     );
     if (result.isErr()) {
       return err(result.error);

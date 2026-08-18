@@ -1,4 +1,4 @@
-import { Result, ok, err } from "ontologic";
+import { Result, UseCase, ok, err } from "ontologic";
 
 import {
   Subscription,
@@ -7,6 +7,7 @@ import {
 import { PlanNoLongerOffered } from "../entities/plan/errors/planNoLongerOffered.error";
 import { SubscriptionRepository } from "../subscription.repository";
 import { PlanRepository } from "../plan.repository";
+import { SubscribeToPlanCommand } from "./commands/subscribeToPlan.command";
 import { EntityNotFound } from "./errors/entityNotFound.error";
 
 /**
@@ -18,52 +19,61 @@ import { EntityNotFound } from "./errors/entityNotFound.error";
  *
  * Note the asymmetry: the Plan is READ, the Subscription is WRITTEN.
  * `saveWithEvents` is the only atomic unit available, so a use case should read
- * from as many aggregates as it needs and write to exactly one.
+ * from as many aggregates as it needs and write to exactly one. Each aggregate
+ * it touches is one more constructor parameter.
  */
-export async function subscribeToPlanUseCase(
-  input: { customerId: string; planId: string },
-  dependencies: {
-    subscriptions: SubscriptionRepository;
-    plans: PlanRepository;
-  },
-): Promise<Result<SubscriptionState, EntityNotFound | PlanNoLongerOffered>> {
-  const { customerId, planId } = input;
-  const { subscriptions, plans } = dependencies;
+export class SubscribeToPlanUseCase implements UseCase<
+  SubscribeToPlanCommand,
+  SubscriptionState,
+  EntityNotFound | PlanNoLongerOffered
+> {
+  constructor(
+    private readonly subscriptions: SubscriptionRepository,
+    private readonly plans: PlanRepository,
+  ) {}
 
-  const planLookup = await plans.getById(planId);
+  async execute(
+    command: SubscribeToPlanCommand,
+  ): Promise<Result<SubscriptionState, EntityNotFound | PlanNoLongerOffered>> {
+    const { customerId, planId } = command.payload;
 
-  if (planLookup.isErr()) {
-    throw planLookup.error; // infrastructure failure → throw
-  }
+    const planLookup = await this.plans.getById(planId);
 
-  const plan = planLookup.value;
+    if (planLookup.isErr()) {
+      throw planLookup.error; // infrastructure failure → throw
+    }
 
-  // Existence needs a lookup, so it is a use-case decision, not a repository one.
-  if (plan === undefined) {
-    return err(new EntityNotFound("This plan does not exist", { entityId: planId }));
-  }
+    const plan = planLookup.value;
 
-  // A rule about ANOTHER aggregate's state. The Plan is a fact source here —
-  // it is never mutated and never saved.
-  if (!plan.readState().offered) {
-    return err(
-      new PlanNoLongerOffered("This plan is no longer offered", { planId }),
+    // Existence needs a lookup, so it is a use-case decision, not a repository one.
+    if (plan === undefined) {
+      return err(
+        new EntityNotFound("This plan does not exist", { entityId: planId }),
+      );
+    }
+
+    // A rule about ANOTHER aggregate's state. The Plan is a fact source here —
+    // it is never mutated and never saved.
+    if (!plan.readState().offered) {
+      return err(
+        new PlanNoLongerOffered("This plan is no longer offered", { planId }),
+      );
+    }
+
+    const { subscription, creationEvent } = Subscription.create({
+      customerId,
+      planId,
+    });
+
+    const saveResult = await this.subscriptions.saveWithEvents(
+      subscription,
+      creationEvent,
     );
+
+    if (saveResult.isErr()) {
+      throw saveResult.error;
+    }
+
+    return ok(subscription.readState());
   }
-
-  const { subscription, creationEvent } = Subscription.create({
-    customerId,
-    planId,
-  });
-
-  const saveResult = await subscriptions.saveWithEvents(
-    subscription,
-    creationEvent,
-  );
-
-  if (saveResult.isErr()) {
-    throw saveResult.error;
-  }
-
-  return ok(subscription.readState());
 }

@@ -29,7 +29,9 @@ function event(model: DomainModel, name: string): EventNode {
 }
 
 function useCase(model: DomainModel, name: string): UseCaseNode {
-  const found = model.nodes.find((n) => n.kind === "useCase" && n.name === name);
+  const found = model.nodes.find(
+    (n) => n.kind === "useCase" && n.name === name,
+  );
   if (!found) throw new Error(`no use case named ${name}`);
   return found as UseCaseNode;
 }
@@ -183,9 +185,7 @@ describe("Given the library's own Order example", () => {
     it("Then every concept records where it was found", () => {
       const order = entity(model, "Order");
 
-      expect(order.location.file).toBe(
-        "domain/entities/order/order.entity.ts",
-      );
+      expect(order.location.file).toBe("domain/entities/order/order.entity.ts");
       expect(order.location.line).toBeGreaterThan(0);
     });
   });
@@ -206,9 +206,7 @@ describe("Given the Order example's application layer", () => {
         (n): n is InvariantNode => n.kind === "invariant",
       );
 
-      expect(
-        invariants.map((i) => [i.name, i.description]).sort(),
-      ).toEqual([
+      expect(invariants.map((i) => [i.name, i.description]).sort()).toEqual([
         ["orderHasAtLeastOneItemInvariant", "Order Has At Least One Item"],
         ["paidOrderHasInvoiceIdInvariant", "Paid Order Has Invoice Id"],
       ]);
@@ -236,9 +234,8 @@ describe("Given the Order example's application layer", () => {
     });
 
     it("Then a use case reports the aggregate it reads and writes", () => {
-      const pay = useCase(model, "payOrderUseCase");
+      const pay = useCase(model, "PayOrderUseCase");
 
-      expect(pay.confidence).toBe("high");
       expect(pay.reads).toEqual(["OrderRepository"]);
       expect(pay.writes).toEqual(["OrderRepository"]);
       expect(namesOf(model, pay.canFail).sort()).toEqual([
@@ -247,35 +244,65 @@ describe("Given the Order example's application layer", () => {
       ]);
     });
 
-    it("Then a use case with no Result return type is still found", () => {
-      // createOrderUseCase returns a bare Promise<OrderState>: it has no domain
-      // failure mode, so there is no Result to key on.
-      const create = useCase(model, "createOrderUseCase");
+    it("Then a use case names the command it is asked to carry out", () => {
+      const pay = useCase(model, "PayOrderUseCase");
 
-      expect(create.confidence).toBe("medium");
+      expect(pay.actionKind).toBe("command");
+      expect(pay.actionTypeName).toBe("PayOrderCommand");
+      expect(pay.actionName).toBe("PAY_ORDER");
+    });
+
+    it("Then a use case that declares no failure reports none", () => {
+      // CreateOrderUseCase declares `never` on the error side: it has no domain
+      // failure mode, and that is an answer rather than a gap.
+      const create = useCase(model, "CreateOrderUseCase");
+
+      expect(create.canFail).toEqual([]);
       expect(create.writes).toEqual(["OrderRepository"]);
+    });
+
+    it("Then the aggregate it depends on is read off the constructor", () => {
+      const pay = useCase(model, "PayOrderUseCase");
+
+      expect(pay.dependencies).toEqual([
+        { name: "orders", type: "OrderRepository" },
+      ]);
+    });
+
+    it("Then nothing in this codebase is reported as an unmarked use case", () => {
+      expect(
+        model.findings.filter((f) => f.code === "use-case-not-marked"),
+      ).toEqual([]);
     });
   });
 });
 
-describe("Given a codebase whose repository is a module-level singleton", () => {
+describe("Given the CreditBalance example, which has both a command and a query", () => {
   let model: DomainModel;
 
   beforeAll(() => {
     model = extractModel({
-      paths: [resolve(REPO_ROOT, "packages/ontologic/src/examples/creditBalance")],
+      paths: [
+        resolve(REPO_ROOT, "packages/ontologic/src/examples/creditBalance"),
+      ],
     });
   });
 
   describe("When the domain model is extracted", () => {
-    it("Then the repository edge is found even though it is not a parameter", () => {
-      const debit = useCase(model, "debitBalanceUseCase");
+    it("Then the repository edge is found through the constructor", () => {
+      const debit = useCase(model, "DebitBalanceUseCase");
 
-      expect(debit.parameters.map((p) => p.type)).not.toContain(
-        "CreditBalanceRepository",
-      );
       expect(debit.reads).toEqual(["CreditBalanceRepository"]);
       expect(debit.writes).toEqual(["CreditBalanceRepository"]);
+    });
+
+    it("Then a read use case is reported as a query and writes nothing", () => {
+      const read = useCase(model, "ReadBalanceUseCase");
+
+      expect(read.actionKind).toBe("query");
+      expect(read.actionName).toBe("READ_BALANCE");
+      expect(read.reads).toEqual(["CreditBalanceRepository"]);
+      expect(read.writes).toEqual([]);
     });
   });
 });
@@ -285,7 +312,9 @@ describe("Given the CreditBalance example, whose event union is incomplete", () 
 
   beforeAll(() => {
     model = extractModel({
-      paths: [resolve(REPO_ROOT, "packages/ontologic/src/examples/creditBalance")],
+      paths: [
+        resolve(REPO_ROOT, "packages/ontologic/src/examples/creditBalance"),
+      ],
     });
   });
 
@@ -350,7 +379,10 @@ describe("Given the reference templates, which use a second aggregate", () => {
 // The library example is a workspace package now, so this runs in CI rather than
 // depending on a sibling checkout. It still exercises the important case: a
 // codebase whose own conventions differ from the library's own examples.
-const LIBRARY_EXAMPLES = resolve(REPO_ROOT, "packages/library-example/src/domain");
+const LIBRARY_EXAMPLES = resolve(
+  REPO_ROOT,
+  "packages/library-example/src/domain",
+);
 
 describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
   "Given a codebase whose conventions differ from the library's own examples",
@@ -409,20 +441,25 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         expect(lost.version).toBe(1);
       });
 
-      it("Then every domain error is flagged for the broken instanceof", () => {
+      it("Then no domain error is flagged for the broken instanceof", () => {
+        // Every error class here restores its prototype. The detection itself
+        // is covered by fixtures/brokenPrototype.ts, since nothing in this
+        // repository omits `setPrototypeOf` any more.
         const flagged = model.findings.filter(
           (f) => f.code === "error-missing-set-prototype",
         );
         const errorCount = model.nodes.filter((n) => n.kind === "error").length;
 
         expect(errorCount).toBe(7);
-        expect(flagged).toHaveLength(7);
+        expect(flagged).toEqual([]);
       });
 
       it("Then nothing is flagged for the pre-1.7 invariant API", () => {
         // Upgraded to the options object when it joined the workspace.
         expect(
-          model.findings.filter((f) => f.code === "legacy-invariant-attachment"),
+          model.findings.filter(
+            (f) => f.code === "legacy-invariant-attachment",
+          ),
         ).toEqual([]);
       });
 
@@ -434,7 +471,7 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
       });
 
       it("Then a cross-aggregate use case shows it reads two and writes one", () => {
-        const register = useCase(model, "registerLoan");
+        const register = useCase(model, "RegisterLoanUseCase");
 
         expect(register.reads.sort()).toEqual([
           "LibraryCollection",
@@ -443,12 +480,9 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         expect(register.writes).toEqual(["LoanRegister"]);
       });
 
-      it("Then the failures are recovered even though the error union is erased", () => {
-        const register = useCase(model, "registerLoan");
+      it("Then the failures come from the declared union, not the call sites", () => {
+        const register = useCase(model, "RegisterLoanUseCase");
 
-        // The signature says Result<LoanState, Error>; the errors are only
-        // visible at the err(new X(...)) call sites.
-        expect(register.returnType).toContain("Error");
         expect(namesOf(model, register.canFail).sort()).toEqual([
           "BookAlreadyOnLoanError",
           "BookLostCannotBeLoanedError",
@@ -457,12 +491,30 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         ]);
       });
 
-      it("Then every use case is flagged for erasing its error union", () => {
-        const flagged = model.findings.filter(
-          (f) => f.code === "use-case-error-union-erased",
-        );
+      it("Then no use case erases its error union any more", () => {
+        // Declaring `Result<T, Error>` stopped compiling when `UseCase`
+        // constrained the error side to `DomainError`.
+        expect(
+          model.findings.filter(
+            (f) => f.code === "use-case-error-union-erased",
+          ),
+        ).toEqual([]);
+      });
 
-        expect(flagged).toHaveLength(6);
+      it("Then the reads are reported as queries and the writes as commands", () => {
+        const kindOf = (name: string): string =>
+          useCase(model, name).actionKind;
+
+        expect(kindOf("SearchBooksUseCase")).toBe("query");
+        expect(kindOf("ListOutstandingLoansForMemberUseCase")).toBe("query");
+        expect(kindOf("RegisterLoanUseCase")).toBe("command");
+        expect(kindOf("RecordBookReturnUseCase")).toBe("command");
+      });
+
+      it("Then no use case is left unmarked", () => {
+        expect(
+          model.findings.filter((f) => f.code === "use-case-not-marked"),
+        ).toEqual([]);
       });
 
       it("Then the repository domain queries are captured", () => {
@@ -476,6 +528,41 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
     });
   },
 );
+
+describe("Given an error class that never restores its prototype", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/brokenPrototype.ts")],
+      includeTests: true,
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then only the class missing setPrototypeOf is flagged", () => {
+      const flagged = model.findings.filter(
+        (f) => f.code === "error-missing-set-prototype",
+      );
+
+      expect(
+        namesOf(
+          model,
+          flagged.map((f) => f.nodeId),
+        ),
+      ).toEqual(["BrokenPrototypeError"]);
+    });
+
+    it("Then the class that restores it is recorded as sound", () => {
+      const restored = model.nodes.find(
+        (n) => n.kind === "error" && n.name === "RestoredPrototypeError",
+      );
+
+      expect(restored).toBeDefined();
+      expect((restored as { setsPrototype: boolean }).setsPrototype).toBe(true);
+    });
+  });
+});
 
 describe("Given a codebase still on the pre-1.7 invariant API", () => {
   let model: DomainModel;
@@ -500,9 +587,12 @@ describe("Given a codebase still on the pre-1.7 invariant API", () => {
         (f) => f.code === "legacy-invariant-attachment",
       );
 
-      expect(namesOf(model, flagged.map((f) => f.nodeId))).toEqual([
-        "LegacyAggregate",
-      ]);
+      expect(
+        namesOf(
+          model,
+          flagged.map((f) => f.nodeId),
+        ),
+      ).toEqual(["LegacyAggregate"]);
     });
   });
 });

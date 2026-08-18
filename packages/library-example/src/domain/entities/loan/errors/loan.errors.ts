@@ -10,6 +10,8 @@ export class LoanAlreadyReturnedError extends DomainError<
       message: `Loan has already been returned`,
       context: { loanId },
     });
+
+    Object.setPrototypeOf(this, LoanAlreadyReturnedError.prototype);
   }
 }
 
@@ -24,6 +26,8 @@ export class MemberActiveLoanLimitExceededError extends DomainError<
       message: `Member has reached the active loan limit (${MAX_ACTIVE_LOANS_PER_MEMBER} books)`,
       context: { memberId, limit: MAX_ACTIVE_LOANS_PER_MEMBER },
     });
+
+    Object.setPrototypeOf(this, MemberActiveLoanLimitExceededError.prototype);
   }
 }
 
@@ -37,5 +41,7 @@ export class LoanNotFoundError extends DomainError<
       message: "No loan exists with this identifier in the loan register",
       context: { loanId },
     });
+
+    Object.setPrototypeOf(this, LoanNotFoundError.prototype);
   }
 }

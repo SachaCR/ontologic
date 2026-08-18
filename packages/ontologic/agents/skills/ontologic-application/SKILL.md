@@ -19,47 +19,106 @@ decision, so it is returned as `err(new EntityNotFound(...))`.
 
 ## Use case shape
 
-A use case is a plain exported async function taking the **input** first, then a named
-**dependencies** bag. There is no `UseCase` base class. The canonical sequence:
+A use case is a **class implementing `UseCase<Action, Output, Errors>`**. Its dependencies
+are constructor parameters. The canonical sequence:
 
 ```typescript
-export async function activateSubscriptionUseCase(
-  input: { id: string; activatedAt: string },
-  dependencies: { subscriptions: SubscriptionRepository },
-): Promise<Result<SubscriptionState, InvalidStatusTransition | EntityNotFound>> {
-  const { id, activatedAt } = input;
-  const { subscriptions } = dependencies;
+export class ActivateSubscriptionUseCase
+  implements UseCase<
+    ActivateSubscriptionCommand,
+    SubscriptionState,
+    InvalidStatusTransition | EntityNotFound
+  >
+{
+  constructor(private readonly subscriptions: SubscriptionRepository) {}
 
-  const resultGetById = await subscriptions.getById(id);
-  if (resultGetById.isErr()) throw resultGetById.error;        // technical → throw
+  async execute(
+    command: ActivateSubscriptionCommand,
+  ): Promise<Result<SubscriptionState, InvalidStatusTransition | EntityNotFound>> {
+    const { id, activatedAt } = command.payload;
 
-  const subscription = resultGetById.value;
-  if (subscription === undefined) {                            // domain → return
-    return err(new EntityNotFound("Does not exist", { entityId: id }));
-  }
+    const resultGetById = await this.subscriptions.getById(id);
+    if (resultGetById.isErr()) throw resultGetById.error;       // technical → throw
 
-  const result = subscription.activate({ activatedAt });
-  if (result.isErr()) {
-    switch (result.error.name) {
-      case "INVALID_STATUS_TRANSITION":
-        return err(result.error);
-      default:
-        switchGuard(result.error.name);                        // exhaustiveness
+    const subscription = resultGetById.value;
+    if (subscription === undefined) {                          // domain → return
+      return err(new EntityNotFound("Does not exist", { entityId: id }));
     }
+
+    const result = subscription.activate({ activatedAt });
+    if (result.isErr()) {
+      switch (result.error.name) {
+        case "INVALID_STATUS_TRANSITION":
+          return err(result.error);
+        default:
+          switchGuard(result.error.name);                      // exhaustiveness
+      }
+    }
+
+    const saveResult = await this.subscriptions.saveWithEvents(
+      subscription,
+      result.value,
+    );
+    if (saveResult.isErr()) throw saveResult.error;
+
+    return ok(subscription.readState());                        // state, not the entity
   }
-
-  const saveResult = await subscriptions.saveWithEvents(subscription, result.value);
-  if (saveResult.isErr()) throw saveResult.error;
-
-  return ok(subscription.readState());                          // state, not the entity
 }
 ```
 
-The dependencies bag is what lets a use case span two aggregates — the positional
-`(repository, ...args)` form cannot express that cleanly.
+Constructor injection is what lets a use case span two aggregates — one parameter per
+repository it touches.
 
 When a use case produces several events, collect them in an array and hand the array to
 `saveWithEvents`.
+
+## The action: `Command` or `Query`
+
+A use case never takes a loose input object. It takes an **action**, and the action says
+whether this is an intent to change something or a request to read:
+
+```typescript
+export class ActivateSubscriptionCommand extends Command<
+  "ACTIVATE_SUBSCRIPTION",
+  { id: string; activatedAt: string }
+> {
+  constructor(payload: { id: string; activatedAt: string }) {
+    super({ name: "ACTIVATE_SUBSCRIPTION", payload });
+  }
+}
+
+export class ReadSubscriptionQuery extends Query<
+  "READ_SUBSCRIPTION",
+  { id: string }
+> {
+  constructor(payload: { id: string }) {
+    super({ name: "READ_SUBSCRIPTION", payload });
+  }
+}
+```
+
+Both mirror `DomainEvent`: a literal name bound once in the subclass, a cloned payload.
+Use a **`Command`** when the use case writes, a **`Query`** when it only reads. The two are
+not interchangeable — each holds private fields, so a `Query` is never assignable where a
+`Command` is expected, even when the payloads match.
+
+Commands live in `useCases/commands/`, queries in `useCases/queries/`, beside
+`useCases/errors/`.
+
+## The error side cannot be widened
+
+`Errors` is constrained to `DomainError`, so `Result<T, Error>` **does not compile** —
+`DomainError` declares a `context` property that `Error` lacks. Declare the union of every
+domain failure the caller must handle, or `never` when the use case has no domain failure
+mode:
+
+```typescript
+implements UseCase<AddBookCommand, BookState, never>              // cannot fail
+implements UseCase<RegisterLoanCommand, LoanState, BookNotFound | BookAlreadyOnLoan>
+```
+
+A widened error union throws away the exhaustiveness checking that makes `switchGuard`
+useful, and leaves callers unable to see what they must handle.
 
 ## Which rules belong here
 
@@ -124,14 +183,22 @@ after a successful save. **Domain code never calls `setVersion`.**
 
 ## Copy-ready templates
 
-`../ontologic-templates/templates/src/domain/useCases/activateSubscription.use-case.ts` and
-`../ontologic-templates/templates/src/domain/subscription.repository.ts` — both type-checked in CI.
+`../ontologic-templates/templates/src/domain/useCases/activateSubscription.use-case.ts`,
+`.../readSubscription.use-case.ts` (the query shape),
+`.../commands/activateSubscription.command.ts` and
+`../ontologic-templates/templates/src/domain/subscription.repository.ts` — all type-checked in CI.
 
 ## Traps
 
 - `InMemoryRepository<Subscription>` is wrong; it needs the event union as the second
   parameter.
 - Returning the entity from a use case instead of `entity.readState()`.
+- Declaring `Result<T, Error>` on a use case — it does not compile. Name the domain errors,
+  or use `never`.
+- Reaching for a `Command` when the use case only reads. If nothing is saved, it is a
+  `Query`.
+- Reading `command.payload` repeatedly in a hot path — every read is a `structuredClone`.
+  Destructure it once at the top of `execute`.
 - A `switch` on `error.name` without `default: switchGuard(...)` — that default is what
   makes the switch exhaustive at compile time.
 - `Result` has only `ok`, `err`, `isOk()`, `isErr()`, `.value`, `.error`. There is no

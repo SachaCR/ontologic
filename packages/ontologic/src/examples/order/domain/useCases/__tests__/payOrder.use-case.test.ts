@@ -1,9 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { OrderRepository } from "../../../order.repository";
-import { createOrderUseCase } from "../createOrder.use-case";
-import { placeOrderUseCase } from "../placeOrder.use-case";
-import { payOrderUseCase } from "../payOrder.use-case";
+import { CreateOrderUseCase } from "../createOrder.use-case";
+import { PlaceOrderUseCase } from "../placeOrder.use-case";
+import { PayOrderUseCase } from "../payOrder.use-case";
+import { CreateOrderCommand } from "../commands/createOrder.command";
+import { PlaceOrderCommand } from "../commands/placeOrder.command";
+import { PayOrderCommand } from "../commands/payOrder.command";
 import { OrderItem } from "../../entities/order/order.entity";
 
 const firstItem: OrderItem = {
@@ -13,26 +16,40 @@ const firstItem: OrderItem = {
   quantity: 1,
 };
 
-describe("payOrderUseCase", () => {
+describe("PayOrderUseCase", () => {
   let repository: OrderRepository;
+  let createOrder: CreateOrderUseCase;
+  let placeOrder: PlaceOrderUseCase;
+  let payOrder: PayOrderUseCase;
 
   beforeEach(() => {
     repository = new OrderRepository();
+    createOrder = new CreateOrderUseCase(repository);
+    placeOrder = new PlaceOrderUseCase(repository);
+    payOrder = new PayOrderUseCase(repository);
   });
 
-  const setupPlacedOrder = async () => {
-    const created = await createOrderUseCase(repository, {
-      customerId: "customer-1",
-      firstItem,
-    });
-    await placeOrderUseCase(repository, created.id);
-    return created.id;
+  const setupDraftOrder = async (): Promise<string> => {
+    const created = await createOrder.execute(
+      new CreateOrderCommand({ customerId: "customer-1", firstItem }),
+    );
+
+    return created._unsafeUnwrap().id;
+  };
+
+  const setupPlacedOrder = async (): Promise<string> => {
+    const orderId = await setupDraftOrder();
+    await placeOrder.execute(new PlaceOrderCommand({ id: orderId }));
+
+    return orderId;
   };
 
   it("returns the order state with PAID status and the invoiceId", async () => {
     const orderId = await setupPlacedOrder();
 
-    const result = await payOrderUseCase(repository, orderId, "invoice-123");
+    const result = await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
     expect(result.isOk()).toBe(true);
     const state = result._unsafeUnwrap();
@@ -43,7 +60,9 @@ describe("payOrderUseCase", () => {
   it("persists the order with PAID status and invoiceId in the repository", async () => {
     const orderId = await setupPlacedOrder();
 
-    await payOrderUseCase(repository, orderId, "invoice-123");
+    await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
     const persisted = (await repository.getById(orderId))._unsafeUnwrap();
     expect(persisted?.readState().status).toBe("PAID");
@@ -53,7 +72,9 @@ describe("payOrderUseCase", () => {
   it("stores an ORDER_PAID event with the invoiceId", async () => {
     const orderId = await setupPlacedOrder();
 
-    await payOrderUseCase(repository, orderId, "invoice-123");
+    await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
     const events = (await repository.getEvents(orderId))._unsafeUnwrap();
     const paidEvent = events.find((e) => e.event.name === "ORDER_PAID");
@@ -69,7 +90,9 @@ describe("payOrderUseCase", () => {
   it("accumulates events: ORDER_CREATED, ORDER_PLACED, then ORDER_PAID", async () => {
     const orderId = await setupPlacedOrder();
 
-    await payOrderUseCase(repository, orderId, "invoice-123");
+    await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
     const events = (await repository.getEvents(orderId))._unsafeUnwrap();
     expect(events).toHaveLength(3);
@@ -79,10 +102,8 @@ describe("payOrderUseCase", () => {
   });
 
   it("returns ENTITY_NOT_FOUND when the order does not exist", async () => {
-    const result = await payOrderUseCase(
-      repository,
-      "unknown-id",
-      "invoice-123",
+    const result = await payOrder.execute(
+      new PayOrderCommand({ id: "unknown-id", invoiceId: "invoice-123" }),
     );
 
     expect(result.isErr()).toBe(true);
@@ -92,12 +113,11 @@ describe("payOrderUseCase", () => {
   });
 
   it("returns INVALID_STATUS_TRANSITION when the order is in DRAFT status", async () => {
-    const created = await createOrderUseCase(repository, {
-      customerId: "customer-1",
-      firstItem,
-    });
+    const orderId = await setupDraftOrder();
 
-    const result = await payOrderUseCase(repository, created.id, "invoice-123");
+    const result = await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {
@@ -107,9 +127,13 @@ describe("payOrderUseCase", () => {
 
   it("returns INVALID_STATUS_TRANSITION when the order is already PAID", async () => {
     const orderId = await setupPlacedOrder();
-    await payOrderUseCase(repository, orderId, "invoice-123");
+    await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-123" }),
+    );
 
-    const result = await payOrderUseCase(repository, orderId, "invoice-456");
+    const result = await payOrder.execute(
+      new PayOrderCommand({ id: orderId, invoiceId: "invoice-456" }),
+    );
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {

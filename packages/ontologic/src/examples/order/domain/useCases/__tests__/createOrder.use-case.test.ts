@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { OrderRepository } from "../../../order.repository";
-import { createOrderUseCase } from "../createOrder.use-case";
+import { CreateOrderUseCase } from "../createOrder.use-case";
+import { CreateOrderCommand } from "../commands/createOrder.command";
 import { OrderItem } from "../../entities/order/order.entity";
 
 const firstItem: OrderItem = {
@@ -11,19 +12,21 @@ const firstItem: OrderItem = {
   quantity: 1,
 };
 
-describe("createOrderUseCase", () => {
+describe("CreateOrderUseCase", () => {
   let repository: OrderRepository;
+  let createOrder: CreateOrderUseCase;
 
   beforeEach(() => {
     repository = new OrderRepository();
+    createOrder = new CreateOrderUseCase(repository);
   });
 
   it("returns the created order state", async () => {
-    const state = await createOrderUseCase(repository, {
-      customerId: "customer-1",
-      firstItem,
-    });
+    const result = await createOrder.execute(
+      new CreateOrderCommand({ customerId: "customer-1", firstItem }),
+    );
 
+    const state = result._unsafeUnwrap();
     expect(state.customerId).toBe("customer-1");
     expect(state.status).toBe("DRAFT");
     expect(state.items).toHaveLength(1);
@@ -32,10 +35,11 @@ describe("createOrderUseCase", () => {
   });
 
   it("persists the order in the repository", async () => {
-    const state = await createOrderUseCase(repository, {
-      customerId: "customer-1",
-      firstItem,
-    });
+    const state = (
+      await createOrder.execute(
+        new CreateOrderCommand({ customerId: "customer-1", firstItem }),
+      )
+    )._unsafeUnwrap();
 
     const result = await repository.getById(state.id);
     const persisted = result._unsafeUnwrap();
@@ -45,10 +49,11 @@ describe("createOrderUseCase", () => {
   });
 
   it("stores an ORDER_CREATED event", async () => {
-    const state = await createOrderUseCase(repository, {
-      customerId: "customer-1",
-      firstItem,
-    });
+    const state = (
+      await createOrder.execute(
+        new CreateOrderCommand({ customerId: "customer-1", firstItem }),
+      )
+    )._unsafeUnwrap();
 
     const eventsResult = await repository.getEvents(state.id);
     const events = eventsResult._unsafeUnwrap();

@@ -1,24 +1,26 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { declareBookLost } from "../declareBookLost.use-case";
+import { DeclareBookLostUseCase } from "../declareBookLost.use-case";
+import { DeclareBookLostCommand } from "../commands/declareBookLost.command";
 import { LibraryCollection } from "../../repositories/libraryCollection.repository";
 import { addCopyToCatalog } from "./helpers";
 
 describe("Given a copy is already listed in the catalog and still on shelf", () => {
   let collection: LibraryCollection;
+  let declareBookLost: DeclareBookLostUseCase;
   let bookId: string;
 
   beforeEach(async () => {
     collection = new LibraryCollection();
+    declareBookLost = new DeclareBookLostUseCase(collection);
     bookId = await addCopyToCatalog(collection, { isbn: "978-2222222222" });
   });
 
   describe("When I declare that copy lost through the use case", () => {
-    let outcome: Awaited<ReturnType<typeof declareBookLost>>;
+    let outcome: Awaited<ReturnType<DeclareBookLostUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await declareBookLost(
-        { bookId },
-        { libraryCollection: collection },
+      outcome = await declareBookLost.execute(
+        new DeclareBookLostCommand({ bookId }),
       );
     });
 
@@ -33,19 +35,20 @@ describe("Given a copy is already listed in the catalog and still on shelf", () 
 
 describe("Given no copy exists in the catalog for the id I have", () => {
   let collection: LibraryCollection;
+  let declareBookLost: DeclareBookLostUseCase;
 
   beforeEach(() => {
     collection = new LibraryCollection();
+    declareBookLost = new DeclareBookLostUseCase(collection);
   });
 
   describe("When I try to declare that id lost", () => {
     const unknownId = "ffffffff-ffff-ffff-ffff-ffffffffffff";
-    let outcome: Awaited<ReturnType<typeof declareBookLost>>;
+    let outcome: Awaited<ReturnType<DeclareBookLostUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await declareBookLost(
-        { bookId: unknownId },
-        { libraryCollection: collection },
+      outcome = await declareBookLost.execute(
+        new DeclareBookLostCommand({ bookId: unknownId }),
       );
     });
 
@@ -60,21 +63,22 @@ describe("Given no copy exists in the catalog for the id I have", () => {
 
 describe("Given I have already declared a copy lost in the catalog", () => {
   let collection: LibraryCollection;
+  let declareBookLost: DeclareBookLostUseCase;
   let bookId: string;
 
   beforeEach(async () => {
     collection = new LibraryCollection();
+    declareBookLost = new DeclareBookLostUseCase(collection);
     bookId = await addCopyToCatalog(collection, { isbn: "978-3333333333" });
-    await declareBookLost({ bookId }, { libraryCollection: collection });
+    await declareBookLost.execute(new DeclareBookLostCommand({ bookId }));
   });
 
   describe("When I try to declare the same copy lost again", () => {
-    let outcome: Awaited<ReturnType<typeof declareBookLost>>;
+    let outcome: Awaited<ReturnType<DeclareBookLostUseCase["execute"]>>;
 
     beforeEach(async () => {
-      outcome = await declareBookLost(
-        { bookId },
-        { libraryCollection: collection },
+      outcome = await declareBookLost.execute(
+        new DeclareBookLostCommand({ bookId }),
       );
     });
 

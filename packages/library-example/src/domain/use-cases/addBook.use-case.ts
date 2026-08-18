@@ -1,27 +1,29 @@
-import { err, ok, Result } from "ontologic";
+import { Result, UseCase, ok } from "ontologic";
+
 import { Book, BookState } from "../entities/book";
 import { LibraryCollection } from "../repositories/libraryCollection.repository";
+import { AddBookCommand } from "./commands/addBook.command";
 
-export async function addBook(
-  bookData: {
-    title: string;
-    author: string;
-    isbn: string;
-    category: string;
-    tags: string[];
-  },
-  dependencies: { libraryCollection: LibraryCollection },
-): Promise<Result<BookState, Error>> {
-  const { libraryCollection } = dependencies;
+/**
+ * Adding a book has no domain failure mode, so the error side is `never`. A
+ * failure to persist is technical, and technical failures are thrown.
+ */
+export class AddBookUseCase implements UseCase<
+  AddBookCommand,
+  BookState,
+  never
+> {
+  constructor(private readonly libraryCollection: LibraryCollection) {}
 
-  const result = Book.create(bookData);
-  const { book, event } = result;
+  async execute(command: AddBookCommand): Promise<Result<BookState, never>> {
+    const { book, event } = Book.create(command.payload);
 
-  const saveResult = await libraryCollection.saveWithEvents(book, event);
+    const saveResult = await this.libraryCollection.saveWithEvents(book, event);
 
-  if (saveResult.isErr()) {
-    return err(saveResult.error);
+    if (saveResult.isErr()) {
+      throw saveResult.error;
+    }
+
+    return ok(book.readState());
   }
-
-  return ok(book.readState());
 }

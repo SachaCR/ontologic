@@ -35,9 +35,10 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
   const invariants = extractInvariants(ctx);
   const repositories = extractRepositories(ctx);
 
-  // Use cases have no type-level signal, so they are detected last — knowing
-  // which classes are repositories is what makes the heuristic work.
-  const useCases = extractUseCases(ctx, {
+  // Use cases are detected after repositories: the repository names are what
+  // let the extractor tell which constructor parameters are aggregates, and
+  // which un-migrated functions still look like use cases.
+  const { useCases, unmarked } = extractUseCases(ctx, {
     repositoryNames: new Set(repositories.map((r) => r.name)),
   });
 
@@ -63,7 +64,7 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     nodes,
     edges,
     eventUnions,
-    findings: computeFindings(nodes, eventUnions),
+    findings: computeFindings(nodes, eventUnions, unmarked),
     aggregateRoots: aggregateRoots(nodes, edges),
     graphs: [],
   };

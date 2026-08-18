@@ -10,6 +10,8 @@ export class BookAlreadyDeclaredLostError extends DomainError<
       message: "This book has already been declared lost",
       context: { bookId },
     });
+
+    Object.setPrototypeOf(this, BookAlreadyDeclaredLostError.prototype);
   }
 }
 
@@ -23,6 +25,8 @@ export class BookNotFoundError extends DomainError<
       message: "No book exists with this identifier in the library collection",
       context: { bookId },
     });
+
+    Object.setPrototypeOf(this, BookNotFoundError.prototype);
   }
 }
 
@@ -36,6 +40,8 @@ export class BookLostCannotBeLoanedError extends DomainError<
       message: "A book that is declared lost cannot be loaned out",
       context: { bookId },
     });
+
+    Object.setPrototypeOf(this, BookLostCannotBeLoanedError.prototype);
   }
 }
 
@@ -46,8 +52,11 @@ export class BookAlreadyOnLoanError extends DomainError<
   constructor(bookId: string) {
     super({
       name: "BOOK_ALREADY_ON_LOAN",
-      message: "This copy is already on loan; return it before lending it again",
+      message:
+        "This copy is already on loan; return it before lending it again",
       context: { bookId },
     });
+
+    Object.setPrototypeOf(this, BookAlreadyOnLoanError.prototype);
   }
 }

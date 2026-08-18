@@ -1,45 +1,57 @@
-import { err, ok, Result } from "ontologic";
+import { Result, UseCase, err, ok } from "ontologic";
+
 import { LoanState } from "../entities/loan";
-import { LoanNotFoundError } from "../entities/loan/errors/loan.errors";
+import {
+  LoanAlreadyReturnedError,
+  LoanNotFoundError,
+} from "../entities/loan/errors/loan.errors";
 import { LoanRegister } from "../repositories/loanRegister.repository";
+import { RecordBookReturnCommand } from "./commands/recordBookReturn.command";
 
-export async function recordBookReturn(
-  returnReceipt: { loanId: string },
-  dependencies: { loanRegister: LoanRegister },
-): Promise<Result<LoanState, Error>> {
-  const { loanId } = returnReceipt;
-  const { loanRegister } = dependencies;
+export class RecordBookReturnUseCase implements UseCase<
+  RecordBookReturnCommand,
+  LoanState,
+  LoanNotFoundError | LoanAlreadyReturnedError
+> {
+  constructor(private readonly loanRegister: LoanRegister) {}
 
-  const returnedAt = new Date().toISOString();
+  async execute(
+    command: RecordBookReturnCommand,
+  ): Promise<Result<LoanState, LoanNotFoundError | LoanAlreadyReturnedError>> {
+    const { loanId } = command.payload;
 
-  const loanLookup = await loanRegister.getById(loanId);
+    // The use case reads the clock; the entity just records what it is told.
+    const returnedAt = new Date().toISOString();
 
-  if (loanLookup.isErr()) {
-    return err(loanLookup.error);
+    const loanLookup = await this.loanRegister.getById(loanId);
+
+    if (loanLookup.isErr()) {
+      throw loanLookup.error;
+    }
+
+    const loan = loanLookup.value;
+
+    if (loan === undefined) {
+      return err(new LoanNotFoundError(loanId));
+    }
+
+    const returnOutcome = loan.returnBook(returnedAt);
+
+    if (returnOutcome.isErr()) {
+      return err(returnOutcome.error);
+    }
+
+    const loanReturnedEvent = returnOutcome.value;
+
+    const persistence = await this.loanRegister.saveWithEvents(
+      loan,
+      loanReturnedEvent,
+    );
+
+    if (persistence.isErr()) {
+      throw persistence.error;
+    }
+
+    return ok(loan.readState());
   }
-
-  const loan = loanLookup.value;
-
-  if (loan === undefined) {
-    return err(new LoanNotFoundError(loanId));
-  }
-
-  const returnOutcome = loan.returnBook(returnedAt);
-
-  if (returnOutcome.isErr()) {
-    return err(returnOutcome.error);
-  }
-
-  const loanReturnedEvent = returnOutcome.value;
-
-  const persistence = await loanRegister.saveWithEvents(
-    loan,
-    loanReturnedEvent,
-  );
-
-  if (persistence.isErr()) {
-    return err(persistence.error);
-  }
-
-  return ok(loan.readState());
 }

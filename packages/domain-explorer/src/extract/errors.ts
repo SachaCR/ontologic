@@ -3,6 +3,7 @@ import ts from "typescript";
 import type { ErrorNode } from "./model";
 import { makeNodeId } from "./model";
 import {
+  docFields,
   eachSourceFile,
   heritageOf,
   literalStringOfTypeNode,
@@ -55,6 +56,7 @@ function toErrorNode(
     id: makeNodeId("error", location.file, name),
     kind: "error",
     name,
+    ...docFields(node),
     errorName,
     contextTypeName: typeArgText(heritage?.typeArguments, 1, sf) ?? "unknown",
     contextFields: membersOfTypeNode(heritage?.typeArguments?.[1], ctx),
