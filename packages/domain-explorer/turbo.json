@@ -1,0 +1,16 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "extends": ["//"],
+  "tasks": {
+    "test": {
+      "inputs": [
+        "src/**",
+        "tsconfig*.json",
+        "package.json",
+        "vitest.config.ts",
+        "$TURBO_ROOT$/packages/ontologic/src/**",
+        "$TURBO_ROOT$/packages/library-example/src/**"
+      ]
+    }
+  }
+}

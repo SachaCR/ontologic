@@ -441,14 +441,17 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         expect(lost.version).toBe(1);
       });
 
-      it("Then every domain error is flagged for the broken instanceof", () => {
+      it("Then no domain error is flagged for the broken instanceof", () => {
+        // Every error class here restores its prototype. The detection itself
+        // is covered by fixtures/brokenPrototype.ts, since nothing in this
+        // repository omits `setPrototypeOf` any more.
         const flagged = model.findings.filter(
           (f) => f.code === "error-missing-set-prototype",
         );
         const errorCount = model.nodes.filter((n) => n.kind === "error").length;
 
         expect(errorCount).toBe(7);
-        expect(flagged).toHaveLength(7);
+        expect(flagged).toEqual([]);
       });
 
       it("Then nothing is flagged for the pre-1.7 invariant API", () => {
@@ -525,6 +528,41 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
     });
   },
 );
+
+describe("Given an error class that never restores its prototype", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/brokenPrototype.ts")],
+      includeTests: true,
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then only the class missing setPrototypeOf is flagged", () => {
+      const flagged = model.findings.filter(
+        (f) => f.code === "error-missing-set-prototype",
+      );
+
+      expect(
+        namesOf(
+          model,
+          flagged.map((f) => f.nodeId),
+        ),
+      ).toEqual(["BrokenPrototypeError"]);
+    });
+
+    it("Then the class that restores it is recorded as sound", () => {
+      const restored = model.nodes.find(
+        (n) => n.kind === "error" && n.name === "RestoredPrototypeError",
+      );
+
+      expect(restored).toBeDefined();
+      expect((restored as { setsPrototype: boolean }).setsPrototype).toBe(true);
+    });
+  });
+});
 
 describe("Given a codebase still on the pre-1.7 invariant API", () => {
   let model: DomainModel;
