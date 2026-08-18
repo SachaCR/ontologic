@@ -15,7 +15,7 @@ A full-featured library management application built with NestJS. Demonstrates a
 
 **Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository · Message Relay · Event Bus · Outbox Pattern
 
-[View on GitHub →](https://github.com/sachacr/library-examples)
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/packages/library-example)
 
 ---
 
@@ -25,7 +25,7 @@ A credit wallet that supports crediting, debiting, locking funds, and sub-credit
 
 **Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
 
-[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/src/examples/creditBalance)
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/packages/ontologic/src/examples/creditBalance)
 
 ---
 
@@ -35,4 +35,4 @@ An order lifecycle that moves through `DRAFT → PLACED → PAID` states. Demons
 
 **Concepts:** Domain Entity · Domain Events · Invariants · Result Pattern · Repository
 
-[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/src/examples/order)
+[View on GitHub →](https://github.com/SachaCR/ontologic/tree/main/packages/ontologic/src/examples/order)

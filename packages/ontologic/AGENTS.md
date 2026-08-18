@@ -11,7 +11,7 @@ import { DomainEntity, DomainEvent, DomainError, BaseDomainInvariant,
 ```
 
 Full docs: <https://ontologic.site/llms.txt> · Full text: <https://ontologic.site/llms-full.txt>
-Tested reference implementation: [`src/examples/order`](https://github.com/SachaCR/ontologic/tree/main/src/examples/order)
+Tested reference implementation: [`src/examples/order`](https://github.com/SachaCR/ontologic/tree/main/packages/ontologic/src/examples/order)
 
 ---
 

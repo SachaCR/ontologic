@@ -117,5 +117,6 @@ handler for domain-meaningful cancellations — the structured context survives 
   <https://ontologic.site/docs/workflows>
 - Everything in one file — <https://ontologic.site/llms-full.txt>
 
-Runnable examples in the library repo: `src/examples/workflows/graph-workflow.ts` and
-`src/examples/workflows/step-workflow-sepaPayment.ts`.
+Runnable examples in the library repo:
+`packages/ontologic/src/examples/workflows/graph-workflow.ts` and
+`packages/ontologic/src/examples/workflows/step-workflow-sepaPayment.ts`.
