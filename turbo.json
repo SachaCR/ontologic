@@ -2,41 +2,25 @@
   "$schema": "https://turbo.build/schema.json",
   "tasks": {
     "build": {
-      "env": [
-        "NODE_ENV"
-      ],
-      "outputs": [
-        "dist/**",
-        "build/**"
-      ],
-      "dependsOn": [
-        "^build"
-      ]
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**", "tsconfig*.json", "package.json"],
+      "outputs": ["dist/**"],
+      "dependsOn": ["^build"]
     },
     "build:release": {
-      "env": [
-        "NODE_ENV"
-      ],
-      "outputs": [
-        "dist/**",
-        "build/**"
-      ],
-      "dependsOn": [
-        "^build:release"
-      ]
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**", "tsconfig*.json", "package.json"],
+      "outputs": ["dist/**"],
+      "dependsOn": ["^build:release"]
     },
     "test": {
-      "env": [
-        "NODE_ENV"
-      ],
-      "outputs": [
-        "reports/**"
-      ],
-      "dependsOn": [
-        "^build"
-      ]
+      "env": ["NODE_ENV"],
+      "inputs": ["src/**", "tsconfig*.json", "package.json", "vitest.config.ts"],
+      "outputs": ["reports/**"],
+      "dependsOn": ["^build"]
     },
     "check:agents": {
+      "inputs": ["src/**", "agents/**", "tsconfig-agents.json"],
       "outputs": []
     }
   }
