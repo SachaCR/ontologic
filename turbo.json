@@ -5,10 +5,6 @@
       "env": [
         "NODE_ENV"
       ],
-      "inputs": [
-        "src/**",
-        "tsconfig*.json"
-      ],
       "outputs": [
         "dist/**",
         "build/**"
@@ -20,10 +16,6 @@
     "build:release": {
       "env": [
         "NODE_ENV"
-      ],
-      "inputs": [
-        "src/**",
-        "tsconfig*.json"
       ],
       "outputs": [
         "dist/**",
@@ -37,9 +29,6 @@
       "env": [
         "NODE_ENV"
       ],
-      "inputs": [
-        "src/**"
-      ],
       "outputs": [
         "reports/**"
       ],
@@ -48,11 +37,6 @@
       ]
     },
     "check:agents": {
-      "inputs": [
-        "src/**",
-        "agents/**",
-        "tsconfig-agents.json"
-      ],
       "outputs": []
     }
   }
