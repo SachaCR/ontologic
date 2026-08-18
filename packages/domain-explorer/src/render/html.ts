@@ -1,5 +1,3 @@
-import { basename } from "node:path";
-
 import type { DomainModel } from "../extract/model";
 import { STYLES } from "./styles";
 import { APP_SCRIPT } from "./app";
@@ -11,7 +9,7 @@ import { APP_SCRIPT } from "./app";
  * output is one file that opens from disk with no server and no network.
  */
 export function renderHtml(model: DomainModel): string {
-  const title = `${basename(model.root) || "Domain"} domain model`;
+  const title = domainTitle(model.root);
 
   return `<!doctype html>
 <html lang="en">
@@ -25,15 +23,25 @@ export function renderHtml(model: DomainModel): string {
 <div class="shell">
   <aside class="rail">
     <div class="rail__head">
-      <h1 class="rail__title">${escapeHtml(title)}</h1>
-      <p class="rail__root">${escapeHtml(model.root)}</p>
-      <input id="search" class="search" type="search" placeholder="Filter concepts…  /"
-             aria-label="Filter concepts" autocomplete="off" spellcheck="false">
+      <div class="rail__brand">
+        <span class="rail__mark" aria-hidden="true">&#9679;</span>
+        <span>
+          <h1 class="rail__title">Domain Explorer</h1>
+          <p class="rail__tag">Ontologic</p>
+        </span>
+      </div>
+      <div class="rail__project">
+        <div class="rail__project-label">Analysed</div>
+        <p class="rail__root">${escapeHtml(model.root)}</p>
+      </div>
+      <input id="search" class="search" type="search" placeholder="Search the model…  /"
+             aria-label="Search the model" autocomplete="off" spellcheck="false">
       <div id="filters" class="filters" role="group" aria-label="Filter by type"></div>
     </div>
     <nav class="rail__fixed" aria-label="Views">
+      <a class="navlink navlink--view" href="#/domain">Domain Model</a>
+      <a class="navlink navlink--view" href="#/use-cases">Use Cases</a>
       <a class="navlink navlink--view" href="#/">Overview</a>
-      <a class="navlink navlink--view" href="#/explore">Explorer</a>
       <a class="navlink navlink--view" href="#/graph">Graph</a>
     </nav>
     <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
@@ -48,6 +56,30 @@ const MODEL = ${embedJson(model)};
 </body>
 </html>
 `;
+}
+
+/**
+ * A readable page title from the analysed path.
+ *
+ * `basename` alone produced "domain domain model" for any path ending in
+ * `/domain` or `/src`, which is most of them — so a generic leaf borrows its
+ * parent instead.
+ */
+function domainTitle(root: string): string {
+  const GENERIC = new Set(["domain", "src", "app", "lib", "packages"]);
+
+  const parts = root.split(/[\\/]+/).filter(Boolean);
+  let leaf = parts[parts.length - 1] ?? "";
+
+  for (
+    let i = parts.length - 1;
+    i >= 0 && GENERIC.has(leaf.toLowerCase());
+    i--
+  ) {
+    leaf = parts[i - 1] ?? leaf;
+  }
+
+  return `${leaf || "Domain"} domain model`;
 }
 
 /**

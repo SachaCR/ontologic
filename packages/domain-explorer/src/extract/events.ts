@@ -3,6 +3,7 @@ import ts from "typescript";
 import type { EventNode, EventUnion } from "./model";
 import { makeNodeId } from "./model";
 import {
+  docFields,
   eachSourceFile,
   heritageOf,
   literalNumberOfTypeNode,
@@ -76,12 +77,14 @@ function toEventNode(
     name;
 
   const version = literalNumberOfTypeNode(heritage.typeArguments?.[1]) ?? 1;
-  const payloadTypeName = typeArgText(heritage.typeArguments, 2, sf) ?? "unknown";
+  const payloadTypeName =
+    typeArgText(heritage.typeArguments, 2, sf) ?? "unknown";
 
   return {
     id: makeNodeId("event", location.file, name),
     kind: "event",
     name,
+    ...docFields(node),
     eventName,
     version,
     payloadTypeName,

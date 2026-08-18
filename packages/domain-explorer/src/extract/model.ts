@@ -81,6 +81,8 @@ export interface StateField {
 /** A behaviour method on an entity or value object. */
 export interface Method {
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   isStatic: boolean;
   /** The written return type, kept verbatim — it reads better than a re-print. */
   returnType: string;
@@ -96,6 +98,8 @@ export interface EntityNode {
   id: NodeId;
   kind: "entity" | "valueObject" | "subEntity";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The `State` type argument. */
   stateTypeName: string;
   /** Present when declared as `DomainEntity<State, Serialized>`. */
@@ -122,6 +126,8 @@ export interface EventNode {
   kind: "event";
   /** The class name. */
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The wire name, from the first type argument. */
   eventName: string;
   version: number;
@@ -134,6 +140,8 @@ export interface ErrorNode {
   id: NodeId;
   kind: "error";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The discriminant, from the first type argument. */
   errorName: string;
   contextTypeName: string;
@@ -165,6 +173,8 @@ export interface RepositoryNode {
   id: NodeId;
   kind: "repository";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   entityTypeName: string;
   eventUnionTypeName: string;
   /**
@@ -184,6 +194,8 @@ export interface UseCaseNode {
   id: NodeId;
   kind: "useCase";
   name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
   /** The action type argument as written, e.g. `PayOrderCommand`. */
   actionTypeName: string;
   /**
@@ -196,6 +208,11 @@ export interface UseCaseNode {
   actionKind: "command" | "query" | "unknown";
   /** The literal name bound by the action, e.g. `PAY_ORDER`. */
   actionName?: string;
+  /**
+   * The action's payload members, resolved from its second type argument —
+   * what a caller supplies to invoke this use case.
+   */
+  actionFields: StateField[];
   /** Constructor parameters — the aggregates and services it was given. */
   dependencies: { name: string; type: string }[];
   returnType: string;

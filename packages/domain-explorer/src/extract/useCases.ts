@@ -1,9 +1,11 @@
 import ts from "typescript";
 
-import type { SourceLocation, UseCaseNode } from "./model";
+import type { SourceLocation, StateField, UseCaseNode } from "./model";
 import { makeNodeId } from "./model";
 import {
+  docFields,
   eachSourceFile,
+  membersOfTypeNode,
   heritageOf,
   isExported,
   locationOf,
@@ -105,6 +107,8 @@ interface ActionDeclaration {
   kind: "command" | "query";
   /** The literal name bound in the subclass, e.g. `"PAY_ORDER"`. */
   actionName?: string;
+  /** The payload members, from the second type argument. */
+  fields: StateField[];
 }
 
 /** `class PayOrderCommand extends Command<"PAY_ORDER", Payload>` */
@@ -127,7 +131,11 @@ function collectActions(ctx: ExtractContext): Map<string, ActionDeclaration> {
 
       if (!kind) return;
 
-      const action: ActionDeclaration = { kind };
+      // The second type argument is the payload — the shape a caller supplies.
+      const action: ActionDeclaration = {
+        kind,
+        fields: membersOfTypeNode(heritage.typeArguments?.[1], ctx),
+      };
 
       // The first type argument is a string literal type — strip the quotes so
       // the report shows PAY_ORDER rather than "PAY_ORDER".
@@ -232,8 +240,10 @@ function toUseCaseNode(
     id: makeNodeId("useCase", location.file, name),
     kind: "useCase",
     name,
+    ...docFields(node),
     actionTypeName,
     actionKind: action?.kind ?? "unknown",
+    actionFields: action?.fields ?? [],
     dependencies: (constructor?.parameters ?? []).map((p) => ({
       name: p.name.getText(sf),
       type: p.type ? p.type.getText(sf).replace(/\s+/g, " ") : "unknown",

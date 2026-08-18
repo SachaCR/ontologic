@@ -37,7 +37,9 @@ export function locationOf(node: ts.Node, root: string): SourceLocation {
  */
 export function heritageOf(
   node: ts.ClassDeclaration,
-): { baseName: string; typeArguments: ts.NodeArray<ts.TypeNode> | undefined } | undefined {
+):
+  | { baseName: string; typeArguments: ts.NodeArray<ts.TypeNode> | undefined }
+  | undefined {
   const clause = node.heritageClauses?.find(
     (h) => h.token === ts.SyntaxKind.ExtendsKeyword,
   );
@@ -93,6 +95,52 @@ export function isPrivate(node: ts.Node): boolean {
       ts.ModifierFlags.Private) !==
     0
   );
+}
+
+/**
+ * The leading doc comment of a declaration, as prose.
+ *
+ * Read off the syntax tree rather than through the checker, for the same reason
+ * everything else here is: the analysed codebase may not resolve its imports.
+ *
+ * Only the description is kept — `@param` and friends are structural
+ * annotations, and the model already carries that information in typed form.
+ * Most declarations have no doc comment at all, so every consumer must render
+ * correctly without one.
+ */
+export function docOf(node: ts.Node): string | undefined {
+  const comments = ts.getJSDocCommentsAndTags(node);
+
+  for (const comment of comments) {
+    if (!ts.isJSDoc(comment)) continue;
+
+    const text =
+      typeof comment.comment === "string"
+        ? comment.comment
+        : (comment.comment ?? [])
+            .map((part) => part.text)
+            .join("")
+            .trim();
+
+    const collapsed = text.replace(/\s+/g, " ").trim();
+    if (collapsed) return collapsed;
+  }
+
+  return undefined;
+}
+
+/**
+ * The doc comment as a spreadable fragment.
+ *
+ * `exactOptionalPropertyTypes` is on, so an inline
+ * `...(doc ? { description: doc } : {})` widens the property to
+ * `string | undefined` and stops assigning. Naming the return type keeps the
+ * property genuinely optional.
+ */
+export function docFields(node: ts.Node): { description?: string } {
+  const description = docOf(node);
+
+  return description === undefined ? {} : { description };
 }
 
 /**
@@ -282,7 +330,8 @@ function classifyDeclaration(
   const heritage = heritageOf(declaration);
   if (
     heritage &&
-    (heritage.baseName === "DomainEntity" || heritage.baseName === "ValueObject")
+    (heritage.baseName === "DomainEntity" ||
+      heritage.baseName === "ValueObject")
   ) {
     return "domainClass";
   }
@@ -342,10 +391,7 @@ export function literalStringOfTypeNode(
   if (!typeNode) return undefined;
 
   // Written directly as "SOME_NAME"
-  if (
-    ts.isLiteralTypeNode(typeNode) &&
-    ts.isStringLiteral(typeNode.literal)
-  ) {
+  if (ts.isLiteralTypeNode(typeNode) && ts.isStringLiteral(typeNode.literal)) {
     return typeNode.literal.text;
   }
 

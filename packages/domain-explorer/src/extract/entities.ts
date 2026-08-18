@@ -14,6 +14,7 @@ import {
   unionMembers,
   unwrapResult,
   type ExtractContext,
+  docFields,
 } from "./ts-utils";
 
 const ENTITY_BASE = "DomainEntity";
@@ -63,7 +64,8 @@ function toEntityNode(
 
   // A value object has no id, so its State is the FIRST type argument in both
   // cases — the shapes happen to line up.
-  const stateTypeName = typeArgText(heritage?.typeArguments, 0, sf) ?? "unknown";
+  const stateTypeName =
+    typeArgText(heritage?.typeArguments, 0, sf) ?? "unknown";
   const serializedTypeName = typeArgText(heritage?.typeArguments, 1, sf);
 
   const { invariants, attachment } = findInvariantAttachment(node, ctx);
@@ -73,6 +75,7 @@ function toEntityNode(
     id: makeNodeId(kind, location.file, name),
     kind,
     name,
+    ...docFields(node),
     stateTypeName,
     stateFields,
     methods: node.members
@@ -167,6 +170,7 @@ function toMethod(node: ts.MethodDeclaration, ctx: ExtractContext): Method {
 
   return {
     name: node.name.getText(sf),
+    ...docFields(node),
     isStatic: isStatic(node),
     returnType: returnTypeNode
       ? returnTypeNode.getText(sf).replace(/\s+/g, " ")

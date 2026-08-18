@@ -10,6 +10,7 @@ import {
   locationOf,
   typeArgText,
   type ExtractContext,
+  docFields,
 } from "./ts-utils";
 
 const IN_MEMORY_BASE = "InMemoryRepository";
@@ -104,6 +105,7 @@ function toPortNode(
     id: makeNodeId("repository", location.file, name),
     kind: "repository",
     name,
+    ...docFields(node),
     entityTypeName: typeArgText(extended.typeArguments, 0, sf) ?? "unknown",
     eventUnionTypeName: typeArgText(extended.typeArguments, 1, sf) ?? "unknown",
     isPort: true,
@@ -151,6 +153,7 @@ function toConcreteNode(
     id: makeNodeId("repository", location.file, name),
     kind: "repository",
     name,
+    ...docFields(node),
     entityTypeName: typeArgText(typeArguments, 0, sf) ?? "unknown",
     eventUnionTypeName: typeArgText(typeArguments, 1, sf) ?? "unknown",
     isPort: false,
