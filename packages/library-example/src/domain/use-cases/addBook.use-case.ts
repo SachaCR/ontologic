@@ -5,8 +5,8 @@ import { LibraryCollection } from "../repositories/libraryCollection.repository"
 import { AddBookCommand } from "./commands/addBook.command";
 
 /**
- * Adding a book has no domain failure mode, so the error side is `never`. A
- * failure to persist is technical, and technical failures are thrown.
+ * Adds a copy to the library's collection. Nothing can refuse it, so this use
+ * case has no domain errors at all.
  */
 export class AddBookUseCase implements UseCase<
   AddBookCommand,

@@ -10,6 +10,7 @@ export interface BookCreatedPayload {
   lost: boolean;
 }
 
+/** A copy joined the collection. Carries the whole catalogue record, so readers need not load the book. */
 export class BookCreatedEvent extends DomainEvent<
   "BOOK_CREATED",
   1,

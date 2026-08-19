@@ -52,8 +52,25 @@ export const APP_SCRIPT = String.raw`
     declared.forEach(function (id) { rootIds[id] = true; });
   })();
 
+  /**
+   * Top level: nothing holds this. Structural only — it says where a thing sits,
+   * not what it is called. The rail groups by it, the diagrams are keyed by it,
+   * and every breadcrumb starts at one.
+   */
   function isRoot(node) {
     return node.kind === "entity" && rootIds[node.id] === true;
+  }
+
+  /**
+   * An aggregate is an entity that actually aggregates: a top-level one holding
+   * at least one entity or value object of its own.
+   *
+   * A top-level entity holding nothing is just an entity. It is still a root —
+   * it still anchors a diagram and a rail group — but calling it an aggregate
+   * claims a structure it does not have.
+   */
+  function isAggregate(node) {
+    return isRoot(node) && containedOf(node.id).length > 0;
   }
 
   function sortByName(nodes) {
@@ -64,10 +81,14 @@ export const APP_SCRIPT = String.raw`
     return sortByName(MODEL.nodes.filter(isRoot));
   }
 
-  /** Entities that are held by something else, plus the sub-entities. */
-  function containedEntities() {
+  function aggregateNodes() {
+    return sortByName(MODEL.nodes.filter(isAggregate));
+  }
+
+  /** Everything with identity that is not an aggregate. */
+  function plainEntities() {
     return sortByName(MODEL.nodes.filter(function (n) {
-      return n.kind === "subEntity" || (n.kind === "entity" && !isRoot(n));
+      return n.kind === "subEntity" || (n.kind === "entity" && !isAggregate(n));
     }));
   }
 
@@ -752,13 +773,13 @@ export const APP_SCRIPT = String.raw`
   var GROUPS = [
     {
       route: "domain", kind: "entity", label: "Aggregates",
-      nodes: rootNodes
+      nodes: aggregateNodes
     },
     {
       route: "entity", kind: "subEntity", label: "Entities",
-      blurb: "Held inside an aggregate. Each has its own identity, but is reached " +
-        "through the root that owns it.",
-      nodes: containedEntities
+      blurb: "Objects with an identity that hold nothing of their own \u2014 either " +
+        "inside an aggregate, or standing alone.",
+      nodes: plainEntities
     },
     {
       route: "value-object", kind: "valueObject", label: "Value objects",
@@ -882,7 +903,7 @@ export const APP_SCRIPT = String.raw`
       return node.actionKind === "query" ? "query" : "command";
     }
     // A contained entity reads as an entity; only a root wears the aggregate colour.
-    if (node.kind === "entity" && !isRoot(node)) return "subEntity";
+    if (node.kind === "entity" && !isAggregate(node)) return "subEntity";
     return node.kind;
   }
 
@@ -890,12 +911,12 @@ export const APP_SCRIPT = String.raw`
     if (node.kind === "useCase") {
       return node.actionKind === "query" ? "QRY" : "CMD";
     }
-    if (node.kind === "entity" && !isRoot(node)) return "ENT";
+    if (node.kind === "entity" && !isAggregate(node)) return "ENT";
     return KIND_BADGE[node.kind] || "";
   }
 
   function labelOf(node) {
-    if (node.kind === "entity" && !isRoot(node)) return "Entity";
+    if (node.kind === "entity" && !isAggregate(node)) return "Entity";
     return KIND_LABEL[node.kind] || node.kind;
   }
 
@@ -1106,6 +1127,18 @@ export const APP_SCRIPT = String.raw`
     return html + "</nav>";
   }
 
+  /**
+   * The head of a breadcrumb: which list this object belongs to. A lone entity
+   * is not in the aggregates screen, so its trail must not claim it is.
+   */
+  function trailHead(node) {
+    var top = pathTo(node)[0];
+
+    return top && isAggregate(top)
+      ? [{ label: "Overview", href: "#/" }, { label: "Aggregates", href: "#/domain" }]
+      : [{ label: "Overview", href: "#/" }, { label: "Entities", href: "#/entity" }];
+  }
+
   /** The chain from an aggregate root down to 'node', following contains edges. */
   function pathTo(node) {
     var chain = [node];
@@ -1162,10 +1195,7 @@ export const APP_SCRIPT = String.raw`
       return { label: n.name, href: hrefOf(n) };
     });
 
-    segments.unshift(
-      { label: "Overview", href: "#/" },
-      { label: "Aggregates", href: "#/domain" }
-    );
+    segments = trailHead(node).concat(segments);
 
     var body = trailHtml(segments) +
       '<h1 class="title">' + esc(node.name) + " " + esc(labelOf(node)) + "</h1>" +
@@ -1194,10 +1224,13 @@ export const APP_SCRIPT = String.raw`
     if (graph) {
       body += '<div class="section"><h2 class="section__head">Structure</h2>' +
         '<p class="subtitle">' +
-        (isRoot(node)
+        (isAggregate(node)
           ? "What this aggregate holds, and the events those produce. " +
             "Errors are left out — this is about structure."
-          : "Where " + esc(node.name) + " sits inside " + esc(graph.title) + ".") +
+          : isRoot(node)
+            ? "This entity holds nothing of its own. The events it produces, " +
+              "and nothing else."
+            : "Where " + esc(node.name) + " sits inside " + esc(graph.title) + ".") +
         "</p>" +
         graphBlockHtml(graph, node.id) +
         legendHtml(GRAPH_LEGEND) +
@@ -1331,10 +1364,7 @@ export const APP_SCRIPT = String.raw`
     var segments = pathTo(owner).map(function (n) {
       return { label: n.name, href: hrefOf(n) };
     });
-    segments.unshift(
-      { label: "Overview", href: "#/" },
-      { label: "Aggregates", href: "#/domain" }
-    );
+    segments = trailHead(owner).concat(segments);
     segments.push({ label: method.name + "()", href: "#" });
 
     var body = trailHtml(segments) +
@@ -1414,23 +1444,24 @@ export const APP_SCRIPT = String.raw`
     ["repository", "Repository"]
   ];
 
-  /** Screen 1 — every aggregate and root entity in the model. */
+  /** Screen 1 — every aggregate in the model. */
   function viewDomainRoots() {
-    var roots = rootNodes();
+    var roots = aggregateNodes();
 
     var html = trailHtml([
         { label: "Overview", href: "#/" },
         { label: "Aggregates" }
       ]) +
       '<h1 class="title">Aggregates \u2014 ' + roots.length + "</h1>" +
-      '<p class="subtitle">The roots of your domain model \u2014 nothing holds these. ' +
-      "Open one to see what it contains and what it can do.</p>" +
+      '<p class="subtitle">Top-level objects that hold others \u2014 nothing holds these, ' +
+      "and each is one atomic write. Open one to see what it contains and what it can do.</p>" +
       legendHtml(DOMAIN_LEGEND);
 
     html += '<div class="section">' +
       (roots.length
         ? '<div class="cards">' + roots.map(function (n) { return blockHtml(n); }).join("") + "</div>"
-        : '<div class="empty">No aggregates found.</div>') +
+        : '<div class="empty">Nothing here aggregates anything \u2014 every entity in ' +
+          'this model stands alone. See <a href="#/entity">Entities</a>.</div>') +
       "</div>";
 
     var orphans = nodesOfKind("valueObject").filter(function (vo) {

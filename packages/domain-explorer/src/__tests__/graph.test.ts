@@ -179,7 +179,7 @@ describe.skipIf(!existsSync(WORKFLOW_V2))(
   },
 );
 
-describe("Given a codebase whose aggregates contain nothing", () => {
+describe("Given a codebase whose entities hold nothing", () => {
   let model: DomainModel;
 
   beforeAll(() => {
@@ -189,14 +189,19 @@ describe("Given a codebase whose aggregates contain nothing", () => {
   });
 
   describe("When the graph layouts are built", () => {
-    it("Then it still produces a diagram of the aggregate and its events", () => {
+    it("Then it still produces a diagram of the entity and its events", () => {
       const order = graphNamed(model, "Order");
 
       expect(order.nodes[0]?.label).toBe("Order");
-      expect(order.nodes.every((n) => n.kind === "entity" || n.kind === "event")).toBe(
-        true,
-      );
       expect(order.nodes.length).toBeGreaterThan(1);
+      expect(order.nodes.every((n) => n.kind !== "valueObject")).toBe(true);
+    });
+
+    it("Then the lone entity is not drawn as an aggregate", () => {
+      // Order is top level and persisted through a repository, but it holds
+      // nothing, so it does not aggregate and must not wear the colour that
+      // says it does.
+      expect(graphNamed(model, "Order").nodes[0]?.kind).toBe("subEntity");
     });
   });
 });

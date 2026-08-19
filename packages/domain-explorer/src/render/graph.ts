@@ -111,7 +111,7 @@ function buildBranch(
   const branch: Branch = {
     node,
     label: node.name,
-    kind: graphKindOf(node, depth),
+    kind: graphKindOf(node, depth, holdings(node, model)),
     children: [],
     x: 0,
     y: 0,
@@ -222,14 +222,26 @@ function familyOf(holder: DomainNode, target: DomainNode): string | undefined {
 /**
  * How a node reads in the diagram.
  *
- * Only the node at depth 0 is the aggregate root. An entity below it is held by
- * something else, and drawing it as an aggregate would hide the hierarchy the
- * diagram exists to show.
+ * Aggregate colour is earned twice over: the node has to be at depth 0, and it
+ * has to actually hold something. An entity below the root is held by something
+ * else, and a root holding nothing is not aggregating — drawing either as an
+ * aggregate would claim a structure the diagram is there to show.
  */
-function graphKindOf(node: DomainNode, depth: number): GraphNode["kind"] {
+/** How many things this node holds. Emitted events are not held. */
+function holdings(node: DomainNode, model: DomainModel): number {
+  return model.edges.filter(
+    (e) => e.kind === "contains" && e.from === node.id,
+  ).length;
+}
+
+function graphKindOf(
+  node: DomainNode,
+  depth: number,
+  children: number,
+): GraphNode["kind"] {
   if (node.kind === "valueObject" || node.kind === "event") return node.kind;
 
-  return depth === 0 ? "entity" : "subEntity";
+  return depth === 0 && children > 0 ? "entity" : "subEntity";
 }
 
 /**

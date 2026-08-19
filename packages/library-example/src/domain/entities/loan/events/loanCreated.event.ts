@@ -8,6 +8,7 @@ export interface LoanCreatedPayload {
   dueDate: string;
 }
 
+/** A member borrowed a copy. Carries the due date, so nothing downstream repeats the lending policy. */
 export class LoanCreatedEvent extends DomainEvent<
   "LOAN_CREATED",
   1,

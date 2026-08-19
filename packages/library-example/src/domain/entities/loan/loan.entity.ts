@@ -21,6 +21,11 @@ export interface LoanState {
 /** Lending policy: calendar days from loan start until the copy is due back. */
 const STANDARD_LOAN_LENGTH_DAYS = 21;
 
+/**
+ * One member's borrowing of one copy, from the day it leaves the shelf until it
+ * comes back. A loan stays open until the copy is returned, which is how the
+ * library knows what is still out.
+ */
 export class Loan extends DomainEntity<LoanState> {
   private constructor(id: string, state: LoanState) {
     super(id, state, {
@@ -32,6 +37,10 @@ export class Loan extends DomainEntity<LoanState> {
     return new Loan(id, state);
   }
 
+  /**
+   * Lends the copy to a member and sets the date it is due back. The term comes
+   * from the library's lending policy, so every loan gets the same one.
+   */
   static create(params: { bookId: string; memberId: string }): {
     loan: Loan;
     event: LoanCreatedEvent;
@@ -64,6 +73,10 @@ export class Loan extends DomainEntity<LoanState> {
     };
   }
 
+  /**
+   * Records the copy coming back and closes the loan. The moment of return is
+   * passed in rather than read from the clock here, which keeps this testable.
+   */
   returnBook(
     returnedAt: string,
   ): Result<LoanReturnedEvent, LoanAlreadyReturnedError> {

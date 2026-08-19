@@ -5,6 +5,7 @@ export interface BookLostPayload {
   bookId: string;
 }
 
+/** A copy was declared lost and can no longer be lent. It stays in the collection with its history. */
 export class BookLostEvent extends DomainEvent<
   "BOOK_LOST",
   1,

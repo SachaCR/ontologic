@@ -1,5 +1,6 @@
 import { DomainError } from "ontologic";
 
+/** The copy has already been declared lost, so there is nothing new to record. */
 export class BookAlreadyDeclaredLostError extends DomainError<
   "BOOK_ALREADY_DECLARED_LOST",
   { bookId: string }
@@ -15,6 +16,7 @@ export class BookAlreadyDeclaredLostError extends DomainError<
   }
 }
 
+/** The library has no copy with this id. */
 export class BookNotFoundError extends DomainError<
   "BOOK_NOT_FOUND",
   { bookId: string }
@@ -30,6 +32,7 @@ export class BookNotFoundError extends DomainError<
   }
 }
 
+/** A copy declared lost cannot be lent — it is not on the shelf to lend. */
 export class BookLostCannotBeLoanedError extends DomainError<
   "BOOK_LOST_CANNOT_BE_LOANED",
   { bookId: string }
@@ -45,6 +48,7 @@ export class BookLostCannotBeLoanedError extends DomainError<
   }
 }
 
+/** The copy is already out with another member. One physical copy, one open loan. */
 export class BookAlreadyOnLoanError extends DomainError<
   "BOOK_ALREADY_ON_LOAN",
   { bookId: string }

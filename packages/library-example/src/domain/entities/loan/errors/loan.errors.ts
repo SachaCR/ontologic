@@ -1,5 +1,6 @@
 import { DomainError } from "ontologic";
 
+/** The copy has already come back and this loan is closed. */
 export class LoanAlreadyReturnedError extends DomainError<
   "LOAN_ALREADY_RETURNED",
   { loanId: string }
@@ -16,6 +17,7 @@ export class LoanAlreadyReturnedError extends DomainError<
 }
 
 export const MAX_ACTIVE_LOANS_PER_MEMBER = 3;
+/** The member already has as many copies out as the library allows. The limit travels with the error. */
 export class MemberActiveLoanLimitExceededError extends DomainError<
   "MEMBER_ACTIVE_LOAN_LIMIT_EXCEEDED",
   { memberId: string; limit: number }
@@ -31,6 +33,7 @@ export class MemberActiveLoanLimitExceededError extends DomainError<
   }
 }
 
+/** The register has no loan with this id. */
 export class LoanNotFoundError extends DomainError<
   "LOAN_NOT_FOUND",
   { loanId: string }

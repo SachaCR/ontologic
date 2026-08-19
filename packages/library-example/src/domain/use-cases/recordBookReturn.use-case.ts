@@ -8,6 +8,10 @@ import {
 import { LoanRegister } from "../repositories/loanRegister.repository";
 import { RecordBookReturnCommand } from "./commands/recordBookReturn.command";
 
+/**
+ * Takes a copy back from a member and closes their loan. The copy itself is
+ * never touched — the loan is the thing that knows it was out.
+ */
 export class RecordBookReturnUseCase implements UseCase<
   RecordBookReturnCommand,
   LoanState,

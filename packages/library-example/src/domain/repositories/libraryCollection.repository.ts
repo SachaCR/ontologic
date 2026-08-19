@@ -7,6 +7,11 @@ export type BookSearchCriteria = {
   author?: string;
 };
 
+/**
+ * The shelves: every copy the library owns, and the only way to reach one.
+ * In-memory here so the example runs anywhere; a real deployment swaps the
+ * implementation without the domain noticing.
+ */
 export class LibraryCollection extends InMemoryRepository<Book, BookEvent> {
   constructor() {
     super(Book.fromState);

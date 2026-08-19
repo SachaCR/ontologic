@@ -15,6 +15,10 @@ export interface BookState {
   lost: boolean;
 }
 
+/**
+ * A single copy the library owns and can lend out. Two copies of the same ISBN
+ * are two Books, and only one of them can be out at a time.
+ */
 export class Book extends DomainEntity<BookState> {
   private constructor(id: string, state: BookState) {
     super(id, state);
@@ -24,6 +28,7 @@ export class Book extends DomainEntity<BookState> {
     return new Book(id, state);
   }
 
+  /** Registers a new copy in the collection. A copy is never added already lost. */
   static create(state: Omit<BookState, "lost">): {
     book: Book;
     event: BookCreatedEvent;
@@ -41,8 +46,11 @@ export class Book extends DomainEntity<BookState> {
     };
   }
 
+  /**
+   * Marks the copy as lost and takes it out of circulation. Declaring it a
+   * second time is refused, so the loss is never recorded twice.
+   */
   declareLost(): Result<BookLostEvent, BookAlreadyDeclaredLostError> {
-
     if (this.state.lost) {
       return err(new BookAlreadyDeclaredLostError(this.id()));
     }

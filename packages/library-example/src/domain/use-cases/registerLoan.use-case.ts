@@ -21,9 +21,8 @@ export type RegisterLoanError =
   | MemberActiveLoanLimitExceededError;
 
 /**
- * Reads two aggregates and writes one. The rules here cannot be decided from a
- * single entity's state — whether this copy is already out, and whether the
- * member is at their limit, are both cross-row questions.
+ * Lends a copy to a member. Refused if the copy is already out, or if the
+ * member is at their borrowing limit.
  */
 export class RegisterLoanUseCase implements UseCase<
   RegisterLoanCommand,

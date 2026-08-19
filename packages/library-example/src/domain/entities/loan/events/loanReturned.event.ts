@@ -7,6 +7,7 @@ export interface LoanReturnedPayload {
   returnedAt: string;
 }
 
+/** A member brought a copy back. Carries the book and member ids, so a reader can close its own view. */
 export class LoanReturnedEvent extends DomainEvent<
   "LOAN_RETURNED",
   1,

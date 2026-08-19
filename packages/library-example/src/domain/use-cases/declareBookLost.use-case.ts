@@ -8,6 +8,10 @@ import {
 import { LibraryCollection } from "../repositories/libraryCollection.repository";
 import { DeclareBookLostCommand } from "./commands/declareBookLost.command";
 
+/**
+ * Records that a copy has gone missing, taking it out of circulation. Refused
+ * if the copy is unknown, or was already declared lost.
+ */
 export class DeclareBookLostUseCase implements UseCase<
   DeclareBookLostCommand,
   BookState,

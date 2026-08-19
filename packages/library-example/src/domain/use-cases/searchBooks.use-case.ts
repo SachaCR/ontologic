@@ -5,8 +5,8 @@ import { LibraryCollection } from "../repositories/libraryCollection.repository"
 import { SearchBooksQuery } from "./queries/searchBooks.query";
 
 /**
- * A read. It is declared over a `Query`, so nothing about it needs to be
- * inferred from the body — the action itself says this writes nothing.
+ * Finds copies in the collection by title or author. Declared over a `Query`,
+ * so the tooling can tell it writes nothing without reading the body.
  */
 export class SearchBooksUseCase implements UseCase<
   SearchBooksQuery,
