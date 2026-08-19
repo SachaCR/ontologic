@@ -1,4 +1,5 @@
 import type { UnmarkedUseCase } from "./useCases";
+import type { UndeclaredSubscriber } from "./readModels";
 import type {
   DomainNode,
   EntityNode,
@@ -7,6 +8,7 @@ import type {
   EventUnion,
   Finding,
   InvariantNode,
+  ReadModelNode,
   UseCaseNode,
 } from "./model";
 
@@ -20,6 +22,7 @@ export function computeFindings(
   nodes: DomainNode[],
   eventUnions: EventUnion[],
   unmarkedUseCases: UnmarkedUseCase[] = [],
+  undeclaredSubscribers: UndeclaredSubscriber[] = [],
 ): Finding[] {
   return [
     ...eventsMissingFromUnions(nodes, eventUnions),
@@ -29,7 +32,60 @@ export function computeFindings(
     ...useCasesWithErasedErrorUnion(nodes),
     ...useCasesNotMarked(unmarkedUseCases),
     ...useCasesWithUndeterminedEvents(nodes),
+    ...subscribersNotDeclared(undeclaredSubscribers),
+    ...readModelsConsumingUnknownEvents(nodes),
   ];
+}
+
+/**
+ * Something registers an event handler but never declares itself a read model,
+ * so the view it maintains is invisible to everything that reads the codebase —
+ * this tool included.
+ *
+ * Kept as a finding rather than treated as a read model outright: a `listenTo`
+ * call proves a subscription, not what is done with it, and a class that emails
+ * on an event is not a view.
+ */
+function subscribersNotDeclared(
+  undeclared: UndeclaredSubscriber[],
+): Finding[] {
+  return undeclared.map((candidate) => ({
+    code: "read-model-not-declared" as const,
+    // Qualified by file: consumers written as scripts are conventionally all
+    // called `main`, and four findings that each say "main" name nothing.
+    message:
+      `${candidate.name} in ${candidate.location.file} subscribes to domain ` +
+      `events but does not implement ReadModel<Events>, so what it builds from ` +
+      `them cannot be determined.`,
+    nodeId: `readModel:${candidate.location.file}#${candidate.name}`,
+    location: candidate.location,
+  }));
+}
+
+/**
+ * A read model listens for an event name nothing in this codebase publishes.
+ * Usually a typo or a rename that moved the publisher and left the subscriber
+ * behind — either way the handler will never run.
+ */
+function readModelsConsumingUnknownEvents(nodes: DomainNode[]): Finding[] {
+  const published = new Set(
+    nodes.filter((n): n is EventNode => n.kind === "event").map((n) => n.eventName),
+  );
+
+  return nodes
+    .filter((n): n is ReadModelNode => n.kind === "readModel")
+    .flatMap((readModel) =>
+      readModel.consumedEventNames
+        .filter((wireName) => !published.has(wireName))
+        .map((wireName) => ({
+          code: "read-model-consumes-unknown-event" as const,
+          message:
+            `${readModel.name} listens for "${wireName}", which no domain event ` +
+            `in this codebase publishes, so the handler never runs.`,
+          nodeId: readModel.id,
+          location: readModel.location,
+        })),
+    );
 }
 
 /**

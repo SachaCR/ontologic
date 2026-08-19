@@ -26,10 +26,17 @@ union in its own file or inline, or put one error per file or ten.
 | Repositories | `extends InMemoryRepository<E, Ev>`, or an interface extending `Repository<E, Ev>` |
 | Use cases | `implements UseCase<Action, Output, Errors>` |
 | Commands and queries | `extends Command<Name, Payload>` / `extends Query<Name, Payload>` |
+| Read models | `implements ReadModel<Events>` |
 
 It also resolves the relationships between them: which method emits which event, which
 errors a behaviour can return, what an aggregate contains, which repositories a use case
-reads from versus writes to, and whether a use case is driven by a command or a query.
+reads from versus writes to, whether a use case is driven by a command or a query, and
+which events each read model is built from.
+
+A read model is found from its declaration, not from its `listenTo` calls. A subscription
+proves that something listens; it does not say whether a view is being built or an email
+sent. Anything that subscribes without declaring itself is reported as a finding rather
+than guessed at.
 
 ## Two views
 

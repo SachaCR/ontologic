@@ -94,6 +94,14 @@ describe("Given a domain model extracted from the Order example", () => {
       expect(() => new Function(APP_SCRIPT)).not.toThrow();
     });
 
+    it("Then the brand mark travels inside the page", () => {
+      // The mark is the Ontologic logo, inlined. A file reference of any kind —
+      // even a relative one, which the network assertion above would not catch —
+      // makes the page depend on something it was not shipped with.
+      expect(html).toMatch(/<span class="rail__mark"[^>]*>\s*<svg/);
+      expect(html).not.toMatch(/<img/);
+    });
+
     it("Then the sidebar offers exactly two views", () => {
       const views = html.match(/<a class="navlink navlink--view"[^>]*>[^<]*<\/a>/g);
 
@@ -119,6 +127,31 @@ describe("Given a domain model extracted from the Order example", () => {
       expect(html).toMatch(
         /VIEWS = \{\s*entity: viewObject,\s*subEntity: viewObject,\s*valueObject: viewObject,/,
       );
+    });
+
+    it("Then a new concept gets a colour in both themes, not just one", () => {
+      // The theme test above checks the blocks exist, not that a token is
+      // defined in each. A colour added to :root alone passes every other
+      // assertion here and renders as an unstyled grey card in dark mode.
+      expect(html.match(/--c-readmodel:/g)).toHaveLength(3);
+      expect(html.match(/--n-readmodel:/g)).toHaveLength(3);
+      expect(html).toContain('[data-kind="readModel"]');
+    });
+
+    it("Then read models are green, beside the queries", () => {
+      // Event storming puts the read side in green, and the logo in this very
+      // page agrees — its View note is #34D399.
+      expect(html).toContain("--c-readmodel: #10b981");
+      expect(html).toContain("--c-readmodel: #34d399");
+    });
+
+    it("Then the board's consumer toggle is delegated, not bound", () => {
+      // The board lives inside #main, which render() replaces wholesale. A
+      // listener bound to the button survives exactly one navigation.
+      expect(html).toMatch(
+        /document\.addEventListener\("click"[\s\S]{0,200}toggleConsumers/,
+      );
+      expect(html).toContain('.board[data-consumers="off"] .board__consumers');
     });
 
     it("Then nothing addresses the retired explorer route", () => {

@@ -16,11 +16,19 @@ export const APP_SCRIPT = String.raw`
     { key: "event",       label: "Events",        route: "event" },
     { key: "error",       label: "Errors",        route: "error" },
     { key: "invariant",   label: "Invariants",    route: "invariant" },
-    { key: "repository",  label: "Repositories",  route: "repository" }
+    { key: "repository",  label: "Repositories",  route: "repository" },
+    { key: "readModel",   label: "Read models",   route: "read-model" }
   ];
 
   var byId = {};
   MODEL.nodes.forEach(function (n) { byId[n.id] = n; });
+
+  /**
+   * Whether a use-case board shows the views built from its events. Kept in
+   * module scope rather than storage, like the kind filters: it should outlive
+   * navigation, and there is nothing to gain from outliving a reload.
+   */
+  var showConsumers = true;
 
   var findingsByNode = {};
   MODEL.findings.forEach(function (f) {
@@ -399,6 +407,20 @@ export const APP_SCRIPT = String.raw`
         }).join("") + "</div></div>";
     }
 
+    var consumers = consumersOf(node.id);
+
+    if (consumers.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Consumed by</h2>' +
+        '<p class="subtitle">Views built from this event. They read it; none of ' +
+        "them can refuse it.</p>" +
+        '<div class="flow">' + consumers.map(function (e) {
+          var from = byId[e.from];
+          return '<a class="flow__item" data-kind="readModel" href="' +
+            (from ? hrefOf(from) : "#") + '">' +
+            esc(from ? from.name : e.from) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
     return html + findingsFor(node.id);
   }
 
@@ -449,6 +471,78 @@ export const APP_SCRIPT = String.raw`
         ? linkList(protects.map(function (e) { return e.from; }))
         : '<span class="dash">Not attached to any entity — this rule is never enforced.</span>') +
       "</p></div>";
+
+    return html + findingsFor(node.id);
+  }
+
+  /**
+   * Events by class name. A read model's declared union names classes, while
+   * its subscriptions name wire names, so comparing the two needs both.
+   */
+  var eventByClassName = {};
+  MODEL.nodes.forEach(function (n) {
+    if (n.kind === "event") eventByClassName[n.name] = n;
+  });
+
+  /** Everything that consumes this event, the mirror of "Emitted by". */
+  function consumersOf(id) {
+    return MODEL.edges.filter(function (e) {
+      return e.to === id && e.kind === "consumes";
+    });
+  }
+
+  function viewReadModel(node) {
+    var html = header(node, "Read model");
+
+    var consumed = edgesFrom(node.id, "consumes");
+
+    html += '<div class="section"><h2 class="section__head">Built from</h2>';
+
+    if (node.consumesEverything) {
+      html += '<p class="subtitle">Listens with a wildcard, so every event in ' +
+        "the model reaches it.</p>";
+    }
+
+    html += consumed.length > 0
+      ? '<div class="cards">' + consumed.map(function (edge) {
+          return byId[edge.to] ? detailCard(byId[edge.to]) : "";
+        }).join("") + "</div>"
+      : '<div class="empty">No event this codebase publishes reaches it.</div>';
+
+    html += "</div>";
+
+    // The gap between the two is worth showing: a union wider than the handlers
+    // is either room left for later or a subscription someone forgot to write.
+    var heard = node.declaredEventNames || [];
+    var unheard = heard.filter(function (name) {
+      var event = eventByClassName[name];
+      return !node.consumesEverything && event &&
+        node.consumedEventNames.indexOf(event.eventName) === -1;
+    });
+
+    if (unheard.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Declared but not heard</h2>' +
+        '<p class="subtitle"><code>' + esc(node.eventUnionTypeName) +
+        "</code> admits these too, but no handler is registered for them.</p>" +
+        '<div class="flow">' + unheard.map(function (name) {
+          var event = eventByClassName[name];
+          return '<a class="flow__item" data-kind="event" href="' +
+            (event ? hrefOf(event) : "#") + '">' + esc(name) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    if (node.queries.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Answers</h2>' +
+        '<p class="subtitle">What this view can be asked, once the events have landed.</p>' +
+        '<div class="scroll"><table><thead><tr><th>Query</th><th>Returns</th></tr></thead><tbody>' +
+        node.queries.map(function (q) {
+          var params = q.parameters.map(function (p) {
+            return p.name + ": " + p.type;
+          }).join(", ");
+          return '<tr><td class="mono nowrap">' + esc(q.name) + "(" + esc(params) + ")</td>" +
+            '<td class="mono muted">' + esc(q.returnType) + "</td></tr>";
+        }).join("") + "</tbody></table></div></div>";
+    }
 
     return html + findingsFor(node.id);
   }
@@ -595,6 +689,44 @@ export const APP_SCRIPT = String.raw`
   }
 
   /**
+   * The views built from a rank's events, once each.
+   *
+   * Deduped across the rank: two events landing in one write often feed the same
+   * view, and drawing it twice would suggest two of them.
+   */
+  function consumerTailHtml(outcomeIds) {
+    var seen = {};
+    var models = [];
+
+    outcomeIds.forEach(function (id) {
+      var event = byId[id];
+      if (!event || event.kind !== "event") return;
+
+      consumersOf(event.id).forEach(function (edge) {
+        if (seen[edge.from]) return;
+        seen[edge.from] = true;
+        if (byId[edge.from]) models.push(byId[edge.from]);
+      });
+    });
+
+    if (models.length === 0) return "";
+
+    return '<span class="board__consumers">' +
+      '<span class="board__arrow">&#8594;</span>' +
+      '<div class="board__rank' + (models.length > 1 ? " board__rank--many" : "") + '">' +
+      models.map(function (model) {
+        return noteHtml({
+          tone: "readModel",
+          kind: "Read model",
+          name: model.name,
+          detail: model.consumesEverything ? "every event" : "",
+          href: hrefOf(model)
+        });
+      }).join("") +
+      "</div></span>";
+  }
+
+  /**
    * The board: the happy path, then one row per way the use case can be refused.
    *
    * Each row reads left to right as a complete story — the steps taken, then
@@ -656,12 +788,19 @@ export const APP_SCRIPT = String.raw`
         });
 
         html += "</div>";
+
+        // Downstream of the events, so a second arrow and a second rank. Folding
+        // these into the rank above would say they happen alongside the events
+        // rather than because of them.
+        if (isSuccess) html += consumerTailHtml(path.outcome);
       } else if (path.kind === "success" && isQuery && node.returnsStateTypeName) {
-        // A query produces a read model rather than an event.
+        // A query hands back state rather than recording an event. This is not
+        // the read-model concept — that is a view built from events, and it has
+        // its own pages.
         html += '<span class="board__arrow">&#8594;</span>' +
           noteHtml({
             tone: "query",
-            kind: "Read model",
+            kind: "Returns",
             name: node.returnsStateTypeName,
             detail: ""
           });
@@ -673,8 +812,18 @@ export const APP_SCRIPT = String.raw`
     var success = node.paths.filter(function (p) { return p.kind === "success"; });
     var failures = node.paths.filter(function (p) { return p.kind === "failure"; });
 
-    var html = '<div class="section"><h2 class="section__head">Board</h2>' +
-      '<div class="board"><div class="board__inner">';
+    // Only worth a control if this codebase has views to show.
+    var hasConsumers = MODEL.edges.some(function (e) { return e.kind === "consumes"; });
+
+    var head = hasConsumers
+      ? '<div class="section__bar"><h2 class="section__head">Board</h2>' +
+        '<button class="toggle" type="button" data-kind="readModel" data-consumers-toggle ' +
+        'aria-pressed="' + showConsumers + '">Read models</button></div>'
+      : '<h2 class="section__head">Board</h2>';
+
+    var html = '<div class="section">' + head +
+      '<div class="board" data-consumers="' + (showConsumers ? "on" : "off") +
+      '"><div class="board__inner">';
 
     success.forEach(function (path) {
       html += '<div class="board__row"><div class="board__label">Happy path</div>' +
@@ -810,6 +959,12 @@ export const APP_SCRIPT = String.raw`
       route: "repository", kind: "repository", label: "Repositories",
       blurb: "The ports through which aggregates are loaded and saved.",
       nodes: function () { return nodesOfKind("repository"); }
+    },
+    {
+      route: "read-model", kind: "readModel", label: "Read models",
+      blurb: "Views built by listening to events rather than written to directly. " +
+        "They answer questions; they decide nothing.",
+      nodes: function () { return nodesOfKind("readModel"); }
     }
   ];
 
@@ -879,6 +1034,7 @@ export const APP_SCRIPT = String.raw`
     invariant: "Invariant",
     repository: "Repository",
     useCase: "Use case",
+    readModel: "Read model",
     behaviour: "Behaviour"
   };
 
@@ -891,6 +1047,7 @@ export const APP_SCRIPT = String.raw`
     error: "ERROR",
     invariant: "INV",
     repository: "REPO",
+    readModel: "RM",
     behaviour: "FN"
   };
 
@@ -1004,6 +1161,15 @@ export const APP_SCRIPT = String.raw`
     if (behaviours) parts.push(behaviours + " behaviour" + (behaviours === 1 ? "" : "s"));
     if (eventCount) parts.push(eventCount + " event" + (eventCount === 1 ? "" : "s"));
     if (errorCount) parts.push(errorCount + " error" + (errorCount === 1 ? "" : "s"));
+
+    if (node.kind === "readModel") {
+      var consumed = edgesFrom(node.id, "consumes").length;
+      if (node.consumesEverything) parts.push("every event");
+      else if (consumed) parts.push(consumed + " event" + (consumed === 1 ? "" : "s"));
+      if (node.queries.length) {
+        parts.push(node.queries.length + " quer" + (node.queries.length === 1 ? "y" : "ies"));
+      }
+    }
 
     return parts;
   }
@@ -1441,7 +1607,8 @@ export const APP_SCRIPT = String.raw`
     ["event", "Event"],
     ["error", "Error"],
     ["invariant", "Invariant"],
-    ["repository", "Repository"]
+    ["repository", "Repository"],
+    ["readModel", "Read model"]
   ];
 
   /** Screen 1 — every aggregate in the model. */
@@ -1766,6 +1933,24 @@ export const APP_SCRIPT = String.raw`
     }
   }
 
+  /** Show or hide the read models on every board at once. */
+  function toggleConsumers(target) {
+    var hit = target && target.closest
+      ? target.closest("[data-consumers-toggle]")
+      : null;
+    if (!hit) return false;
+
+    showConsumers = !showConsumers;
+    hit.setAttribute("aria-pressed", String(showConsumers));
+
+    var boards = document.querySelectorAll("[data-consumers]");
+    for (var i = 0; i < boards.length; i++) {
+      boards[i].setAttribute("data-consumers", showConsumers ? "on" : "off");
+    }
+
+    return true;
+  }
+
   /** Open or close the family box the event landed on. */
   function toggleUnfold(target) {
     var hit = target && target.closest ? target.closest("[data-unfold]") : null;
@@ -1822,6 +2007,7 @@ export const APP_SCRIPT = String.raw`
     error: viewError,
     invariant: viewInvariant,
     repository: viewRepository,
+    readModel: viewReadModel,
     useCase: viewUseCase
   };
 
@@ -1899,6 +2085,7 @@ export const APP_SCRIPT = String.raw`
 
   document.addEventListener("click", function (event) {
     if (toggleUnfold(event.target)) event.preventDefault();
+    else if (toggleConsumers(event.target)) event.preventDefault();
   });
 
   document.addEventListener("keydown", function (event) {

@@ -6,6 +6,7 @@ import { extractErrors } from "./extract/errors";
 import { extractInvariants } from "./extract/invariants";
 import { extractRepositories } from "./extract/repositories";
 import { extractUseCases } from "./extract/useCases";
+import { extractReadModels } from "./extract/readModels";
 import { linkModel } from "./extract/link";
 import {
   aggregateRoots,
@@ -44,6 +45,10 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     repositories,
   });
 
+  // Read models need the union aliases so `ReadModel<LibraryEvent>` can be
+  // resolved to the events that alias names.
+  const { readModels, undeclared } = extractReadModels(ctx, unions);
+
   // Sub-entities are discovered through containment, so they can only be found
   // once the entities that hold them have been extracted.
   const subEntities = extractSubEntities(ctx, entities);
@@ -56,6 +61,7 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     ...invariants,
     ...repositories,
     ...useCases,
+    ...readModels,
   ];
 
   const edges = [...linkModel(nodes), ...linkContainment(nodes)];
@@ -66,7 +72,7 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
     nodes,
     edges,
     eventUnions,
-    findings: computeFindings(nodes, eventUnions, unmarked),
+    findings: computeFindings(nodes, eventUnions, unmarked, undeclared),
     aggregateRoots: aggregateRoots(nodes, edges),
     graphs: [],
   };

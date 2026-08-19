@@ -6,6 +6,7 @@ import type {
   EventNode,
   InvariantNode,
   NodeId,
+  ReadModelNode,
   RepositoryNode,
   UseCaseNode,
 } from "./model";
@@ -40,6 +41,21 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
   const repositoriesByName = indexByName(
     nodes.filter((n): n is RepositoryNode => n.kind === "repository"),
   );
+
+  // A subscription names an event the way it travels, not the way it is
+  // declared: `listenTo("BOOK_CREATED")`, never `listenTo("BookCreatedEvent")`.
+  // So read models need their own index, over the wire name.
+  const eventsByWireName = new Map<string, NodeId>();
+  const ambiguousWireNames = new Set<string>();
+
+  for (const node of nodes) {
+    if (node.kind !== "event") continue;
+
+    if (eventsByWireName.has(node.eventName)) ambiguousWireNames.add(node.eventName);
+    eventsByWireName.set(node.eventName, node.id);
+  }
+
+  for (const name of ambiguousWireNames) eventsByWireName.delete(name);
 
   const edges: Edge[] = [];
 
@@ -88,6 +104,23 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
       if (entityId) {
         edges.push({ from: node.id, to: entityId, kind: "persists" });
       }
+      continue;
+    }
+
+    if (node.kind === "readModel") {
+      const readModel = node as ReadModelNode;
+
+      // A wildcard listener hears every event there is, so the edges are drawn
+      // to all of them rather than to none.
+      const wanted = readModel.consumesEverything
+        ? [...eventsByWireName.keys()]
+        : readModel.consumedEventNames;
+
+      for (const wireName of wanted) {
+        const eventId = eventsByWireName.get(wireName);
+        if (eventId) edges.push({ from: node.id, to: eventId, kind: "consumes" });
+      }
+
       continue;
     }
 

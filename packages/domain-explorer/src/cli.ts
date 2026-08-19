@@ -101,6 +101,7 @@ function printSummary(model: DomainModel): void {
     ["invariants", byKind("invariant")],
     ["repositories", byKind("repository")],
     ["use cases", byKind("useCase")],
+    ["read models", byKind("readModel")],
     ["event unions", model.eventUnions.length],
   ];
 

@@ -8,6 +8,7 @@ import type {
   EntityNode,
   EventNode,
   InvariantNode,
+  ReadModelNode,
   RepositoryNode,
   UseCaseNode,
 } from "../extract/model";
@@ -46,6 +47,14 @@ function useCase(model: DomainModel, name: string): UseCaseNode {
   );
   if (!found) throw new Error(`no use case named ${name}`);
   return found as UseCaseNode;
+}
+
+function readModel(model: DomainModel, name: string): ReadModelNode {
+  const found = model.nodes.find(
+    (n) => n.kind === "readModel" && n.name === name,
+  );
+  if (!found) throw new Error(`no read model named ${name}`);
+  return found as ReadModelNode;
 }
 
 function repository(model: DomainModel, name: string): RepositoryNode {
@@ -776,6 +785,77 @@ describe("Given a codebase still on the pre-1.7 invariant API", () => {
           flagged.map((f) => f.nodeId),
         ),
       ).toEqual(["LegacyAggregate"]);
+    });
+  });
+});
+
+describe("Given a codebase with event consumers of every shape", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/readModel.ts")],
+    });
+  });
+
+  describe("When read models are extracted", () => {
+    it("Then a declared read model records what it listens for", () => {
+      const view = readModel(model, "ShelfOccupancy");
+
+      expect(view.consumedEventNames).toEqual(["SHELF_FILLED", "SHELF_CLEARED"]);
+      expect(view.consumesEverything).toBe(false);
+      expect(view.queries.map((q) => q.name)).toEqual(["countOccupied"]);
+    });
+
+    it("Then subscriptions become edges to the events themselves", () => {
+      const view = readModel(model, "ShelfOccupancy");
+
+      const consumed = model.edges
+        .filter((e) => e.kind === "consumes" && e.from === view.id)
+        .map((e) => model.nodes.find((n) => n.id === e.to)?.name)
+        .sort();
+
+      expect(consumed).toEqual(["ShelfCleared", "ShelfFilled"]);
+    });
+
+    it("Then what it may hear is kept apart from what it does hear", () => {
+      // The union admits three events and only two handlers are registered.
+      // Collapsing the two would report a subscription that does not exist.
+      const view = readModel(model, "ShelfOccupancy");
+
+      expect(view.declaredEventNames).toEqual([
+        "ShelfCleared",
+        "ShelfFilled",
+        "ShelfPainted",
+      ]);
+      expect(view.consumedEventNames).toHaveLength(2);
+    });
+
+    it("Then a subscriber that never declares itself is reported, not guessed at", () => {
+      // A listenTo call proves a subscription, not that a view is being built —
+      // one of these logs and the other is a script.
+      const reported = model.findings
+        .filter((f) => f.code === "read-model-not-declared")
+        .map((f) => f.message);
+
+      expect(reported).toHaveLength(2);
+      expect(reported.join("")).toContain("ShelfAuditLog");
+      expect(reported.join("")).toContain("watchEverything");
+
+      expect(
+        model.nodes.some((n) => n.kind === "readModel" && n.name === "ShelfAuditLog"),
+      ).toBe(false);
+    });
+
+    it("Then listening for an event nothing publishes is a finding", () => {
+      // Reached through a cast here; in a real codebase it is usually a read
+      // model listening to another bounded context, whose events are not in
+      // the analysed directory.
+      const finding = model.findings.find(
+        (f) => f.code === "read-model-consumes-unknown-event",
+      );
+
+      expect(finding?.message).toContain("SHELF_CLEANED");
     });
   });
 });

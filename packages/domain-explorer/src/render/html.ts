@@ -39,7 +39,24 @@ const MODEL = ${embedJson(model)};
   <aside class="rail">
     <div class="rail__head">
       <div class="rail__brand">
-        <span class="rail__mark" aria-hidden="true">&#9679;</span>
+        <span class="rail__mark" aria-hidden="true">
+          <svg viewBox="0 0 240 240" fill="none">
+            <defs>
+              <marker id="ol-amber" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#FBBF24"/></marker>
+              <marker id="ol-sky" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#38BDF8"/></marker>
+              <marker id="ol-orange" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#F97316"/></marker>
+              <marker id="ol-green" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#34D399"/></marker>
+            </defs>
+            <path d="M 146.7 46.7 A 78 78 0 0 1 193.3 93.3" stroke="#38BDF8" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-sky)"/>
+            <path d="M 193.3 146.7 A 78 78 0 0 1 146.7 193.3" stroke="#F97316" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-orange)"/>
+            <path d="M 93.3 193.3 A 78 78 0 0 1 46.7 146.7" stroke="#34D399" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-green)"/>
+            <path d="M 46.7 93.3 A 78 78 0 0 1 93.3 46.7" stroke="#FBBF24" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-amber)"/>
+            <rect x="100" y="22" width="40" height="40" rx="10" fill="#FBBF24" transform="rotate(-7 120 42)"/>
+            <rect x="178" y="100" width="40" height="40" rx="10" fill="#38BDF8" transform="rotate(7 198 120)"/>
+            <rect x="100" y="178" width="40" height="40" rx="10" fill="#F97316" transform="rotate(7 120 198)"/>
+            <rect x="22" y="100" width="40" height="40" rx="10" fill="#34D399" transform="rotate(-7 42 120)"/>
+          </svg>
+        </span>
         <span>
           <h1 class="rail__title">Domain Explorer</h1>
           <p class="rail__tag">Ontologic</p>

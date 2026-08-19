@@ -21,7 +21,8 @@ export type NodeKind =
   | "error"
   | "invariant"
   | "repository"
-  | "useCase";
+  | "useCase"
+  | "readModel";
 
 /**
  * A field's type resolved back to its declaration.
@@ -280,13 +281,40 @@ export interface UseCaseNode {
   location: SourceLocation;
 }
 
+export interface ReadModelNode {
+  id: NodeId;
+  kind: "readModel";
+  name: string;
+  /** Leading doc comment, when the codebase has one. Usually absent. */
+  description?: string;
+  /** The written type argument to `ReadModel<...>`. */
+  eventUnionTypeName: string;
+  /**
+   * Event class names the union names, when it is a union this file can read.
+   * The vocabulary the read model is allowed to hear, which is not the same as
+   * what it subscribes to.
+   */
+  declaredEventNames: string[];
+  /**
+   * Wire names passed to `listenTo`, in the order written. These are event
+   * names as they travel — `BOOK_CREATED` — not class names.
+   */
+  consumedEventNames: string[];
+  /** Whether it registers a `listenTo("*")` handler, i.e. hears everything. */
+  consumesEverything: boolean;
+  /** What it exposes to be asked — every public method that is not `subscribe`. */
+  queries: Method[];
+  location: SourceLocation;
+}
+
 export type DomainNode =
   | EntityNode
   | EventNode
   | ErrorNode
   | InvariantNode
   | RepositoryNode
-  | UseCaseNode;
+  | UseCaseNode
+  | ReadModelNode;
 
 export type EdgeKind =
   | "emits"
@@ -298,7 +326,9 @@ export type EdgeKind =
   /** The source holds the target. Drives the Explorer's hierarchy. */
   | "contains"
   /** The source names the target by id, without holding it. */
-  | "references";
+  | "references"
+  /** The source is a read model built from the target event. */
+  | "consumes";
 
 export interface Edge {
   from: NodeId;
@@ -317,6 +347,8 @@ export interface Finding {
     | "use-case-error-union-erased"
     | "use-case-not-marked"
     | "use-case-events-undetermined"
+    | "read-model-not-declared"
+    | "read-model-consumes-unknown-event"
     | "legacy-invariant-attachment";
   message: string;
   /** The node the finding is attached to. */

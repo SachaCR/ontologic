@@ -7,6 +7,7 @@ export * from "./domainEntity";
 export * from "./valueObject";
 export * from "./repository";
 export * from "./useCase";
+export * from "./readModel";
 export * from "./result";
 export * from "./domainInvariant";
 export * from "./event-bus";

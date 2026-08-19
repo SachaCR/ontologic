@@ -51,7 +51,6 @@ export const STYLES = `
   --rail-active-ink: #09090b;
   --rail-field: #ffffff;
   --rail-field-line: #d4d4d8;
-  --rail-mark-ink: #ffffff;
 
   /* Concept colours. Applied through --k / --k-soft, never referenced directly. */
   --c-aggregate: #eab308;      --c-aggregate-soft: #fffbeb;
@@ -64,6 +63,7 @@ export const STYLES = `
   --c-command: #2563eb;        --c-command-soft: #eff6ff;
   --c-query: #0d9488;          --c-query-soft: #f0fdfa;
   --c-invariant: #db2777;      --c-invariant-soft: #fdf2f8;
+  --c-readmodel: #10b981;      --c-readmodel-soft: #ecfdf5;
 
   /* Paper tints for the board. Mid-saturation so a note reads as paper and
      still takes dark ink — the concept colour is too strong to write on and
@@ -73,6 +73,7 @@ export const STYLES = `
   --n-value: #e5e7eb;
   --n-command: #bfdbfe;
   --n-query: #99f6e4;
+  --n-readmodel: #a7f3d0;
   --n-event: #fed7aa;
   --n-error: #fecaca;
   --n-ink: #09090b;
@@ -124,7 +125,6 @@ export const STYLES = `
     --rail-active-ink: #ffffff;
     --rail-field: #27272a;
     --rail-field-line: #3f3f46;
-    --rail-mark-ink: #0d0d10;
 
     --c-aggregate: #facc15;      --c-aggregate-soft: #2a2410;
     --c-entity: #f59e0b;         --c-entity-soft: #2e2210;
@@ -136,12 +136,14 @@ export const STYLES = `
     --c-command: #60a5fa;        --c-command-soft: #16233d;
     --c-query: #2dd4bf;          --c-query-soft: #10312e;
     --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+    --c-readmodel: #34d399;      --c-readmodel-soft: #0d2a20;
 
     --n-aggregate: #5c4a10;
     --n-entity: #5c3f0c;
     --n-value: #33353b;
     --n-command: #1e3a6b;
     --n-query: #0f4a44;
+    --n-readmodel: #0f3d2c;
     --n-event: #5c3517;
     --n-error: #5c1f1f;
     --n-ink: #f4f4f5;
@@ -177,7 +179,6 @@ export const STYLES = `
   --rail-active-ink: #ffffff;
   --rail-field: #27272a;
   --rail-field-line: #3f3f46;
-  --rail-mark-ink: #0d0d10;
 
   --c-aggregate: #facc15;      --c-aggregate-soft: #2a2410;
   --c-entity: #f59e0b;         --c-entity-soft: #2e2210;
@@ -189,12 +190,14 @@ export const STYLES = `
   --c-command: #60a5fa;        --c-command-soft: #16233d;
   --c-query: #2dd4bf;          --c-query-soft: #10312e;
   --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+  --c-readmodel: #34d399;      --c-readmodel-soft: #0d2a20;
 
   --n-aggregate: #5c4a10;
   --n-entity: #5c3f0c;
   --n-value: #33353b;
   --n-command: #1e3a6b;
   --n-query: #0f4a44;
+  --n-readmodel: #0f3d2c;
   --n-event: #5c3517;
   --n-error: #5c1f1f;
   --n-ink: #f4f4f5;
@@ -217,6 +220,7 @@ export const STYLES = `
 [data-kind="command"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft);   --k-note: var(--n-command); }
 [data-kind="query"]       { --k: var(--c-query);      --k-soft: var(--c-query-soft);     --k-note: var(--n-query); }
 [data-kind="invariant"]   { --k: var(--c-invariant);  --k-soft: var(--c-invariant-soft); --k-note: var(--n-error); }
+[data-kind="readModel"]   { --k: var(--c-readmodel);  --k-soft: var(--c-readmodel-soft); --k-note: var(--n-readmodel); }
 [data-kind="family"]      { --k: var(--line-strong);  --k-soft: var(--surface-sunken);   --k-note: var(--n-value); }
 
 * { box-sizing: border-box; }
@@ -249,12 +253,10 @@ a { color: var(--accent-ink); text-underline-offset: 2px; }
 .rail__head { padding: 20px var(--s4) var(--s3); }
 
 .rail__brand { display: flex; align-items: center; gap: 10px; }
-.rail__mark {
-  width: 30px; height: 30px; border-radius: 7px; flex: none;
-  background: var(--c-command);
-  display: grid; place-items: center;
-  font-size: 15px; font-weight: 700; color: var(--rail-mark-ink);
-}
+/* The Ontologic mark, inlined in html.ts — it carries its own colours, so it
+   needs no plate behind it. */
+.rail__mark { width: 34px; height: 34px; flex: none; display: block; }
+.rail__mark svg { width: 100%; height: 100%; display: block; }
 .rail__title {
   margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--rail-ink);
 }
@@ -378,6 +380,21 @@ kbd {
 .section__head {
   margin: 0 0 var(--s3); font-size: 12px; font-weight: 600;
   letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* A heading with a control beside it. */
+.section__bar { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+
+.toggle {
+  flex: none; padding: 4px 10px; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--ink-muted); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+.toggle[aria-pressed="true"] {
+  color: var(--k, var(--ink)); border-color: var(--k, var(--line-strong));
+  background: var(--k-soft, var(--surface));
 }
 
 /* ---------- legend bar ---------- */
@@ -686,6 +703,12 @@ a.note { cursor: pointer; }
   content: ""; position: absolute; left: 1px; top: 16px; bottom: 16px;
   width: 1px; background: var(--line-strong);
 }
+/* Wrapped so the group can be hidden as one. The wrapper is display:contents so
+   the arrow and the rank stay direct flex items of the path — showing and hiding
+   never changes the row's spacing, or the notes' tilt. */
+.board__consumers { display: contents; }
+.board[data-consumers="off"] .board__consumers { display: none; }
+
 .board__alt {
   padding-left: 2px;
   font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
