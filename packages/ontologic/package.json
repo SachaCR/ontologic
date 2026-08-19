@@ -14,8 +14,10 @@
   ],
   "scripts": {
     "test": "vitest run",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "tsc",
-    "build:release": "tsc --project tsconfig-release.json",
+    "build:release": "pnpm run clean && tsc --project tsconfig-release.json",
+    "prepack": "pnpm run build:release",
     "check:agents": "tsc --project tsconfig-agents.json",
     "example:step": "pnpx tsx src/examples/workflows/step-workflow-sepaPayment.ts",
     "example:graph": "pnpx tsx src/examples/workflows/graph-workflow.ts",
@@ -46,6 +48,9 @@
   },
   "bugs": {
     "url": "https://github.com/SachaCR/ontologic/issues"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"

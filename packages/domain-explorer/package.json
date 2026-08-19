@@ -11,8 +11,10 @@
     "/dist"
   ],
   "scripts": {
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "build": "tsc",
-    "build:release": "tsc --project tsconfig-release.json",
+    "build:release": "pnpm run clean && tsc --project tsconfig-release.json",
+    "prepack": "pnpm run build:release",
     "test": "vitest run",
     "test:report": "vitest run && vite preview --outDir reports"
   },
@@ -35,15 +37,17 @@
   "bugs": {
     "url": "https://github.com/SachaCR/ontologic/issues"
   },
-  "peerDependencies": {
-    "typescript": ">=5.0.0"
+  "dependencies": {
+    "typescript": "^5.9.3"
   },
   "devDependencies": {
     "@types/node": "^25.4.0",
-    "typescript": "^5.9.3",
     "vitest": "^4.1.3",
     "@vitest/ui": "^4.1.3",
     "@vitest/coverage-v8": "^4.1.3"
+  },
+  "engines": {
+    "node": ">=20"
   },
   "publishConfig": {
     "access": "public"
