@@ -1,6 +1,13 @@
 import ts from "typescript";
 
-import type { SourceLocation, StateField, UseCaseNode } from "./model";
+import type {
+  EntityNode,
+  Method,
+  RepositoryNode,
+  SourceLocation,
+  StateField,
+  UseCaseNode,
+} from "./model";
 import { makeNodeId } from "./model";
 import {
   docFields,
@@ -41,6 +48,16 @@ const READ_PREFIXES = /^(find|search|count|get|list)/;
 export interface UseCaseExtractionInput {
   /** Class names known to be repositories, used to type-match parameters. */
   repositoryNames: Set<string>;
+  /**
+   * Already-extracted entities and repositories.
+   *
+   * Needed to answer "which events does this call produce": the repository says
+   * which entity it persists, and the entity's method already declares what it
+   * emits. Both are read as written names — `link.ts` resolves them to node ids
+   * in the same pass that resolves `Method.emits`.
+   */
+  entities: EntityNode[];
+  repositories: RepositoryNode[];
 }
 
 /** An exported function that looks like a use case but carries no marker. */
@@ -79,6 +96,15 @@ export function extractUseCases(
   const actions = collectActions(ctx);
   const unionAliases = collectUnionAliases(ctx);
 
+  // Repository -> the entity it persists, and entity -> its methods. Both are
+  // written names; `link.ts` resolves the resulting event names to node ids.
+  const entityByRepository = new Map(
+    input.repositories.map((r) => [r.name, r.entityTypeName] as const),
+  );
+  const methodsByEntity = new Map(
+    input.entities.map((e) => [e.name, e.methods] as const),
+  );
+
   const useCases: UseCaseNode[] = [];
   const unmarked: UnmarkedUseCase[] = [];
 
@@ -87,7 +113,10 @@ export function extractUseCases(
 
     sf.forEachChild((node) => {
       if (ts.isClassDeclaration(node)) {
-        const useCase = toUseCaseNode(node, ctx, input, actions, unionAliases);
+        const useCase = toUseCaseNode(node, ctx, input, actions, unionAliases, {
+          entityByRepository,
+          methodsByEntity,
+        });
         if (useCase) useCases.push(useCase);
         return;
       }
@@ -188,6 +217,10 @@ function toUseCaseNode(
   input: UseCaseExtractionInput,
   actions: Map<string, ActionDeclaration>,
   unionAliases: Map<string, string[]>,
+  lookups: {
+    entityByRepository: Map<string, string>;
+    methodsByEntity: Map<string, Method[]>;
+  },
 ): UseCaseNode | undefined {
   const sf = node.getSourceFile();
   const name = node.name?.text;
@@ -223,6 +256,13 @@ function toUseCaseNode(
 
   const bindings = repositoryBindingsOfClass(node, input.repositoryNames);
   const access = analyseRepositoryAccess(execute?.body, bindings, sf);
+  const events = eventsEmittedIn(
+    execute?.body,
+    sf,
+    bindings,
+    lookups.entityByRepository,
+    lookups.methodsByEntity,
+  );
 
   const location = locationOf(node, ctx.root);
 
@@ -255,6 +295,8 @@ function toUseCaseNode(
     canFail,
     reads: access.reads,
     writes: access.writes,
+    emits: events.emits,
+    eventsUndetermined: events.undetermined,
     location,
   };
 
@@ -415,6 +457,197 @@ function repositoryBindingsOfFunction(
   }
 
   return bindings;
+}
+
+/**
+ * The events a use case body produces.
+ *
+ * `saveWithEvents(entity, domainEvents)` is the anchor: its second argument is,
+ * by contract, exactly what gets emitted. Everything here is about resolving
+ * that expression back to event class names.
+ *
+ * Purely syntactic, per the rule in ts-utils.ts — every hop is a name looked up
+ * in a map the model already built, never a checker query. The two terminal
+ * cases are a `new SomeEvent(...)` and a method call on a known entity, whose
+ * declared return type already names the event.
+ */
+function eventsEmittedIn(
+  body: ts.Node | undefined,
+  sf: ts.SourceFile,
+  bindings: Map<string, string>,
+  entityByRepository: Map<string, string>,
+  methodsByEntity: Map<string, Method[]>,
+): { emits: string[]; undetermined: boolean } {
+  if (!body) return { emits: [], undetermined: false };
+
+  /** `const x = <init>` — destructured names all point at the same initialiser. */
+  const locals = new Map<string, ts.Expression>();
+
+  const collectLocals = (n: ts.Node): void => {
+    if (ts.isVariableDeclaration(n) && n.initializer) {
+      if (ts.isIdentifier(n.name)) {
+        locals.set(n.name.text, n.initializer);
+      } else if (ts.isObjectBindingPattern(n.name)) {
+        // `const { book, event } = Book.create(...)` — the property names are
+        // not stable across codebases (`event` here, `creationEvent` there), so
+        // both names resolve through the factory call rather than by name.
+        for (const element of n.name.elements) {
+          if (ts.isIdentifier(element.name)) {
+            locals.set(element.name.text, n.initializer);
+          }
+        }
+      }
+    }
+    ts.forEachChild(n, collectLocals);
+  };
+  collectLocals(body);
+
+  const receiverText = (expression: ts.Expression): string =>
+    expression.getText(sf).split(".").pop() ?? "";
+
+  /** Which entity an expression ultimately denotes, by written name. */
+  const entityOf = (
+    expression: ts.Expression,
+    seen: Set<ts.Node>,
+  ): string | undefined => {
+    if (seen.has(expression)) return undefined;
+    seen.add(expression);
+
+    if (ts.isAwaitExpression(expression))
+      return entityOf(expression.expression, seen);
+
+    if (ts.isPropertyAccessExpression(expression)) {
+      // `lookup.value` — the Result wrapper is transparent here.
+      return entityOf(expression.expression, seen);
+    }
+
+    if (ts.isIdentifier(expression)) {
+      // `Book.create(...)` — the receiver is the entity's own name, not a local.
+      if (methodsByEntity.has(expression.text)) return expression.text;
+
+      const bound = locals.get(expression.text);
+      return bound ? entityOf(bound, seen) : undefined;
+    }
+
+    if (
+      ts.isCallExpression(expression) &&
+      ts.isPropertyAccessExpression(expression.expression)
+    ) {
+      const receiver = receiverText(expression.expression.expression);
+
+      // `this.libraryCollection.getById(...)` -> LibraryCollection -> Book
+      const repository = bindings.get(receiver);
+      if (repository) return entityByRepository.get(repository);
+
+      // `Book.create(...)` — a static factory names its entity directly.
+      if (methodsByEntity.has(receiver)) return receiver;
+    }
+
+    return undefined;
+  };
+
+  let undetermined = false;
+  const emits = new Set<string>();
+
+  /** Event class names an expression evaluates to. */
+  const resolve = (expression: ts.Expression, seen: Set<ts.Node>): void => {
+    if (seen.has(expression)) return;
+    seen.add(expression);
+
+    if (ts.isAwaitExpression(expression))
+      return resolve(expression.expression, seen);
+
+    if (ts.isNewExpression(expression)) {
+      // The use case built the event itself.
+      emits.add(expression.expression.getText(sf));
+      return;
+    }
+
+    if (ts.isArrayLiteralExpression(expression)) {
+      if (expression.elements.length === 0) return;
+      for (const element of expression.elements) resolve(element, seen);
+      return;
+    }
+
+    if (ts.isIdentifier(expression)) {
+      const bound = locals.get(expression.text);
+
+      if (bound && ts.isArrayLiteralExpression(bound)) {
+        // An accumulator: the events are whatever was pushed into it.
+        resolvePushesInto(expression.text, seen);
+        return;
+      }
+
+      if (!bound) {
+        undetermined = true;
+        return;
+      }
+
+      resolve(bound, seen);
+      return;
+    }
+
+    if (ts.isPropertyAccessExpression(expression)) {
+      // `result.value` — unwrap and resolve what produced the Result.
+      resolve(expression.expression, seen);
+      return;
+    }
+
+    if (
+      ts.isCallExpression(expression) &&
+      ts.isPropertyAccessExpression(expression.expression)
+    ) {
+      const entity = entityOf(expression.expression.expression, new Set());
+      const called = expression.expression.name.getText(sf);
+      const method = (methodsByEntity.get(entity ?? "") ?? []).find(
+        (m) => m.name === called,
+      );
+
+      if (!method) {
+        undetermined = true;
+        return;
+      }
+
+      for (const name of method.emits) emits.add(name);
+      return;
+    }
+
+    undetermined = true;
+  };
+
+  /** `domainEvents.push(x)` — every argument pushed into a named accumulator. */
+  const resolvePushesInto = (name: string, seen: Set<ts.Node>): void => {
+    const visit = (n: ts.Node): void => {
+      if (
+        ts.isCallExpression(n) &&
+        ts.isPropertyAccessExpression(n.expression) &&
+        n.expression.name.getText(sf) === "push" &&
+        n.expression.expression.getText(sf) === name
+      ) {
+        for (const argument of n.arguments) resolve(argument, seen);
+      }
+      ts.forEachChild(n, visit);
+    };
+    visit(body);
+  };
+
+  const visit = (n: ts.Node): void => {
+    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
+      const called = n.expression.name.getText(sf);
+      const receiver = receiverText(n.expression.expression);
+
+      if (called === "saveWithEvents" && bindings.has(receiver)) {
+        const argument = n.arguments[1];
+
+        if (!argument) undetermined = true;
+        else resolve(argument, new Set());
+      }
+    }
+    ts.forEachChild(n, visit);
+  };
+  visit(body);
+
+  return { emits: [...emits], undetermined };
 }
 
 /** Which repositories the body reads from, and which it writes to. */

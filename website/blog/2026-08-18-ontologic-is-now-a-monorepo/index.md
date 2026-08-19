@@ -5,6 +5,10 @@ authors: [sacha]
 tags: [typescript, architecture, release]
 ---
 
+Ontologic has moved to a monorepo. The library, the worked example and a new tool now live in one workspace — which means the example is built and typechecked against the library on every commit, instead of quietly drifting away from it in a repository of its own.
+
+<!-- truncate -->
+
 ## One repository, three packages
 
 Ontologic now lives in a pnpm workspace with turbo on top:
@@ -21,7 +25,13 @@ The line that matters is in the example's manifest:
 
 Not a version range. The example resolves to the library source sitting in the same commit. `pnpm build` typechecks both, in dependency order, and a change to the library that breaks the example fails right there — at the change, not weeks later when someone copies a snippet that no longer works.
 
-Moving the example in surfaced that `super(id, state, [...])` immediately. It is now:
+Moving the example in surfaced a defect immediately. Its `Loan` entity still passed invariants as a positional array — the pre-1.7 signature:
+
+```ts
+super(id, state, [dueDateAfterLoanDate, returnDateAfterLoanDate]);
+```
+
+That stopped compiling when 1.7.0 replaced the array with an options object. But the example sat in its own repository, pinned to `"ontologic": "^1.6.2"`, and nothing ever built the two together — so nothing failed, and I did not notice. It is now:
 
 ```ts
 super(id, state, {
@@ -29,7 +39,7 @@ super(id, state, {
 });
 ```
 
-One line. It had been wrong since 1.7.0 shipped a month ago.
+One line. It had been wrong for a month.
 
 ## The example was the thing that had to move
 

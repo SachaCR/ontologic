@@ -52,7 +52,12 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
         method.canFail = resolveAll(method.canFail, errorsByName);
 
         for (const target of method.emits) {
-          edges.push({ from: node.id, to: target, kind: "emits", via: method.name });
+          edges.push({
+            from: node.id,
+            to: target,
+            kind: "emits",
+            via: method.name,
+          });
         }
 
         for (const target of method.canFail) {
@@ -89,9 +94,14 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
     if (node.kind === "useCase") {
       const useCase = node as UseCaseNode;
       useCase.canFail = resolveAll(useCase.canFail, errorsByName);
+      useCase.emits = resolveAll(useCase.emits, eventsByName);
 
       for (const target of useCase.canFail) {
         edges.push({ from: node.id, to: target, kind: "canFail" });
+      }
+
+      for (const target of useCase.emits) {
+        edges.push({ from: node.id, to: target, kind: "emits" });
       }
 
       for (const repositoryName of useCase.reads) {

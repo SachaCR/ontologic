@@ -230,6 +230,22 @@ export interface UseCaseNode {
   /** Repository identifiers this use case reads from / writes to. */
   reads: string[];
   writes: string[];
+  /**
+   * The events this use case actually produces, as node ids.
+   *
+   * Inferred from the body: whatever reaches `saveWithEvents(entity, events)`
+   * is by contract what gets emitted. This is narrower than the events the
+   * written aggregate declares — a use case that calls one method emits that
+   * method's events, not the aggregate's whole repertoire.
+   */
+  emits: NodeId[];
+  /**
+   * A `saveWithEvents` argument could not be traced back to an event.
+   *
+   * Distinguishes "emits nothing" from "could not tell" — without it an
+   * untraceable body is indistinguishable from a query.
+   */
+  eventsUndetermined: boolean;
   location: SourceLocation;
 }
 
@@ -269,6 +285,7 @@ export interface Finding {
     | "invariant-never-attached"
     | "use-case-error-union-erased"
     | "use-case-not-marked"
+    | "use-case-events-undetermined"
     | "legacy-invariant-attachment";
   message: string;
   /** The node the finding is attached to. */

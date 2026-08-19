@@ -296,6 +296,18 @@ describe("Given the CreditBalance example, which has both a command and a query"
       expect(debit.writes).toEqual(["CreditBalanceRepository"]);
     });
 
+    it("Then events accumulated into an array are all resolved", () => {
+      // `const domainEvents = []; domainEvents.push(a); domainEvents.push(b);`
+      // then handed to saveWithEvents as one batch.
+      const create = useCase(model, "CreateBalanceWithCreditsUseCase");
+
+      expect(namesOf(model, create.emits).sort()).toEqual([
+        "CreditBalanceCreated",
+        "CreditBalanceCredited",
+      ]);
+      expect(create.eventsUndetermined).toBe(false);
+    });
+
     it("Then a read use case is reported as a query and writes nothing", () => {
       const read = useCase(model, "ReadBalanceUseCase");
 
@@ -511,6 +523,45 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         expect(kindOf("RecordBookReturnUseCase")).toBe("command");
       });
 
+      it("Then a use case reports only the events it actually causes", () => {
+        // RegisterLoan reads the Book aggregate but never writes it, so none of
+        // Book's events belong to it. Reporting the written aggregate's whole
+        // repertoire is the over-reporting this replaced.
+        const register = useCase(model, "RegisterLoanUseCase");
+
+        expect(namesOf(model, register.emits)).toEqual(["LoanCreatedEvent"]);
+        expect(register.eventsUndetermined).toBe(false);
+      });
+
+      it("Then an event destructured from a static factory is resolved", () => {
+        // `const { book, event } = Book.create(...)` — the property name is not
+        // stable across codebases, so this resolves through the factory call.
+        const addBook = useCase(model, "AddBookUseCase");
+
+        expect(namesOf(model, addBook.emits)).toEqual(["BookCreatedEvent"]);
+      });
+
+      it("Then an event unwrapped from a Result is resolved", () => {
+        const declareLost = useCase(model, "DeclareBookLostUseCase");
+
+        expect(namesOf(model, declareLost.emits)).toEqual(["BookLostEvent"]);
+      });
+
+      it("Then a query emits nothing, and says so rather than failing to tell", () => {
+        const search = useCase(model, "SearchBooksUseCase");
+
+        expect(search.emits).toEqual([]);
+        expect(search.eventsUndetermined).toBe(false);
+      });
+
+      it("Then nothing in this codebase has undetermined events", () => {
+        expect(
+          model.findings.filter(
+            (f) => f.code === "use-case-events-undetermined",
+          ),
+        ).toEqual([]);
+      });
+
       it("Then no use case is left unmarked", () => {
         expect(
           model.findings.filter((f) => f.code === "use-case-not-marked"),
@@ -528,6 +579,59 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
     });
   },
 );
+
+describe("Given a use case that builds its own event", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/eventFromUseCase.ts")],
+      includeTests: true,
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then the event it constructs is reported as emitted", () => {
+      const open = useCase(model, "OpenAccountViaReferralUseCase");
+
+      expect(namesOf(model, open.emits)).toEqual(["ReferralAccountOpened"]);
+      expect(open.eventsUndetermined).toBe(false);
+    });
+  });
+});
+
+describe("Given a use case whose event is built by a helper", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/untraceableEvents.ts")],
+      includeTests: true,
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then it is reported as undetermined rather than as emitting nothing", () => {
+      const escalate = useCase(model, "EscalateTicketUseCase");
+
+      expect(escalate.emits).toEqual([]);
+      expect(escalate.eventsUndetermined).toBe(true);
+    });
+
+    it("Then the gap is surfaced as a finding", () => {
+      const flagged = model.findings.filter(
+        (f) => f.code === "use-case-events-undetermined",
+      );
+
+      expect(
+        namesOf(
+          model,
+          flagged.map((f) => f.nodeId),
+        ),
+      ).toEqual(["EscalateTicketUseCase"]);
+    });
+  });
+});
 
 describe("Given an error class that never restores its prototype", () => {
   let model: DomainModel;

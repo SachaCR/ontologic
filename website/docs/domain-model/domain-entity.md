@@ -418,13 +418,11 @@ if (result.isOk()) {
 }
 ```
 
-### Events from use cases
+### Several events from one operation
 
-Events don't always belong on the entity. Sometimes the entity simply doesn't have enough context to produce a meaningful event — that context only exists at the use case level.
+An operation often produces more than one event. Creating an account and crediting it immediately is two facts, not one: the entity knows how to create itself, and it knows how to apply a credit, and each hands back its own event.
 
-Consider creating a new account and immediately crediting it in one operation. The entity knows how to create itself, and it knows how to apply a credit. But the fact that _"an account was opened with an initial deposit"_ is a higher-level business concept that neither operation alone can express. The use case has the full picture.
-
-In that case, the use case itself is responsible for producing the event:
+The use case collects them and saves them together — `saveWithEvents` takes one event or an array, and writes them with the state atomically:
 
 ```typescript
 class OpenAccountWithDepositUseCase
@@ -456,7 +454,7 @@ class OpenAccountWithDepositUseCase
 See [Use Case](../application/use-case.md) for the full shape, including why the error side
 is `never` here.
 
-The rule of thumb: if the event can be produced with only the entity's internal state, let the entity produce it. If the event requires knowledge that only the use case has (other entities, input parameters, business context), produce it in the use case.
+Both events here come from the entity, which is the normal case. When an event exists only in a context the aggregate has no business holding — a referral programme, say — the use case can build that one itself and save it alongside. See [Events you can't assign to a single entity](./domain-events.md#events-you-cant-assign-to-a-single-entity).
 
 A few things worth noting about how `ontologic` models events:
 

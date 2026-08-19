@@ -33,8 +33,9 @@ templates/src/domain/
 └── useCases/
     ├── activateSubscription.use-case.ts         # single-aggregate: the canonical sequence
     ├── subscribeToPlan.use-case.ts              # CROSS-aggregate: reads Plan, writes Subscription
+    ├── subscribeToPlanViaCampaign.use-case.ts   # builds one of its OWN events
     ├── readSubscription.use-case.ts             # a READ: declared over a Query, writes nothing
-    ├── commands/activateSubscription.command.ts, commands/subscribeToPlan.command.ts
+    ├── commands/*.command.ts
     ├── queries/readSubscription.query.ts
     └── errors/entityNotFound.error.ts
 ```
@@ -47,6 +48,13 @@ aggregate, so it cannot be a `Subscription` invariant — it lives in the use ca
 Read `activateSubscription.use-case.ts` and `readSubscription.use-case.ts` side by side to
 see the command/query split: the bodies differ only in that one saves, and the type
 argument says which before you read either body.
+
+`subscribeToPlanViaCampaign.use-case.ts` is the exception to "events come from the entity".
+A campaign is not something a `Subscription` should know about, so the use case records the
+conversion itself and saves it alongside the aggregate's own creation event — added to
+them, never substituted for them. Reach for `subscribeToPlan.use-case.ts` first; use this
+shape only when modelling the fact on the aggregate would mean teaching it a context it has
+no business holding.
 
 Imports are written the way a consumer writes them — `from "ontologic"` — so a copied
 file works unchanged in an application.

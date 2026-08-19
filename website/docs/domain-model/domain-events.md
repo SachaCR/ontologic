@@ -240,16 +240,22 @@ class OpenAccountViaReferralUseCase
   async execute(command: OpenAccountViaReferralCommand) {
     const { newUserId, referrerId } = command.payload;
 
-    const account = BankAccount.create({ ownerId: newUserId });
-    account.deposit(REFERRAL_BONUS);
+    // The entity produces what it can know from its own state.
+    const { account, creationEvent } = BankAccount.create({ ownerId: newUserId });
+    const depositEvent = account.deposit({ amount: REFERRAL_BONUS });
 
+    // Only the use case knows the deposit was a referral bonus.
     const referralEvent = new ReferralAccountOpened(account.id(), {
       newAccountId: account.id(),
       referrerId,
       bonusAmount: REFERRAL_BONUS,
     });
 
-    const saved = await this.accounts.saveWithEvents(account, [referralEvent]);
+    const saved = await this.accounts.saveWithEvents(account, [
+      creationEvent,
+      depositEvent,
+      referralEvent,
+    ]);
 
     if (saved.isErr()) {
       throw saved.error;
@@ -260,9 +266,11 @@ class OpenAccountViaReferralUseCase
 }
 ```
 
-The entity handles the mechanics. The use case holds the meaning.
+The entity handles the mechanics. The use case holds the meaning. Note that all three events are saved together — the entity's own events are not replaced by the use case's, they are joined by it.
 
 The rule of thumb: if the event can be produced with only the entity's internal state, let the entity produce it. If the event requires knowledge that only the use case has, produce it in the use case.
+
+You could of course put `account.applyReferralBonus(referrerId)` on the entity instead, and sometimes that is the better model. The question to ask is whether the aggregate should know the concept at all: if teaching it the rule means teaching it a context it has no business holding, the event belongs to the use case. Ontologic does not decide that for you — nobody knows your domain and its constraints better than you do.
 
 ---
 

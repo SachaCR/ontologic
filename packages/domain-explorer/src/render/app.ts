@@ -612,29 +612,53 @@ export const APP_SCRIPT = String.raw`
       html += "</div></div>";
     }
 
-    // Events are the aggregate's, not this use case's — the extractor does not
-    // correlate a use-case body with the entity methods it calls.
-    var events = {};
-    writes.forEach(function (edge) {
-      aggregatesBehind(edge.to).forEach(function (entity) {
-        edgesFrom(entity.id, "emits").forEach(function (e) { events[e.to] = true; });
-        containedTree(entity.id).forEach(function (child) {
-          edgesFrom(child.id, "emits").forEach(function (e) { events[e.to] = true; });
+    // Inferred from the body: whatever reaches saveWithEvents is what is emitted.
+    html += '<div class="section"><h2 class="section__head">Events emitted</h2>';
+
+    if (node.emits.length > 0) {
+      html += '<div class="cards">' + node.emits.map(function (id) {
+        var n = byId[id];
+        return n ? detailCard(n) : "";
+      }).join("") + "</div>";
+    } else if (!node.eventsUndetermined) {
+      html += '<div class="empty">' +
+        (isQuery
+          ? "A query changes nothing, so it emits nothing."
+          : "Nothing reaches <code>saveWithEvents</code> \u2014 this use case " +
+            "persists state without recording an event.") +
+        "</div>";
+    }
+
+    if (node.eventsUndetermined) {
+      // Be explicit that this is a gap, not an answer.
+      html += '<p class="subtitle" style="margin-top:10px">Something passed to ' +
+        "<code>saveWithEvents</code> could not be traced to an event class, so this " +
+        "list may be incomplete. Every event the written aggregate declares is shown " +
+        "below instead.</p>";
+
+      var aggregateEvents = {};
+      writes.forEach(function (edge) {
+        aggregatesBehind(edge.to).forEach(function (entity) {
+          edgesFrom(entity.id, "emits").forEach(function (e) { aggregateEvents[e.to] = true; });
+          containedTree(entity.id).forEach(function (child) {
+            edgesFrom(child.id, "emits").forEach(function (e) { aggregateEvents[e.to] = true; });
+          });
         });
       });
-    });
 
-    var eventIds = Object.keys(events);
-    if (eventIds.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Events its aggregate can emit</h2>' +
-        '<p class="subtitle">Every event the written aggregate declares \u2014 not only the ones ' +
-        "this use case causes. Which of them a given call produces is not determinable from " +
-        "the types alone.</p><div class=\"cards\">" +
-        eventIds.map(function (id) {
+      var fallback = Object.keys(aggregateEvents).filter(function (id) {
+        return node.emits.indexOf(id) === -1;
+      });
+
+      if (fallback.length > 0) {
+        html += '<div class="cards">' + fallback.map(function (id) {
           var n = byId[id];
           return n ? detailCard(n) : "";
-        }).join("") + "</div></div>";
+        }).join("") + "</div>";
+      }
     }
+
+    html += "</div>";
 
     html += '<div class="section"><h2 class="section__head">Errors raised</h2>';
     html += node.canFail.length
@@ -664,10 +688,14 @@ export const APP_SCRIPT = String.raw`
         '<span class="flow__verb">' + esc(t.kind) + "</span>" + esc(t.entity.name) + "</a>";
     });
 
-    if (node.returnsStateTypeName) {
+    node.emits.forEach(function (id) {
+      var event = byId[id];
+      if (!event) return;
+
       html += '<span class="flow__arrow">&#8594;</span>' +
-        '<span class="flow__item" data-kind="event">' + esc(node.returnsStateTypeName) + "</span>";
-    }
+        '<a class="flow__item" data-kind="event" href="' + hrefOf(event) + '">' +
+        esc(event.name) + "</a>";
+    });
 
     html += "</div></div>";
 

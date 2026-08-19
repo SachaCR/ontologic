@@ -155,6 +155,12 @@ if (saveResult.isErr()) throw saveResult.error;
 Atomicity is the reason to batch: the state change and the events that record it must land
 together or not at all.
 
+Those events normally come from the entity. A use case may also build one itself when the
+event only exists in a context the aggregate has no business holding — a referral bonus on
+top of an ordinary credit, say. It is saved alongside the entity's own events, not instead
+of them. See `where-logic-goes.md` in the `ontologic-domain-modeling` skill for the test to
+apply.
+
 ## Where use-case-level errors live
 
 Failures that belong to the use case rather than the entity — `EntityNotFound` is the

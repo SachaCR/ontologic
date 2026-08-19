@@ -40,6 +40,8 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
   // which un-migrated functions still look like use cases.
   const { useCases, unmarked } = extractUseCases(ctx, {
     repositoryNames: new Set(repositories.map((r) => r.name)),
+    entities,
+    repositories,
   });
 
   // Sub-entities are discovered through containment, so they can only be found

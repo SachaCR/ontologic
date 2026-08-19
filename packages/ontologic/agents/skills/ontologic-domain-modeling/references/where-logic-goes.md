@@ -150,10 +150,40 @@ clock forces every test through `vi.useFakeTimers()` and `vi.setSystemTime()`. A
 that depends on the clock depends on the outside world, which is the thing entities are
 supposed to avoid.
 
-**Events are constructed by the entity and returned inside the `Result`.** A use case
-never calls `new SomeEvent(...)`. Its job is to take the event the entity handed back and
-pass it to `saveWithEvents`. Publishing is not its job either — the repository persists
-events alongside state, and the message relay forwards them.
+**Events are normally constructed by the entity and returned inside the `Result`.** The use
+case takes what the entity handed back and passes it to `saveWithEvents`. Publishing is not
+its job either — the repository persists events alongside state, and the message relay
+forwards them.
+
+**But a use case may construct an event when the entity cannot know it happened.** Some
+events only exist in a context the aggregate has no business holding.
+
+A bank account knows how to open itself and how to take a credit, so it emits
+`ACCOUNT_CREATED` and `ACCOUNT_CREDITED` from its own state. Now add a referral programme:
+opening an account through a referral grants a bonus, and the business wants
+`REFERRAL_BONUS_GRANTED` tracked. The `Account` entity has no idea a referral exists — the
+use case does.
+
+```typescript
+const { account, creationEvent } = Account.create({ ownerId });
+const creditEvent = account.credit({ amount: REFERRAL_BONUS });
+
+// Only this use case knows the credit was a referral bonus.
+const bonusEvent = new ReferralBonusGranted(account.id(), {
+  referrerId,
+  amount: REFERRAL_BONUS,
+});
+
+await accounts.saveWithEvents(account, [creationEvent, creditEvent, bonusEvent]);
+```
+
+You could instead put `account.applyReferralBonus(referrerId)` on the entity, and sometimes
+that is the better model. The test is whether the aggregate should know the concept at all:
+if teaching it the rule means teaching it a context it has no business holding, the event
+belongs to the use case.
+
+The default stays entity-produced — an event derivable from the aggregate's own state
+belongs on the aggregate. This is the exception, not a second equal option.
 
 **Entities never do I/O.** No repository, no HTTP, no logger, no clock. If a rule needs
 any of those, that is the signal it belongs in a use case.

@@ -28,7 +28,33 @@ export function computeFindings(
     ...invariantsNeverAttached(nodes),
     ...useCasesWithErasedErrorUnion(nodes),
     ...useCasesNotMarked(unmarkedUseCases),
+    ...useCasesWithUndeterminedEvents(nodes),
   ];
+}
+
+/**
+ * A use case that saves events the extractor could not trace back to an event
+ * class — produced inside a helper, or through an expression the syntactic walk
+ * does not follow.
+ *
+ * Reported rather than guessed at, so the page can distinguish "emits nothing"
+ * from "could not tell". Falling back to the whole aggregate's events would
+ * over-report, which is what this replaced.
+ */
+function useCasesWithUndeterminedEvents(nodes: DomainNode[]): Finding[] {
+  return nodes
+    .filter((n): n is UseCaseNode => n.kind === "useCase")
+    .filter((useCase) => useCase.eventsUndetermined)
+    .map((useCase) => ({
+      code: "use-case-events-undetermined" as const,
+      message:
+        `${useCase.name} passes something to saveWithEvents that could not be ` +
+        `traced to a domain event, so the events it emits are incomplete. ` +
+        `Building the event in the use case or in a called entity method makes ` +
+        `it visible.`,
+      nodeId: useCase.id,
+      location: useCase.location,
+    }));
 }
 
 /**

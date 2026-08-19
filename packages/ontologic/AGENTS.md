@@ -327,6 +327,11 @@ Note that `getById` returns `ok(undefined)` for a missing entity — absence is 
 decision for the caller, not an infrastructure error. When several events are produced,
 collect them in an array and pass it to `saveWithEvents`.
 
+Events normally come from the entity. A use case may construct one itself when the event
+only exists in a context the aggregate has no business holding — `REFERRAL_BONUS_GRANTED`
+alongside the account's own `ACCOUNT_CREATED` and `ACCOUNT_CREDITED`. It is saved with the
+entity's events, never instead of them.
+
 The `Errors` argument is constrained to `DomainError`, so `Result<T, Error>` does not
 compile — `Error` has no `context` property. Name the domain failures, or declare `never`
 when there are none.
