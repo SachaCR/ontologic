@@ -43,6 +43,25 @@ describe("Given a domain model extracted from the Order example", () => {
       expect(embedded.edges).toHaveLength(model.edges.length);
     });
 
+    it("Then the theme can be switched, and follows the system by default", () => {
+      expect(html).toContain('data-theme-set="system"');
+      expect(html).toContain('data-theme-set="light"');
+      expect(html).toContain('data-theme-set="dark"');
+
+      // No attribute on the served markup means "follow the system" — the CSS
+      // keys the un-stamped state off prefers-color-scheme.
+      expect(html).not.toContain('<html lang="en" data-theme');
+    });
+
+    it("Then a saved theme is restored before the body renders", () => {
+      // The restore has to run in <head>. Below the body it would repaint, and a
+      // forced-light page on a dark machine would flash dark first.
+      const head = html.slice(0, html.indexOf("<body>"));
+
+      expect(head).toContain("ontologic-theme");
+      expect(head).toContain('setAttribute("data-theme"');
+    });
+
     it("Then the page has exactly the two script blocks it writes", () => {
       expect(html.match(/<script/g)).toHaveLength(2);
       expect(html.match(/<\/script>/g)).toHaveLength(2);

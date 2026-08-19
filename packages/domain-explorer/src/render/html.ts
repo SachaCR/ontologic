@@ -18,6 +18,21 @@ export function renderHtml(model: DomainModel): string {
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>
 <style>${STYLES}</style>
+<script>
+// Restore the saved theme before first paint, so a forced light page on a dark
+// machine never flashes dark. Only documentElement exists at this point.
+(function () {
+  try {
+    var saved = localStorage.getItem("ontologic-theme");
+    if (saved === "light" || saved === "dark") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {
+    // A file:// page may have storage blocked entirely; follow the system then.
+  }
+})();
+const MODEL = ${embedJson(model)};
+</script>
 </head>
 <body>
 <div class="shell">
@@ -45,13 +60,17 @@ export function renderHtml(model: DomainModel): string {
       <a class="navlink navlink--view" href="#/graph">Graph</a>
     </nav>
     <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
-    <p class="hint"><kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> clear</p>
+    <div class="rail__foot">
+      <div id="theme" class="theme" role="group" aria-label="Colour theme">
+        <button class="theme__btn" type="button" data-theme-set="system" aria-pressed="true">System</button>
+        <button class="theme__btn" type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button class="theme__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+      <p class="hint"><kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> clear</p>
+    </div>
   </aside>
   <main id="main" class="main"></main>
 </div>
-<script>
-const MODEL = ${embedJson(model)};
-</script>
 <script>${APP_SCRIPT}</script>
 </body>
 </html>

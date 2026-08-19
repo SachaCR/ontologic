@@ -542,9 +542,17 @@ export const APP_SCRIPT = String.raw`
       '<span class="note__name">' + esc(o.name) + "</span>" +
       (o.detail ? '<span class="note__detail">' + esc(o.detail) + "</span>" : "");
 
+    // Notes are a fixed size, so long names are clipped. The full text stays
+    // reachable: the title shows it on hover, and the note links through to the
+    // detail page.
+    var full = o.name + (o.detail ? " \u00b7 " + o.detail : "");
+    var title = ' title="' + esc(full) + '"';
+
     return o.href
-      ? '<a class="note" data-kind="' + esc(o.tone) + '" href="' + o.href + '">' + inner + "</a>"
-      : '<span class="note" data-kind="' + esc(o.tone) + '">' + inner + "</span>";
+      ? '<a class="note" data-kind="' + esc(o.tone) + '"' + title +
+        ' href="' + o.href + '">' + inner + "</a>"
+      : '<span class="note" data-kind="' + esc(o.tone) + '"' + title + ">" +
+        inner + "</span>";
   }
 
   /**
@@ -626,7 +634,8 @@ export const APP_SCRIPT = String.raw`
     var success = node.paths.filter(function (p) { return p.kind === "success"; });
     var failures = node.paths.filter(function (p) { return p.kind === "failure"; });
 
-    var html = '<div class="section"><h2 class="section__head">Board</h2><div class="board">';
+    var html = '<div class="section"><h2 class="section__head">Board</h2>' +
+      '<div class="board"><div class="board__inner">';
 
     success.forEach(function (path) {
       html += '<div class="board__row"><div class="board__label">Happy path</div>' +
@@ -639,7 +648,7 @@ export const APP_SCRIPT = String.raw`
         pathHtml(path) + "</div>";
     });
 
-    html += "</div>";
+    html += "</div></div>";
 
     if (failures.length === 0) {
       html += '<p class="subtitle" style="margin-top:10px">No domain failure \u2014 ' +
@@ -818,10 +827,17 @@ export const APP_SCRIPT = String.raw`
           esc(o.stats.join(" \u00b7 ")) + "</span></div>"
         : "");
 
+    // Cards are a fixed height, so long names and descriptions are clipped. The
+    // full text stays reachable: the title shows it on hover, and the card links
+    // through to the detail page.
+    var full = o.name + (o.desc ? " \u2014 " + o.desc : "");
+    var title = ' title="' + esc(full) + '"';
+
     return o.href
-      ? '<a class="' + cls + '" data-kind="' + esc(o.kind) + '" href="' + o.href + '">' +
-        inner + "</a>"
-      : '<div class="' + cls + '" data-kind="' + esc(o.kind) + '">' + inner + "</div>";
+      ? '<a class="' + cls + '" data-kind="' + esc(o.kind) + '"' + title +
+        ' href="' + o.href + '">' + inner + "</a>"
+      : '<div class="' + cls + '" data-kind="' + esc(o.kind) + '"' + title + ">" +
+        inner + "</div>";
   }
 
   function containedOf(id) {
@@ -1281,6 +1297,61 @@ export const APP_SCRIPT = String.raw`
     }).join("") + "</div>";
   }
 
+  // ---------- theme ----------
+
+  var THEME_KEY = "ontologic-theme";
+
+  /**
+   * Three states, matching the three the stylesheet defines: no attribute means
+   * follow the system, and an explicit value overrides it in either direction.
+   */
+  function currentTheme() {
+    var set = document.documentElement.getAttribute("data-theme");
+    return set === "light" || set === "dark" ? set : "system";
+  }
+
+  function applyTheme(choice) {
+    if (choice === "system") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", choice);
+    }
+
+    try {
+      if (choice === "system") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, choice);
+    } catch (e) {
+      // Storage can be blocked on file:// — the choice still applies, it just
+      // does not survive a reload.
+    }
+
+    markTheme();
+  }
+
+  function markTheme() {
+    var now = currentTheme();
+    var buttons = document.querySelectorAll("[data-theme-set]");
+
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute(
+        "aria-pressed",
+        buttons[i].getAttribute("data-theme-set") === now ? "true" : "false",
+      );
+    }
+  }
+
+  function wireTheme() {
+    var group = document.getElementById("theme");
+    if (!group) return;
+
+    group.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-theme-set]");
+      if (button) applyTheme(button.getAttribute("data-theme-set"));
+    });
+
+    markTheme();
+  }
+
   // ---------- graph ----------
 
   var BOX_W = 172, BOX_H = 24;
@@ -1491,6 +1562,7 @@ export const APP_SCRIPT = String.raw`
 
   window.addEventListener("hashchange", render);
 
+  wireTheme();
   renderFilters();
   renderRail("");
   render();
