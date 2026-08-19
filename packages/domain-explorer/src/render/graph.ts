@@ -32,6 +32,7 @@ interface Branch {
   label: string;
   kind: GraphNode["kind"];
   count?: number;
+  memberIds?: NodeId[];
   children: Branch[];
   x: number;
   y: number;
@@ -75,6 +76,7 @@ function layoutFor(
 
     if (branch.node) node.id = branch.node.id;
     if (branch.count !== undefined) node.count = branch.count;
+    if (branch.memberIds) node.memberIds = branch.memberIds;
 
     nodes.push(node);
 
@@ -109,7 +111,7 @@ function buildBranch(
   const branch: Branch = {
     node,
     label: node.name,
-    kind: graphKindOf(node),
+    kind: graphKindOf(node, depth),
     children: [],
     x: 0,
     y: 0,
@@ -154,10 +156,13 @@ function buildBranch(
       continue;
     }
 
+    // Collapsed, but not thrown away: none of these members has children, so the
+    // page can unfold the box back into them without re-deciding the tree.
     branch.children.push({
       label: family,
       kind: "family",
       count: members.length,
+      memberIds: members.map((member) => member.id),
       children: [],
       x: 0,
       y: 0,
@@ -214,16 +219,17 @@ function familyOf(holder: DomainNode, target: DomainNode): string | undefined {
   return refs.find((ref) => ref.symbol === target.name && ref.family)?.family;
 }
 
-function graphKindOf(node: DomainNode): GraphNode["kind"] {
-  switch (node.kind) {
-    case "entity":
-    case "subEntity":
-    case "valueObject":
-    case "event":
-      return node.kind;
-    default:
-      return "entity";
-  }
+/**
+ * How a node reads in the diagram.
+ *
+ * Only the node at depth 0 is the aggregate root. An entity below it is held by
+ * something else, and drawing it as an aggregate would hide the hierarchy the
+ * diagram exists to show.
+ */
+function graphKindOf(node: DomainNode, depth: number): GraphNode["kind"] {
+  if (node.kind === "valueObject" || node.kind === "event") return node.kind;
+
+  return depth === 0 ? "entity" : "subEntity";
 }
 
 /**

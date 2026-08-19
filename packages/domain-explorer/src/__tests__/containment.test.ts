@@ -217,3 +217,38 @@ describe("Given an aggregate whose state holds plain data", () => {
     });
   });
 });
+
+describe("Given an entity held inside another entity", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/containedEntity.ts")],
+    });
+  });
+
+  describe("When the model is extracted", () => {
+    it("Then the contained entity is an entity that is not a root", () => {
+      // The pair the renderer badges from. Extending DomainEntity is what makes
+      // Vehicle an entity; being held by Fleet is what stops it being an
+      // aggregate, and reading only the first of those labels it AGG.
+      const vehicle = model.nodes.find((n) => n.name === "Vehicle");
+
+      expect(vehicle?.kind).toBe("entity");
+      expect(model.aggregateRoots).not.toContain(vehicle?.id);
+    });
+
+    it("Then only the holder is a root", () => {
+      expect(model.aggregateRoots.map((id) => nameOf(model, id))).toEqual([
+        "Fleet",
+      ]);
+    });
+
+    it("Then a sub-entity is neither", () => {
+      const odometer = model.nodes.find((n) => n.name === "Odometer");
+
+      expect(odometer?.kind).toBe("subEntity");
+      expect(model.aggregateRoots).not.toContain(odometer?.id);
+    });
+  });
+});

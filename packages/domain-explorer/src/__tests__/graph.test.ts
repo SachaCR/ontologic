@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { extractModel } from "../index";
+import { APP_SCRIPT } from "../render/app";
+import { GRAPH_GEOMETRY } from "../render/graph";
 import type { DomainModel, GraphLayout } from "../extract/model";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..");
@@ -195,6 +197,105 @@ describe("Given a codebase whose aggregates contain nothing", () => {
         true,
       );
       expect(order.nodes.length).toBeGreaterThan(1);
+    });
+  });
+});
+
+describe("Given an aggregate holding a union of interchangeable value objects", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/unionFamily.ts")],
+    });
+  });
+
+  describe("When the graph layouts are built", () => {
+    it("Then the union collapses to one box named after the alias", () => {
+      const sensor = graphNamed(model, "Sensor");
+      const family = sensor.nodes.find((n) => n.kind === "family");
+
+      expect(family?.label).toBe("Reading");
+      expect(family?.count).toBe(4);
+      expect(sensor.nodes).toHaveLength(2);
+    });
+
+    it("Then the box keeps what it stands for, so the page can unfold it", () => {
+      const family = graphNamed(model, "Sensor").nodes.find(
+        (n) => n.kind === "family",
+      );
+
+      const members = (family?.memberIds ?? []).map((id) =>
+        model.nodes.find((n) => n.id === id),
+      );
+
+      expect(members.map((n) => n?.name).sort()).toEqual([
+        "Celsius",
+        "Fahrenheit",
+        "Kelvin",
+        "Pascal",
+      ]);
+    });
+
+    it("Then no member of a collapsed family holds anything", () => {
+      // What unfolding relies on: it adds leaves to the tree and never has to
+      // decide what hangs off them. The generator only collapses a family when
+      // this holds, so a member that grew children would have expanded instead.
+      const family = graphNamed(model, "Sensor").nodes.find(
+        (n) => n.kind === "family",
+      );
+
+      for (const id of family?.memberIds ?? []) {
+        expect(
+          model.edges.some(
+            (e) => e.from === id && (e.kind === "contains" || e.kind === "emits"),
+          ),
+        ).toBe(false);
+      }
+    });
+  });
+});
+
+describe("Given an aggregate holding another entity", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/containedEntity.ts")],
+    });
+  });
+
+  describe("When the graph layouts are built", () => {
+    it("Then only the root is drawn as an aggregate", () => {
+      // Both classes extend DomainEntity. Drawing them in the same colour hides
+      // the hierarchy the diagram exists to show.
+      const fleet = graphNamed(model, "Fleet");
+
+      expect(fleet.nodes[indexOfLabel(fleet, "Fleet")]?.kind).toBe("entity");
+      expect(fleet.nodes[indexOfLabel(fleet, "Vehicle")]?.kind).toBe("subEntity");
+    });
+
+    it("Then the page can draw the same tree the generator did", () => {
+      // Unfolding a family re-places the tree in the browser, with the rule
+      // copied into render/app.ts. Copied constants drift, and the failure is
+      // silent: boxes land in plausible but wrong positions.
+      const declared = /BOX_W = (\d+), BOX_H = (\d+), COLUMN = (\d+), ROW = (\d+), PAD = (\d+)/
+        .exec(APP_SCRIPT);
+
+      expect(declared).not.toBeNull();
+      expect(declared?.slice(1, 6).map(Number)).toEqual([
+        GRAPH_GEOMETRY.BOX_W,
+        GRAPH_GEOMETRY.BOX_H,
+        GRAPH_GEOMETRY.COLUMN,
+        GRAPH_GEOMETRY.ROW,
+        GRAPH_GEOMETRY.PAD,
+      ]);
+    });
+
+    it("Then the contained entity gets no diagram of its own", () => {
+      // Layouts are keyed by root, which is why a contained entity's page has to
+      // borrow the one above it.
+      expect(model.graphs.map((g) => g.title)).toEqual(["Fleet"]);
     });
   });
 });

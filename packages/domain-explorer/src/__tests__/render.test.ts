@@ -2,9 +2,15 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { resolve } from "node:path";
 
 import { extractModel, renderHtml } from "../index";
+import { APP_SCRIPT } from "../render/app";
 import type { DomainModel } from "../extract/model";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..");
+
+/** The JSON the page embeds, as text. */
+function embeddedModel(html: string): string {
+  return /const MODEL = (\{[\s\S]*?\});\n<\/script>/.exec(html)?.[1] ?? "{}";
+}
 
 describe("Given a domain model extracted from the Order example", () => {
   let model: DomainModel;
@@ -78,6 +84,70 @@ describe("Given a domain model extracted from the Order example", () => {
 
     it("Then wide content scrolls inside its own container", () => {
       expect(html).toMatch(/\.scroll\s*\{[^}]*overflow-x:\s*auto/);
+    });
+
+    it("Then the inlined script parses", () => {
+      // The script is assembled as a template literal, so a stray quote or
+      // backtick produces a page that renders a sidebar and a blank body — every
+      // structural assertion here still passes. Compiling it is the only check
+      // that reads it as code.
+      expect(() => new Function(APP_SCRIPT)).not.toThrow();
+    });
+
+    it("Then the sidebar offers exactly two views", () => {
+      const views = html.match(/<a class="navlink navlink--view"[^>]*>[^<]*<\/a>/g);
+
+      expect(views).toHaveLength(2);
+      expect(views?.join("")).toContain(">Overview<");
+      expect(views?.join("")).toContain(">Use Cases<");
+    });
+
+    it("Then the object decides its view, not the address it was reached by", () => {
+      // The whole point of the merge: resolve the id and dispatch on its kind
+      // BEFORE looking at the route. If a route comparison came first, then
+      // "#/entity/<id>" and "#/domain/<id>" could drift back into two pages for
+      // one object, which is the bug this fixes.
+      const dispatch = html.indexOf("VIEWS[node.kind](node)");
+      const firstRouteTest = html.indexOf('route === "domain"');
+
+      expect(dispatch).toBeGreaterThan(-1);
+      expect(firstRouteTest).toBeGreaterThan(-1);
+      expect(dispatch).toBeLessThan(firstRouteTest);
+    });
+
+    it("Then every stateful kind resolves to the same view", () => {
+      expect(html).toMatch(
+        /VIEWS = \{\s*entity: viewObject,\s*subEntity: viewObject,\s*valueObject: viewObject,/,
+      );
+    });
+
+    it("Then nothing addresses the retired explorer route", () => {
+      // "#/explore/<id>" still resolves so saved links work, but nothing on the
+      // page produces one any more — the diagram used to, which is how clicking
+      // an event landed on a dead end.
+      expect(html).not.toContain('"#/explore/');
+    });
+
+    it("Then no page sends the reader somewhere else for the rest", () => {
+      // The explorer used to bottom out in "Nothing below this — see its detail
+      // page". There is no other page now.
+      expect(html).not.toContain("Nothing below this");
+      expect(html).not.toContain("its detail page");
+    });
+
+    it("Then the standalone graph screen is a redirect, not a view", () => {
+      expect(html).not.toContain("function viewGraph");
+      expect(html).toMatch(/route === "graph"[\s\S]{0,200}location\.replace/);
+    });
+
+    it("Then the overview no longer carries the event unions table", () => {
+      // The unions stay in the model — the CLI summary and the
+      // event-missing-from-union finding both read them — but the overview is
+      // counts and findings only.
+      expect(html).not.toContain("Event unions");
+      expect(JSON.parse(embeddedModel(html)).eventUnions.length).toBeGreaterThan(
+        0,
+      );
     });
   });
 });

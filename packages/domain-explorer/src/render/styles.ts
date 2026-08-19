@@ -498,10 +498,12 @@ a.card:hover { border-color: var(--k); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s3); }
 .tile {
-  padding: var(--s3) var(--s4); background: var(--surface);
+  display: block; padding: var(--s3) var(--s4); background: var(--surface);
   border: 1px solid var(--line); border-radius: var(--radius);
   border-left: 6px solid var(--k, var(--line-strong));
+  color: inherit; text-decoration: none;
 }
+a.tile:hover { border-color: var(--k); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
 .tile__n {
   font-size: 26px; font-weight: 700;
   font-variant-numeric: tabular-nums; line-height: 1.1;
@@ -510,6 +512,8 @@ a.card:hover { border-color: var(--k); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   margin-top: 2px; font-size: 11px; letter-spacing: 0.05em;
   text-transform: uppercase; color: var(--ink-faint);
 }
+
+.gfold { cursor: pointer; }
 
 /* ---------- inspector ---------- */
 

@@ -31,15 +31,23 @@ It also resolves the relationships between them: which method emits which event,
 errors a behaviour can return, what an aggregate contains, which repositories a use case
 reads from versus writes to, and whether a use case is driven by a command or a query.
 
-## Three views
+## Two views
 
-**Overview** — counts, findings, and the event unions.
+**Overview** — how many of each concept the codebase has, and the findings below. Every
+count opens what it counted, and from there you drill down one level at a time: an
+aggregate, then what it holds, then its behaviours, then the events and errors each
+behaviour produces.
 
-**Explorer** — drill down one level at a time: aggregate roots, then what each holds, then
-its behaviours, then the events and errors each behaviour produces.
+Each aggregate and entity page opens on a diagram of the aggregate it belongs to — the
+root, what hangs off it, and the events those produce. Errors are left out; the diagram is
+about structure. On a contained entity the diagram is its root's, with the entity marked.
+A box standing for a union of interchangeable types unfolds when you click it.
 
-**Graph** — one diagram per aggregate root: the root, what hangs off it, and the events
-those produce. Errors are left out; this view is about structure.
+Every object has exactly one page, whichever link you followed to get there. The kind of
+the thing decides what the page shows, never the address it was reached by.
+
+**Use cases** — every command and query, each with its flow drawn as an event-storming
+board: the happy path and each failure path, with the events or errors they end on.
 
 ## Findings
 

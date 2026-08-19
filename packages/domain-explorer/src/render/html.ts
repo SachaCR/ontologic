@@ -54,10 +54,8 @@ const MODEL = ${embedJson(model)};
       <div id="filters" class="filters" role="group" aria-label="Filter by type"></div>
     </div>
     <nav class="rail__fixed" aria-label="Views">
-      <a class="navlink navlink--view" href="#/domain">Domain Model</a>
-      <a class="navlink navlink--view" href="#/use-cases">Use Cases</a>
-      <a class="navlink navlink--view" href="#/">Overview</a>
-      <a class="navlink navlink--view" href="#/graph">Graph</a>
+      <a class="navlink navlink--view" data-view="" href="#/">Overview</a>
+      <a class="navlink navlink--view" data-view="use-cases" href="#/use-cases">Use Cases</a>
     </nav>
     <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
     <div class="rail__foot">

@@ -339,6 +339,12 @@ export interface GraphNode {
   kind: "entity" | "subEntity" | "valueObject" | "event" | "family";
   /** How many members a family box stands for. */
   count?: number;
+  /**
+   * What a family box stands for, so the page can unfold it. Ids rather than
+   * labels: the names are already in `nodes`, and unfolded boxes link through
+   * the same way every other box does.
+   */
+  memberIds?: NodeId[];
   x: number;
   y: number;
 }

@@ -10,7 +10,7 @@ export const APP_SCRIPT = String.raw`
   "use strict";
 
   var KINDS = [
-    { key: "entity",      label: "Aggregates",    route: "entity" },
+    { key: "entity",      label: "Aggregates & entities", route: "entity" },
     { key: "valueObject", label: "Value objects", route: "value-object" },
     { key: "useCase",     label: "Use cases",     route: "use-case" },
     { key: "event",       label: "Events",        route: "event" },
@@ -30,6 +30,47 @@ export const APP_SCRIPT = String.raw`
   var routeToKind = {};
   KINDS.forEach(function (k) { routeToKind[k.route] = k.key; });
 
+  /**
+   * Aggregate roots, as a lookup.
+   *
+   * "entity" in the model means "extends DomainEntity", which is not the same
+   * question as "is an aggregate root": an entity held by another entity is
+   * contained, and must not wear the same badge or colour as the root that
+   * holds it.
+   */
+  var rootIds = {};
+  (function () {
+    var declared = (MODEL.aggregateRoots || []).filter(function (id) { return byId[id]; });
+
+    // Nothing contains anything: there is no hierarchy to distinguish, so every
+    // entity stands on its own. The rail and the graph layout assume the same.
+    if (declared.length === 0) {
+      MODEL.nodes.forEach(function (n) { if (n.kind === "entity") rootIds[n.id] = true; });
+      return;
+    }
+
+    declared.forEach(function (id) { rootIds[id] = true; });
+  })();
+
+  function isRoot(node) {
+    return node.kind === "entity" && rootIds[node.id] === true;
+  }
+
+  function sortByName(nodes) {
+    return nodes.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  function rootNodes() {
+    return sortByName(MODEL.nodes.filter(isRoot));
+  }
+
+  /** Entities that are held by something else, plus the sub-entities. */
+  function containedEntities() {
+    return sortByName(MODEL.nodes.filter(function (n) {
+      return n.kind === "subEntity" || (n.kind === "entity" && !isRoot(n));
+    }));
+  }
+
   function esc(value) {
     return String(value == null ? "" : value)
       .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
@@ -42,13 +83,29 @@ export const APP_SCRIPT = String.raw`
   }
 
   function routeOf(node) {
+    // Anything with state and identity is one object with one page, whatever
+    // route it came in on. "domain" is that page.
+    if (node.kind === "entity" || node.kind === "subEntity" ||
+        node.kind === "valueObject") {
+      return "domain";
+    }
+
+    // The router branch is plural; KINDS says "use-case". Both resolve, which is
+    // exactly the kind of accident this function now exists to prevent.
+    if (node.kind === "useCase") return "use-cases";
+
     for (var i = 0; i < KINDS.length; i++) {
       if (KINDS[i].key === node.kind) return KINDS[i].route;
     }
+
     return node.kind;
   }
 
-  /** Stable per-node URL. Names can repeat across modules, so ids carry the path. */
+  /**
+   * The address of a node. The only one — every link to an object goes through
+   * here, so clicking the same thing in the rail, in a list, on the board or in
+   * the diagram lands on the same page.
+   */
   function hrefOf(node) {
     return "#/" + routeOf(node) + "/" + encodeURIComponent(node.id);
   }
@@ -126,10 +183,7 @@ export const APP_SCRIPT = String.raw`
     var claimed = {};
     var html = "";
 
-    var roots = (MODEL.aggregateRoots || []).map(function (id) { return byId[id]; })
-      .filter(Boolean);
-
-    if (roots.length === 0) roots = nodesOfKind("entity");
+    var roots = rootNodes();
 
     roots.forEach(function (root) {
       var members = [root].concat(descendantsOf(root.id));
@@ -209,15 +263,24 @@ export const APP_SCRIPT = String.raw`
   }
 
   function markCurrent() {
-    var current = decodeURIComponent((location.hash.split("/")[2] || ""));
+    var parts = location.hash.replace(/^#\/?/, "").split("/");
+    var route = parts[0] || "";
+    var current = decodeURIComponent(parts[1] || "");
     var links = document.querySelectorAll(".navlink");
 
     for (var i = 0; i < links.length; i++) {
-      if (links[i].getAttribute("data-id") === current) {
-        links[i].setAttribute("aria-current", "page");
-      } else {
-        links[i].removeAttribute("aria-current");
-      }
+      var link = links[i];
+      var view = link.getAttribute("data-view");
+
+      // Concept links match on the node they point at; the two view links match
+      // on the branch, since everything that is not a use case hangs off the
+      // overview.
+      var on = view === null
+        ? link.getAttribute("data-id") === current
+        : view === (route === "use-cases" ? "use-cases" : "");
+
+      if (on) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
     }
   }
 
@@ -280,64 +343,14 @@ export const APP_SCRIPT = String.raw`
     return '<p class="subtitle"><code>' + esc(node.location.file) + ":" + node.location.line + "</code></p>";
   }
 
-  function header(node, kindLabel, prose) {
-    return '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(node.kind) +
-      '">' + esc(kindLabel) + "</span></div>" +
+  function header(node, label, prose) {
+    return '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(kindAttr(node)) +
+      '">' + esc(label) + "</span></div>" +
       '<h1 class="title' + (prose ? " title--prose" : "") + '">' + esc(node.name) + "</h1>" +
       whereFound(node);
   }
 
   // ---------- detail views ----------
-
-  function viewEntity(node) {
-    var isVo = node.kind === "valueObject";
-    var html = header(node, isVo ? "Value object" : "Aggregate");
-
-    html += '<div class="section"><h2 class="section__head">State — ' +
-      '<span class="mono">' + esc(node.stateTypeName) + "</span></h2>" +
-      fieldsTable(node.stateFields, "State type could not be resolved.") + "</div>";
-
-    var behaviour = node.methods.filter(function (m) {
-      return m.emits.length > 0 || m.canFail.length > 0;
-    });
-
-    if (behaviour.length > 0) {
-      var rows = behaviour.map(function (m) {
-        var params = (m.parameters || []).map(function (p) {
-          return p.name + ": " + p.type;
-        }).join(", ");
-
-        return "<tr><td>" +
-          '<span class="mono nowrap">' +
-          (m.isStatic ? '<span class="faint">static </span>' : "") +
-          "<b>" + esc(m.name) + "</b>(" + esc(params) + ")</span>" +
-          '<span class="sig">→ ' + esc(m.returnType) + "</span></td>" +
-          "<td>" + linkList(m.emits) + "</td>" +
-          "<td>" + linkList(m.canFail) + "</td></tr>";
-      }).join("");
-
-      html += '<div class="section"><h2 class="section__head">Behaviour</h2>' +
-        '<div class="scroll"><table><thead><tr><th>Method</th><th>Emits</th><th>Can fail with</th></tr></thead><tbody>' +
-        rows + "</tbody></table></div></div>";
-    }
-
-    if (node.invariants.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Invariants</h2>' +
-        '<div class="flow">' + node.invariants.map(function (id) {
-          var inv = byId[id];
-          return '<a class="flow__item" href="' + (inv ? hrefOf(inv) : "#") + '">' +
-            esc(inv ? inv.description : id) + "</a>";
-        }).join("") + "</div></div>";
-    }
-
-    var persisted = edgesTo(node.id, "persists");
-    if (persisted.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Persisted by</h2>' +
-        '<p>' + linkList(persisted.map(function (e) { return e.from; })) + "</p></div>";
-    }
-
-    return html + findingsFor(node.id);
-  }
 
   function viewEvent(node) {
     var html = header(node, "Domain event");
@@ -357,7 +370,9 @@ export const APP_SCRIPT = String.raw`
       html += '<div class="section"><h2 class="section__head">Emitted by</h2><div class="flow">' +
         emitters.map(function (e) {
           var from = byId[e.from];
-          return '<a class="flow__item" href="' + (from ? hrefOf(from) : "#") + '">' +
+          return '<a class="flow__item"' +
+            (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
             esc(from ? from.name : e.from) +
             (e.via ? '<span class="faint">.' + esc(e.via) + "()</span>" : "") + "</a>";
         }).join("") + "</div></div>";
@@ -387,7 +402,9 @@ export const APP_SCRIPT = String.raw`
       html += '<div class="section"><h2 class="section__head">Returned by</h2><div class="flow">' +
         raisers.map(function (e) {
           var from = byId[e.from];
-          return '<a class="flow__item" href="' + (from ? hrefOf(from) : "#") + '">' +
+          return '<a class="flow__item"' +
+            (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
             esc(from ? from.name : e.from) +
             (e.via ? '<span class="faint">.' + esc(e.via) + "()</span>" : "") + "</a>";
         }).join("") + "</div></div>";
@@ -450,7 +467,8 @@ export const APP_SCRIPT = String.raw`
         users.map(function (e) {
           var from = byId[e.from];
           return '<a class="flow__item flow__item--' + (e.kind === "writes" ? "write" : "read") +
-            '" href="' + (from ? hrefOf(from) : "#") + '">' +
+            '"' + (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
             '<span class="flow__verb">' + esc(e.kind) + "</span>" +
             esc(from ? from.name : e.from) + "</a>";
         }).join("") + "</div></div>";
@@ -586,7 +604,7 @@ export const APP_SCRIPT = String.raw`
             kind: step.kind === "write" ? "Writes" : step.kind === "read" ? "Reads" : "Calls",
             name: step.name,
             detail: step.detail,
-            href: target ? "#/domain/" + encodeURIComponent(target.id) : ""
+            href: target ? hrefOf(target) : ""
           });
       });
 
@@ -720,18 +738,76 @@ export const APP_SCRIPT = String.raw`
 
   // ---------- overview ----------
 
+  /**
+   * The groups the overview counts, in the order it counts them.
+   *
+   * One entry drives both the counter and the screen it opens, so the number and
+   * the page behind it cannot disagree. Aggregates and entities share one kind
+   * in the model and are split here on containment.
+   *
+   * An entry carrying a blurb is served by the generic list screen; the two
+   * without one — aggregates and use cases — have hand-written screens the
+   * router reaches first.
+   */
+  var GROUPS = [
+    {
+      route: "domain", kind: "entity", label: "Aggregates",
+      nodes: rootNodes
+    },
+    {
+      route: "entity", kind: "subEntity", label: "Entities",
+      blurb: "Held inside an aggregate. Each has its own identity, but is reached " +
+        "through the root that owns it.",
+      nodes: containedEntities
+    },
+    {
+      route: "value-object", kind: "valueObject", label: "Value objects",
+      blurb: "Immutable and compared by value \u2014 two with the same contents are the " +
+        "same thing.",
+      nodes: function () { return nodesOfKind("valueObject"); }
+    },
+    {
+      route: "use-cases", kind: "command", label: "Use cases",
+      nodes: function () { return nodesOfKind("useCase"); }
+    },
+    {
+      route: "event", kind: "event", label: "Events",
+      blurb: "Facts already recorded. Each one is named in the past tense.",
+      nodes: function () { return nodesOfKind("event"); }
+    },
+    {
+      route: "error", kind: "error", label: "Errors",
+      blurb: "Refusals a behaviour can return \u2014 expected outcomes, not exceptions.",
+      nodes: function () { return nodesOfKind("error"); }
+    },
+    {
+      route: "invariant", kind: "invariant", label: "Invariants",
+      blurb: "Rules that must hold before a change is allowed through.",
+      nodes: function () { return nodesOfKind("invariant"); }
+    },
+    {
+      route: "repository", kind: "repository", label: "Repositories",
+      blurb: "The ports through which aggregates are loaded and saved.",
+      nodes: function () { return nodesOfKind("repository"); }
+    }
+  ];
+
+  var groupByRoute = {};
+  GROUPS.forEach(function (g) { groupByRoute[g.route] = g; });
+
   function viewOverview() {
-    var html = '<div class="crumb"><span>Domain model</span></div>' +
-      '<h1 class="title">Overview</h1>' +
-      '<p class="subtitle">Extracted from <code>' + esc(MODEL.root) + "</code></p>";
+    var html = '<h1 class="title">Overview</h1>' +
+      '<p class="subtitle">Extracted from <code>' + esc(MODEL.root) + "</code>. " +
+      "Every count opens what it counted.</p>";
 
     html += '<div class="section"><div class="tiles">';
-    KINDS.forEach(function (kind) {
-      var count = nodesOfKind(kind.key).length;
+    GROUPS.forEach(function (group) {
+      var count = group.nodes().length;
       if (count === 0) return;
-      html += '<div class="tile" data-kind="' + esc(kind.key) + '"><div class="tile__n">' +
+      html += '<a class="tile" data-kind="' + esc(group.kind) +
+        '" href="#/' + esc(group.route) + '"><div class="tile__n">' +
         count + "</div>" +
-        '<div class="tile__k">' + esc(kind.label) + "</div></div>";
+        '<div class="tile__k">' + esc(group.label) + "</div></a>";
     });
     html += "</div></div>";
 
@@ -745,16 +821,30 @@ export const APP_SCRIPT = String.raw`
         '<div class="empty">No contradictions found.</div></div>';
     }
 
-    if (MODEL.eventUnions.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Event unions</h2><div class="scroll"><table><thead>' +
-        "<tr><th>Union</th><th>Members</th></tr></thead><tbody>" +
-        MODEL.eventUnions.map(function (u) {
-          return '<tr><td class="mono nowrap">' + esc(u.name) + "</td>" +
-            '<td class="mono muted">' + esc(u.memberNames.join(" | ")) + "</td></tr>";
-        }).join("") + "</tbody></table></div></div>";
-    }
-
     return html;
+  }
+
+  /**
+   * Every node in one group, as a grid — where an overview counter leads.
+   */
+  function viewKindList(route) {
+    var group = groupByRoute[route];
+    if (!group || !group.blurb) return "";
+
+    var nodes = group.nodes();
+
+    return trailHtml([
+        { label: "Overview", href: "#/" },
+        { label: group.label }
+      ]) +
+      '<h1 class="title">' + esc(group.label) + " \u2014 " + nodes.length + "</h1>" +
+      '<p class="subtitle">' + esc(group.blurb) + "</p>" +
+      '<div class="section">' +
+      (nodes.length
+        ? '<div class="cards">' + nodes.map(function (n) { return blockHtml(n); }).join("") +
+          "</div>"
+        : '<div class="empty">None found.</div>') +
+      "</div>";
   }
 
   // ---------- explorer ----------
@@ -791,6 +881,8 @@ export const APP_SCRIPT = String.raw`
     if (node.kind === "useCase") {
       return node.actionKind === "query" ? "query" : "command";
     }
+    // A contained entity reads as an entity; only a root wears the aggregate colour.
+    if (node.kind === "entity" && !isRoot(node)) return "subEntity";
     return node.kind;
   }
 
@@ -798,7 +890,13 @@ export const APP_SCRIPT = String.raw`
     if (node.kind === "useCase") {
       return node.actionKind === "query" ? "QRY" : "CMD";
     }
+    if (node.kind === "entity" && !isRoot(node)) return "ENT";
     return KIND_BADGE[node.kind] || "";
+  }
+
+  function labelOf(node) {
+    if (node.kind === "entity" && !isRoot(node)) return "Entity";
+    return KIND_LABEL[node.kind] || node.kind;
   }
 
   /**
@@ -909,20 +1007,7 @@ export const APP_SCRIPT = String.raw`
     return null;
   }
 
-  /** How many blocks the next level would show — drives the count badge. */
-  function childCount(node) {
-    if (node.kind === "event" || node.kind === "error" || node.kind === "invariant") return 0;
-
-    var behaviours = (node.methods || []).filter(function (m) {
-      return m.emits.length > 0 || m.canFail.length > 0;
-    });
-
-    return containedOf(node.id).length + behaviours.length;
-  }
-
   function blockHtml(node, extraClass) {
-    var terminal = childCount(node) === 0;
-
     return cardHtml({
       kind: kindAttr(node),
       name: node.name,
@@ -932,10 +1017,7 @@ export const APP_SCRIPT = String.raw`
       stats: statsOf(node),
       tinted: true,
       extra: extraClass,
-      // Terminal cards link to the detail page; the rest drill down.
-      href: terminal
-        ? hrefOf(node)
-        : "#/domain/" + encodeURIComponent(node.id)
+      href: hrefOf(node)
     });
   }
 
@@ -1043,27 +1125,84 @@ export const APP_SCRIPT = String.raw`
     return chain;
   }
 
-  function viewExplorer(target) {
-    // Level 4: a behaviour, addressed as owner::method.
-    if (target && target.indexOf("::") !== -1) {
-      var found = behaviourOf(target);
-      if (found) return viewBehaviour(found.owner, found.method);
-    }
+  /** Every id a node's methods name, once each, in the order they appear. */
+  function acrossMethods(node, field) {
+    var seen = {};
+    var ids = [];
 
-    var node = byId[target];
-    if (!node) return viewDomainRoots();
-
-    var segments = pathTo(node).map(function (n) {
-      return { label: n.name, href: "#/domain/" + encodeURIComponent(n.id) };
+    (node.methods || []).forEach(function (method) {
+      (method[field] || []).forEach(function (id) {
+        if (seen[id]) return;
+        seen[id] = true;
+        ids.push(id);
+      });
     });
-    segments.unshift({ label: "Domain Model", href: "#/domain" });
+
+    return ids;
+  }
+
+  function detailCards(ids) {
+    return '<div class="cards">' + ids.map(function (id) {
+      return byId[id] ? detailCard(byId[id]) : "";
+    }).join("") + "</div>";
+  }
+
+  /**
+   * The page for one object that carries state and identity — an aggregate, an
+   * entity inside one, a sub-entity, or a value object.
+   *
+   * There is exactly one of these per object. There used to be two: a structural
+   * view reached from the lists and the diagram, and a detail view reached from
+   * the rail. Which one you got depended on where you clicked, which is not a
+   * property of the thing you clicked. The sections below are the union of both,
+   * ordered as: what it is, what shape it has, what it does, what it holds.
+   */
+  function viewObject(node) {
+    var segments = pathTo(node).map(function (n) {
+      return { label: n.name, href: hrefOf(n) };
+    });
+
+    segments.unshift(
+      { label: "Overview", href: "#/" },
+      { label: "Aggregates", href: "#/domain" }
+    );
 
     var body = trailHtml(segments) +
-      '<h1 class="title">' + esc(node.name) + " " +
-      esc(KIND_LABEL[node.kind] || node.kind) + "</h1>" +
-      '<p class="subtitle">' + esc(node.description ||
-        "Behaviours, entities and value objects inside " + node.name + ".") + "</p>" +
+      '<h1 class="title">' + esc(node.name) + " " + esc(labelOf(node)) + "</h1>" +
+      (node.description ? '<p class="subtitle">' + esc(node.description) + "</p>" : "") +
+      whereFound(node) +
       legendHtml(DOMAIN_LEGEND);
+
+    var invariants = node.invariants || [];
+
+    // What is always true of this object comes first — it frames everything
+    // below rather than trailing it.
+    if (invariants.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Invariants</h2>' +
+        '<div class="flow">' + invariants.map(function (id) {
+          var inv = byId[id];
+          return '<a class="flow__item" data-kind="invariant" href="' +
+            (inv ? hrefOf(inv) : "#") + '">' +
+            esc(inv ? inv.description : id) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    // Then the shape: the lists further down only make sense once you can see
+    // what holds what.
+    var graph = graphFor(node);
+
+    if (graph) {
+      body += '<div class="section"><h2 class="section__head">Structure</h2>' +
+        '<p class="subtitle">' +
+        (isRoot(node)
+          ? "What this aggregate holds, and the events those produce. " +
+            "Errors are left out — this is about structure."
+          : "Where " + esc(node.name) + " sits inside " + esc(graph.title) + ".") +
+        "</p>" +
+        graphBlockHtml(graph, node.id) +
+        legendHtml(GRAPH_LEGEND) +
+        "</div>";
+    }
 
     var behaviours = (node.methods || []).filter(function (m) {
       return m.emits.length > 0 || m.canFail.length > 0;
@@ -1074,6 +1213,21 @@ export const APP_SCRIPT = String.raw`
         '<div class="cards">' +
         behaviours.map(function (m) { return behaviourBlockHtml(node, m); }).join("") +
         "</div></div>";
+    }
+
+    // The roll-up: a behaviour card carries only counts, and this is what those
+    // count. Everything here is also reachable one level deeper, per behaviour.
+    var emitted = acrossMethods(node, "emits");
+    var raised = acrossMethods(node, "canFail");
+
+    if (emitted.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Events emitted</h2>' +
+        detailCards(emitted) + "</div>";
+    }
+
+    if (raised.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Errors raised</h2>' +
+        detailCards(raised) + "</div>";
     }
 
     // The design separates what an aggregate holds by kind rather than listing
@@ -1099,9 +1253,10 @@ export const APP_SCRIPT = String.raw`
     }
 
     var references = referencesOf(node.id);
+
     if (references.length > 0) {
       body += '<div class="section"><h2 class="section__head">References</h2>' +
-        '<p class="subtitle">Named by id, not held \u2014 following one leaves this aggregate.</p>' +
+        '<p class="subtitle">Named by id, not held — following one leaves this aggregate.</p>' +
         '<div class="cards">' + references.map(function (edge) {
           var to = byId[edge.to];
           if (!to) return "";
@@ -1111,27 +1266,32 @@ export const APP_SCRIPT = String.raw`
             mono: true,
             badge: badgeOf(to),
             desc: "Referenced by id via " + edge.via + ".",
-            href: "#/domain/" + encodeURIComponent(to.id)
+            href: hrefOf(to)
           });
         }).join("") + "</div></div>";
     }
 
-    if (contained.length === 0 && behaviours.length === 0 && references.length === 0) {
-      body += '<div class="section"><div class="empty">Nothing below this \u2014 see ' +
-        '<a href="' + hrefOf(node) + '">its detail page</a> for state and payload.</div></div>';
+    var persisted = edgesTo(node.id, "persists");
+
+    if (persisted.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Persisted by</h2>' +
+        "<p>" + linkList(persisted.map(function (e) { return e.from; })) + "</p></div>";
     }
 
-    // Screen 3: the fields inspector, for anything that carries state.
+    body += findingsFor(node.id);
+
     var fields = node.stateFields || [];
     if (fields.length === 0) return body;
 
+    // The state type name rides in the inspector label, so the detail page's
+    // "State — <Type>" heading survives without a second table of the same rows.
     return '<div class="main--split"><div class="main__body">' + body + "</div>" +
       inspectorHtml({
         name: node.name,
         kind: kindAttr(node),
         badge: badgeOf(node),
         desc: node.description || "",
-        label: "Fields &amp; metadata",
+        label: "State &mdash; <span class=\"mono\">" + esc(node.stateTypeName) + "</span>",
         fields: fields.map(function (f) {
           return {
             name: f.name,
@@ -1142,7 +1302,6 @@ export const APP_SCRIPT = String.raw`
       }) + "</div>";
   }
 
-  /** The right-hand detail panel from screens 3 and 4. */
   function inspectorHtml(o) {
     var html = '<aside class="inspector" data-kind="' + esc(o.kind) + '">' +
       '<div class="inspector__top">' +
@@ -1170,9 +1329,12 @@ export const APP_SCRIPT = String.raw`
   /** Screen 4 — the events and errors one behaviour produces. */
   function viewBehaviour(owner, method) {
     var segments = pathTo(owner).map(function (n) {
-      return { label: n.name, href: "#/domain/" + encodeURIComponent(n.id) };
+      return { label: n.name, href: hrefOf(n) };
     });
-    segments.unshift({ label: "Domain Model", href: "#/domain" });
+    segments.unshift(
+      { label: "Overview", href: "#/" },
+      { label: "Aggregates", href: "#/domain" }
+    );
     segments.push({ label: method.name + "()", href: "#" });
 
     var body = trailHtml(segments) +
@@ -1240,7 +1402,7 @@ export const APP_SCRIPT = String.raw`
       '): <span class="t">' + esc(method.returnType) + "</span>";
   }
 
-  /** The legend bar the design puts under every Domain Model header. */
+  /** The legend bar under every object header. */
   var DOMAIN_LEGEND = [
     ["entity", "Aggregate"],
     ["subEntity", "Entity"],
@@ -1254,17 +1416,15 @@ export const APP_SCRIPT = String.raw`
 
   /** Screen 1 — every aggregate and root entity in the model. */
   function viewDomainRoots() {
-    var roots = (MODEL.aggregateRoots || []).map(function (id) { return byId[id]; })
-      .filter(Boolean);
+    var roots = rootNodes();
 
-    // Fall back to every entity when nothing contains anything — a codebase with
-    // no sub-entities has no roots to distinguish.
-    if (roots.length === 0) roots = nodesOfKind("entity");
-
-    var html = trailHtml([{ label: "Domain Model", href: "#/domain" }]) +
-      '<h1 class="title">Aggregates &amp; Entities</h1>' +
-      '<p class="subtitle">All aggregates and root entities in your domain model. ' +
-      "Click to explore behaviours, events, and errors.</p>" +
+    var html = trailHtml([
+        { label: "Overview", href: "#/" },
+        { label: "Aggregates" }
+      ]) +
+      '<h1 class="title">Aggregates \u2014 ' + roots.length + "</h1>" +
+      '<p class="subtitle">The roots of your domain model \u2014 nothing holds these. ' +
+      "Open one to see what it contains and what it can do.</p>" +
       legendHtml(DOMAIN_LEGEND);
 
     html += '<div class="section">' +
@@ -1354,7 +1514,13 @@ export const APP_SCRIPT = String.raw`
 
   // ---------- graph ----------
 
-  var BOX_W = 172, BOX_H = 24;
+  // Geometry, mirroring GRAPH_GEOMETRY in render/graph.ts so unfolding a family
+  // can re-place the tree with the same rule the generator used. A test asserts
+  // the two agree.
+  var BOX_W = 172, BOX_H = 24, COLUMN = 208, ROW = 30, PAD = 16;
+
+  /** Family boxes the reader has opened, keyed by "<rootId>#<index>". */
+  var unfolded = {};
 
   // The same concept colours as the cards. Kept as a second mapping because SVG
   // attributes cannot read the [data-kind] custom properties.
@@ -1379,10 +1545,108 @@ export const APP_SCRIPT = String.raw`
   }
 
   /**
-   * Draw a precomputed layout. All the decisions were made at generation time;
-   * this only turns coordinates into SVG.
+   * The diagram for whichever aggregate a node belongs to. Layouts are keyed by
+   * root, so a contained entity borrows the one for the root above it.
    */
-  function graphSvg(layout) {
+  function graphFor(node) {
+    var graphs = MODEL.graphs || [];
+    var trail = pathTo(node);
+    var rootId = trail.length > 0 ? trail[0].id : node.id;
+
+    for (var i = 0; i < graphs.length; i++) {
+      if (graphs[i].rootId === rootId) return graphs[i];
+    }
+
+    return null;
+  }
+
+  /** A family member reads the way it would have if it were never collapsed. */
+  function memberKind(node) {
+    if (!node) return "valueObject";
+    return node.kind === "valueObject" || node.kind === "event"
+      ? node.kind
+      : "subEntity";
+  }
+
+  /**
+   * The layout with every opened family unfolded back into its members.
+   *
+   * The generator decided the tree (render/graph.ts) and this only re-runs its
+   * placement rule over a bigger one: depth sets x, leaves stack down a running
+   * cursor, and a parent centres between its first and last child. That works
+   * because a collapsed family is only ever collapsed when none of its members
+   * has children — so unfolding adds leaves and never a new decision.
+   */
+  function placedGraph(layout) {
+    var nodes = layout.nodes.map(function (n) {
+      return {
+        id: n.id, label: n.label, kind: n.kind, count: n.count,
+        memberIds: n.memberIds, open: false, x: 0, y: 0
+      };
+    });
+
+    var kids = nodes.map(function () { return []; });
+    layout.edges.forEach(function (edge) { kids[edge.from].push(edge.to); });
+
+    nodes.slice().forEach(function (node, index) {
+      if (!node.memberIds || !unfolded[layout.rootId + "#" + index]) return;
+      node.open = true;
+
+      node.memberIds.forEach(function (id) {
+        var member = byId[id];
+
+        kids[index].push(nodes.length);
+        kids.push([]);
+        nodes.push({
+          id: id,
+          label: member ? member.name : id,
+          kind: memberKind(member),
+          open: false,
+          x: 0, y: 0
+        });
+      });
+    });
+
+    var cursor = 0;
+
+    var place = function (index, depth) {
+      var node = nodes[index];
+      node.x = PAD + depth * COLUMN;
+
+      if (kids[index].length === 0) {
+        node.y = cursor;
+        cursor += ROW;
+        return;
+      }
+
+      kids[index].forEach(function (child) { place(child, depth + 1); });
+
+      var first = nodes[kids[index][0]];
+      var last = nodes[kids[index][kids[index].length - 1]];
+      node.y = (first.y + last.y) / 2;
+    };
+
+    place(0, 0);
+
+    var edges = [];
+    kids.forEach(function (list, from) {
+      list.forEach(function (to) { edges.push({ from: from, to: to }); });
+    });
+
+    var maxX = nodes.reduce(function (max, n) { return Math.max(max, n.x); }, 0);
+
+    return {
+      rootId: layout.rootId,
+      title: layout.title,
+      nodes: nodes,
+      edges: edges,
+      width: maxX + BOX_W + PAD,
+      height: Math.max(cursor + PAD * 2, BOX_H + PAD * 2)
+    };
+  }
+
+  function graphSvg(source, currentId) {
+    var layout = placedGraph(source);
     var edges = "";
     var boxes = "";
 
@@ -1400,24 +1664,47 @@ export const APP_SCRIPT = String.raw`
         '" fill="none" stroke="var(--line-strong)" stroke-width="1"/>';
     });
 
-    layout.nodes.forEach(function (node) {
-      var label = node.kind === "family"
-        ? truncate(node.label, 18) + " ×" + node.count
+    layout.nodes.forEach(function (node, index) {
+      var family = node.kind === "family";
+
+      var label = family
+        ? truncate(node.label, 16) + " ×" + node.count
         : truncate(node.label, 22);
+
+      // The box for the node whose page this is, so a contained entity can see
+      // where it sits rather than having to find its own name.
+      var here = !!currentId && node.id === currentId;
 
       var box =
         '<rect x="' + node.x + '" y="' + node.y + '" width="' + BOX_W +
         '" height="' + BOX_H + '" rx="4" fill="' +
         (GRAPH_FILL[node.kind] || "var(--surface)") + '" stroke="' +
-        (GRAPH_STROKE[node.kind] || "var(--line-strong)") + '" stroke-width="1"' +
-        (node.kind === "family" ? ' stroke-dasharray="3 2"' : "") + "/>" +
+        (GRAPH_STROKE[node.kind] || "var(--line-strong)") + '" stroke-width="' +
+        (here ? "2.5" : "1") + '"' +
+        (family ? ' stroke-dasharray="3 2"' : "") + "/>" +
         '<text x="' + (node.x + 9) + '" y="' + (node.y + 16) +
         '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="' +
-        (node.kind === "event" ? "10.5" : "11.5") + '" fill="var(--ink)">' +
+        (node.kind === "event" ? "10.5" : "11.5") + '" font-weight="' +
+        (here ? "700" : "400") + '" fill="var(--ink)">' +
         esc(label) + "</text>";
 
+      if (family) {
+        // A caret rather than a link: the box stands for several nodes, so there
+        // is nowhere for it to navigate to. Opening it is the only thing it does.
+        box += '<text x="' + (node.x + BOX_W - 9) + '" y="' + (node.y + 16) +
+          '" text-anchor="end" font-size="11" fill="var(--ink)">' +
+          (node.open ? "\u25be" : "\u25b8") + "</text>";
+
+        boxes += '<g class="gfold" role="button" tabindex="0" data-unfold="' +
+          esc(layout.rootId + "#" + index) + '" aria-expanded="' + node.open +
+          '" aria-label="' + esc(node.label) + ", " + node.count + ' of them">' +
+          box + "</g>";
+        return;
+      }
+
       boxes += node.id
-        ? '<a href="#/explore/' + encodeURIComponent(node.id) + '">' + box + "</a>"
+        ? '<a href="' + (byId[node.id] ? hrefOf(byId[node.id]) : "#") + '">' +
+          box + "</a>"
         : box;
     });
 
@@ -1427,51 +1714,79 @@ export const APP_SCRIPT = String.raw`
       edges + boxes + "</svg>";
   }
 
-  function viewGraph(target) {
+  /**
+   * The diagram in its scroll container. Unfolding redraws only what is inside
+   * it, so the reader keeps their scroll position and the rest of the page.
+   */
+  function graphBlockHtml(layout, currentId) {
+    return '<div class="scroll" style="padding:6px" data-graph="' +
+      esc(layout.rootId) + '" data-current="' + esc(currentId || "") + '">' +
+      graphSvg(layout, currentId) + "</div>";
+  }
+
+  function redrawGraph(container) {
+    var rootId = container.getAttribute("data-graph");
     var graphs = MODEL.graphs || [];
 
-    var html = '<h1 class="title">Graph</h1>' +
-      '<p class="subtitle">Each aggregate root with what it holds and the events those ' +
-      "produce. Errors are left out — this view is about structure.</p>";
-
-    if (graphs.length === 0) {
-      return html + '<div class="empty">No aggregates found.</div>';
-    }
-
-    var selected = graphs[0];
     for (var i = 0; i < graphs.length; i++) {
-      if (graphs[i].rootId === target) selected = graphs[i];
+      if (graphs[i].rootId !== rootId) continue;
+      container.innerHTML = graphSvg(graphs[i], container.getAttribute("data-current"));
+      return;
     }
-
-    if (graphs.length > 1) {
-      html += '<div class="flow" style="margin-bottom:16px">' + graphs.map(function (g) {
-        return '<a class="flow__item' +
-          (g.rootId === selected.rootId ? " flow__item--write" : "") +
-          '" href="#/graph/' + encodeURIComponent(g.rootId) + '">' +
-          esc(g.title) + "</a>";
-      }).join("") + "</div>";
-    }
-
-    html += '<div class="scroll" style="padding:6px">' + graphSvg(selected) + "</div>";
-
-    html += '<div class="section"><h2 class="section__head">Legend</h2>' +
-      legendHtml([
-        ["entity", "aggregate or sub-entity"],
-        ["valueObject", "value object"],
-        ["event", "event"],
-        ["family", "family — any one of N"]
-      ]) +
-      '<p class="subtitle" style="margin-top:10px">Every box links into the Explorer.</p>' +
-      "</div>";
-
-    return html;
   }
+
+  /** Open or close the family box the event landed on. */
+  function toggleUnfold(target) {
+    var hit = target && target.closest ? target.closest("[data-unfold]") : null;
+    if (!hit) return false;
+
+    var key = hit.getAttribute("data-unfold");
+    if (unfolded[key]) delete unfolded[key];
+    else unfolded[key] = true;
+
+    var container = hit.closest("[data-graph]");
+    if (!container) return true;
+
+    redrawGraph(container);
+
+    // The members appear one column to the right of the box, usually past the
+    // edge of the scroll box. Without this the reader clicks and sees a gap open
+    // where the box was, with what they asked for off-screen.
+    var opened = container.querySelector(
+      '[data-unfold="' + key + '"][aria-expanded="true"]'
+    );
+    var box = opened && opened.querySelector("rect");
+
+    if (box) {
+      var right = Number(box.getAttribute("x")) + COLUMN + BOX_W + PAD;
+      if (right > container.clientWidth) {
+        container.scrollLeft = right - container.clientWidth;
+      }
+    }
+
+    return true;
+  }
+
+  /** Reads the diagram, not the page — the concept legend above covers the rest. */
+  var GRAPH_LEGEND = [
+    ["entity", "aggregate root"],
+    ["subEntity", "entity it holds"],
+    ["valueObject", "value object"],
+    ["event", "event"],
+    ["family", "family — any one of N, click to open"]
+  ];
 
   // ---------- routing ----------
 
+  /**
+   * The one view per kind. The router consults this and nothing else once it has
+   * a node, so an object cannot render differently depending on how it was
+   * reached.
+   */
   var VIEWS = {
-    entity: viewEntity,
-    valueObject: viewEntity,
+    entity: viewObject,
+    subEntity: viewObject,
+    valueObject: viewObject,
     event: viewEvent,
     error: viewError,
     invariant: viewInvariant,
@@ -1481,36 +1796,57 @@ export const APP_SCRIPT = String.raw`
 
   function render() {
     var parts = location.hash.replace(/^#\/?/, "").split("/");
-    var main = document.getElementById("main");
-    var html;
+    var route = parts[0] || "";
+    var target = decodeURIComponent(parts.slice(1).join("/") || "");
 
-    if (!parts[0]) {
-      html = viewOverview();
-    } else if (parts[0] === "domain" || parts[0] === "explore") {
-      // "explore" is the pre-redesign address, kept so saved links still work.
-      html = viewExplorer(decodeURIComponent(parts.slice(1).join("/") || ""));
-    } else if (parts[0] === "use-cases") {
-      var useCaseId = decodeURIComponent(parts.slice(1).join("/") || "");
-      html = byId[useCaseId] ? viewUseCase(byId[useCaseId]) : viewUseCases();
-    } else if (parts[0] === "graph") {
-      html = viewGraph(decodeURIComponent(parts.slice(1).join("/") || ""));
-    } else {
-      var node = byId[decodeURIComponent(parts[1] || "")];
-      var kind = routeToKind[parts[0]];
-
-      if (node && VIEWS[node.kind]) {
-        html = VIEWS[node.kind](node);
-      } else {
-        html = '<h1 class="title">Not found</h1>' +
-          '<p class="subtitle">No ' + esc(kind || parts[0]) +
-          ' matches this address. <a href="#/">Back to the overview</a>.</p>';
-      }
+    // The standalone graph screen is gone — the diagram belongs to the aggregate
+    // it describes. Rewrite the address rather than render something else at it,
+    // and replace rather than push, so Back does not bounce off the redirect.
+    if (route === "graph") {
+      location.replace(
+        "#/domain" + (target ? "/" + encodeURIComponent(target) : "")
+      );
+      return;
     }
 
-    main.innerHTML = html;
+    var main = document.getElementById("main");
+
+    main.innerHTML = viewFor(route, target);
     main.scrollTop = 0;
     window.scrollTo(0, 0);
     markCurrent();
+  }
+
+  /**
+   * What to draw.
+   *
+   * The object decides, never the address: an id is resolved and dispatched on
+   * its kind before the route is looked at, so every address that names the same
+   * node renders the same page. The route only picks a screen when there is no
+   * node to pick one — a list, or the overview.
+   */
+  function viewFor(route, target) {
+    // A behaviour is not a node; it is addressed as owner::method.
+    if (target.indexOf("::") !== -1) {
+      var found = behaviourOf(target);
+      if (found) return viewBehaviour(found.owner, found.method);
+    }
+
+    var node = byId[target];
+    if (node && VIEWS[node.kind]) return VIEWS[node.kind](node);
+
+    if (!route) return viewOverview();
+
+    // "explore" is the pre-redesign address, kept so saved links still work.
+    if (route === "domain" || route === "explore") return viewDomainRoots();
+    if (route === "use-cases" || route === "use-case") return viewUseCases();
+
+    var list = viewKindList(route);
+    if (list) return list;
+
+    return '<h1 class="title">Not found</h1>' +
+      '<p class="subtitle">No ' + esc(routeToKind[route] || route) +
+      ' matches this address. <a href="#/">Back to the overview</a>.</p>';
   }
 
   var searchBox = document.getElementById("search");
@@ -1530,7 +1866,20 @@ export const APP_SCRIPT = String.raw`
     renderRail(searchBox.value);
   });
 
+  document.addEventListener("click", function (event) {
+    if (toggleUnfold(event.target)) event.preventDefault();
+  });
+
   document.addEventListener("keydown", function (event) {
+    // A focused family box opens on Enter or Space, before Enter is read as
+    // "open whatever the rail cursor is on".
+    if (event.key === "Enter" || event.key === " ") {
+      if (toggleUnfold(event.target)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
     // "/" focuses the filter box from anywhere, the way search boxes usually do.
     if (event.key === "/" && event.target !== searchBox) {
       event.preventDefault();
