@@ -90,7 +90,7 @@ export const APP_SCRIPT = String.raw`
   function navlinkHtml(node) {
     var flagged = findingsByNode[node.id] ? " navlink--flagged" : "";
 
-    return '<a class="navlink' + flagged + '" data-kind="' + esc(node.kind) +
+    return '<a class="navlink' + flagged + '" data-kind="' + esc(kindAttr(node)) +
       '" data-id="' + esc(node.id) + '" href="' + hrefOf(node) + '">' +
       '<span class="navlink__dot"></span>' +
       '<span class="navlink__text">' + esc(node.name) + "</span></a>";
@@ -535,6 +535,126 @@ export const APP_SCRIPT = String.raw`
     });
   }
 
+  /** One sticky note. */
+  function noteHtml(o) {
+    var inner =
+      '<span class="note__kind">' + esc(o.kind) + "</span>" +
+      '<span class="note__name">' + esc(o.name) + "</span>" +
+      (o.detail ? '<span class="note__detail">' + esc(o.detail) + "</span>" : "");
+
+    return o.href
+      ? '<a class="note" data-kind="' + esc(o.tone) + '" href="' + o.href + '">' + inner + "</a>"
+      : '<span class="note" data-kind="' + esc(o.tone) + '">' + inner + "</span>";
+  }
+
+  /**
+   * The board: the happy path, then one row per way the use case can be refused.
+   *
+   * Each row reads left to right as a complete story — the steps taken, then
+   * where it ended. Repeating the prefix is the point: a failure row is a
+   * scenario you can read on its own.
+   */
+  function boardHtml(node) {
+    if (!node.paths || node.paths.length === 0) return "";
+
+    var isQuery = node.actionKind === "query";
+    var actionTone = isQuery ? "query" : "command";
+
+    function pathHtml(path) {
+      var html = '<div class="board__path">' +
+        noteHtml({
+          tone: actionTone,
+          kind: isQuery ? "Query" : "Command",
+          name: node.actionName || node.actionTypeName,
+          detail: ""
+        });
+
+      path.steps.forEach(function (step) {
+        var target = step.nodeId ? byId[step.nodeId] : null;
+
+        html += '<span class="board__arrow">&#8594;</span>' +
+          noteHtml({
+            tone: target ? kindAttr(target) : "entity",
+            kind: step.kind === "write" ? "Writes" : step.kind === "read" ? "Reads" : "Calls",
+            name: step.name,
+            detail: step.detail,
+            href: target ? "#/domain/" + encodeURIComponent(target.id) : ""
+          });
+      });
+
+      if (path.outcome.length > 0) {
+        // One rank, not a sequence: events reaching the same saveWithEvents are
+        // written together, and errors leaving the same guard are alternatives.
+        // Either way none of them follows another.
+        var many = path.outcome.length > 1;
+        var isSuccess = path.kind === "success";
+
+        html += '<span class="board__arrow">&#8594;</span>' +
+          '<div class="board__rank' + (many ? " board__rank--many" : "") + '">';
+
+        path.outcome.forEach(function (id, index) {
+          var outcome = byId[id];
+
+          if (many && index > 0 && !isSuccess) {
+            html += '<span class="board__alt">or</span>';
+          }
+
+          html += noteHtml({
+            tone: isSuccess ? "event" : "error",
+            kind: isSuccess ? "Event" : "Error",
+            name: outcome ? outcome.name : id,
+            detail: outcome && outcome.eventName ? outcome.eventName : "",
+            href: outcome ? hrefOf(outcome) : ""
+          });
+        });
+
+        html += "</div>";
+      } else if (path.kind === "success" && isQuery && node.returnsStateTypeName) {
+        // A query produces a read model rather than an event.
+        html += '<span class="board__arrow">&#8594;</span>' +
+          noteHtml({
+            tone: "query",
+            kind: "Read model",
+            name: node.returnsStateTypeName,
+            detail: ""
+          });
+      }
+
+      return html + "</div>";
+    }
+
+    var success = node.paths.filter(function (p) { return p.kind === "success"; });
+    var failures = node.paths.filter(function (p) { return p.kind === "failure"; });
+
+    var html = '<div class="section"><h2 class="section__head">Board</h2><div class="board">';
+
+    success.forEach(function (path) {
+      html += '<div class="board__row"><div class="board__label">Happy path</div>' +
+        pathHtml(path) + "</div>";
+    });
+
+    failures.forEach(function (path, index) {
+      html += '<div class="board__row board__row--failure">' +
+        '<div class="board__label">Failure path ' + (index + 1) + "</div>" +
+        pathHtml(path) + "</div>";
+    });
+
+    html += "</div>";
+
+    if (failures.length === 0) {
+      html += '<p class="subtitle" style="margin-top:10px">No domain failure \u2014 ' +
+        "this use case cannot be refused.</p>";
+    }
+
+    if (node.eventsUndetermined) {
+      html += '<p class="subtitle" style="margin-top:10px">Something passed to ' +
+        "<code>saveWithEvents</code> could not be traced to an event class, so the " +
+        "happy path may be incomplete.</p>";
+    }
+
+    return html + "</div>";
+  }
+
   /** Screen 6 — one use case in full. */
   function viewUseCase(node) {
     var isQuery = node.actionKind === "query";
@@ -555,6 +675,8 @@ export const APP_SCRIPT = String.raw`
           : "A command: an intent to change state, which the domain may refuse.")) +
       "</p>";
 
+    html += boardHtml(node);
+
     // The action, as the shape a caller has to supply.
     html += '<div class="section"><h2 class="section__head">' +
       (isQuery ? "Query input" : "Command input") + "</h2><pre>" +
@@ -571,133 +693,6 @@ export const APP_SCRIPT = String.raw`
           esc(node.actionName) + "</code></p>"
         : "") +
       "</div>";
-
-    var writes = edgesFrom(node.id, "writes");
-    var reads = edgesFrom(node.id, "reads");
-
-    // An aggregate that is both read and written appears once, as written —
-    // several use cases load through the same repository they save to.
-    var touched = [];
-    var touchedBy = {};
-
-    writes.concat(reads).forEach(function (edge) {
-      aggregatesBehind(edge.to).forEach(function (entity) {
-        if (touchedBy[entity.id]) return;
-        touchedBy[entity.id] = true;
-        touched.push({
-          entity: entity,
-          kind: edge.kind,
-          via: byId[edge.to] ? byId[edge.to].name : "a repository"
-        });
-      });
-    });
-
-    if (touched.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Aggregates &amp; entities involved</h2>' +
-        '<p class="subtitle">A use case reads from as many aggregates as it needs and writes to ' +
-        "exactly one \u2014 <code>saveWithEvents</code> is the only atomic unit.</p>" +
-        '<div class="cards">';
-
-      touched.forEach(function (t) {
-        html += cardHtml({
-          kind: kindAttr(t.entity),
-          name: t.entity.name,
-          mono: true,
-          badge: badgeOf(t.entity),
-          desc: (t.kind === "writes" ? "Written through " : "Read through ") + t.via + ".",
-          href: "#/domain/" + encodeURIComponent(t.entity.id)
-        });
-      });
-
-      html += "</div></div>";
-    }
-
-    // Inferred from the body: whatever reaches saveWithEvents is what is emitted.
-    html += '<div class="section"><h2 class="section__head">Events emitted</h2>';
-
-    if (node.emits.length > 0) {
-      html += '<div class="cards">' + node.emits.map(function (id) {
-        var n = byId[id];
-        return n ? detailCard(n) : "";
-      }).join("") + "</div>";
-    } else if (!node.eventsUndetermined) {
-      html += '<div class="empty">' +
-        (isQuery
-          ? "A query changes nothing, so it emits nothing."
-          : "Nothing reaches <code>saveWithEvents</code> \u2014 this use case " +
-            "persists state without recording an event.") +
-        "</div>";
-    }
-
-    if (node.eventsUndetermined) {
-      // Be explicit that this is a gap, not an answer.
-      html += '<p class="subtitle" style="margin-top:10px">Something passed to ' +
-        "<code>saveWithEvents</code> could not be traced to an event class, so this " +
-        "list may be incomplete. Every event the written aggregate declares is shown " +
-        "below instead.</p>";
-
-      var aggregateEvents = {};
-      writes.forEach(function (edge) {
-        aggregatesBehind(edge.to).forEach(function (entity) {
-          edgesFrom(entity.id, "emits").forEach(function (e) { aggregateEvents[e.to] = true; });
-          containedTree(entity.id).forEach(function (child) {
-            edgesFrom(child.id, "emits").forEach(function (e) { aggregateEvents[e.to] = true; });
-          });
-        });
-      });
-
-      var fallback = Object.keys(aggregateEvents).filter(function (id) {
-        return node.emits.indexOf(id) === -1;
-      });
-
-      if (fallback.length > 0) {
-        html += '<div class="cards">' + fallback.map(function (id) {
-          var n = byId[id];
-          return n ? detailCard(n) : "";
-        }).join("") + "</div>";
-      }
-    }
-
-    html += "</div>";
-
-    html += '<div class="section"><h2 class="section__head">Errors raised</h2>';
-    html += node.canFail.length
-      ? '<div class="cards">' + node.canFail.map(function (id) {
-          var n = byId[id];
-          return n ? detailCard(n) : "";
-        }).join("") + "</div>"
-      : '<div class="empty">No domain failures \u2014 this use case cannot be refused.</div>';
-
-    if (node.errorUnionErased) {
-      html += '<p class="subtitle" style="margin-top:10px">Recovered from the ' +
-        "<code>err(new \u2026)</code> call sites: the declared return type erases them to " +
-        "<code>Error</code>.</p>";
-    }
-    html += "</div>";
-
-    // The flow strip: command, then each aggregate, then what comes out.
-    html += '<div class="section"><h2 class="section__head">Flow</h2><div class="flow">' +
-      '<span class="flow__item" data-kind="' + esc(kindAttr(node)) + '">' +
-      esc(node.actionName || node.actionTypeName) + "</span>";
-
-    touched.forEach(function (t) {
-      html += '<span class="flow__arrow">&#8594;</span>' +
-        '<a class="flow__item' + (t.kind === "reads" ? " flow__item--read" : "") +
-        '" data-kind="' + esc(kindAttr(t.entity)) + '" href="#/domain/' +
-        encodeURIComponent(t.entity.id) + '">' +
-        '<span class="flow__verb">' + esc(t.kind) + "</span>" + esc(t.entity.name) + "</a>";
-    });
-
-    node.emits.forEach(function (id) {
-      var event = byId[id];
-      if (!event) return;
-
-      html += '<span class="flow__arrow">&#8594;</span>' +
-        '<a class="flow__item" data-kind="event" href="' + hrefOf(event) + '">' +
-        esc(event.name) + "</a>";
-    });
-
-    html += "</div></div>";
 
     var rows = node.dependencies.map(function (dep) {
       return '<tr><td class="mono nowrap">' + esc(dep.name) + "</td>" +

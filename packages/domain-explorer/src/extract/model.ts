@@ -190,6 +190,32 @@ export interface RepositoryNode {
   location: SourceLocation;
 }
 
+/** One stop along a use case's path — an aggregate it touches. */
+export interface UseCaseStep {
+  kind: "read" | "call" | "write";
+  /** The aggregate or entity this step acts on. */
+  name: string;
+  /** The method called on it, e.g. `getById`, `declareLost`, `saveWithEvents`. */
+  detail: string;
+  /** The entity node, when it resolved. */
+  nodeId?: NodeId;
+}
+
+/**
+ * One complete way a use case can end.
+ *
+ * Derived by walking `execute` in source order: the success path is the body
+ * with its guards removed, and each failure path is the prefix of that spine up
+ * to the guard that returns. Infrastructure `throw`s are not paths — they are
+ * not domain outcomes.
+ */
+export interface UseCasePath {
+  kind: "success" | "failure";
+  steps: UseCaseStep[];
+  /** Events on a success path, errors on a failure path, as node ids. */
+  outcome: NodeId[];
+}
+
 export interface UseCaseNode {
   id: NodeId;
   kind: "useCase";
@@ -246,6 +272,11 @@ export interface UseCaseNode {
    * untraceable body is indistinguishable from a query.
    */
   eventsUndetermined: boolean;
+  /**
+   * Every way this use case can end, in source order: the success path first,
+   * then one failure path per guard. Empty when the body could not be walked.
+   */
+  paths: UseCasePath[];
   location: SourceLocation;
 }
 

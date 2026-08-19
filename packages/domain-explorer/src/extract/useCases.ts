@@ -7,6 +7,8 @@ import type {
   SourceLocation,
   StateField,
   UseCaseNode,
+  UseCasePath,
+  UseCaseStep,
 } from "./model";
 import { makeNodeId } from "./model";
 import {
@@ -256,7 +258,7 @@ function toUseCaseNode(
 
   const bindings = repositoryBindingsOfClass(node, input.repositoryNames);
   const access = analyseRepositoryAccess(execute?.body, bindings, sf);
-  const events = eventsEmittedIn(
+  const analysis = analyseBody(
     execute?.body,
     sf,
     bindings,
@@ -295,8 +297,9 @@ function toUseCaseNode(
     canFail,
     reads: access.reads,
     writes: access.writes,
-    emits: events.emits,
-    eventsUndetermined: events.undetermined,
+    emits: analysis.emits,
+    eventsUndetermined: analysis.undetermined,
+    paths: analysis.paths,
     location,
   };
 
@@ -460,25 +463,30 @@ function repositoryBindingsOfFunction(
 }
 
 /**
- * The events a use case body produces.
+ * What a use case body does, in order.
  *
- * `saveWithEvents(entity, domainEvents)` is the anchor: its second argument is,
- * by contract, exactly what gets emitted. Everything here is about resolving
- * that expression back to event class names.
+ * `saveWithEvents(entity, domainEvents)` is the anchor for events: its second
+ * argument is, by contract, exactly what gets emitted. The paths come from the
+ * same walk — every `if` in these bodies is a single-branch early exit, so the
+ * body is a straight spine with guards hanging off it. The success path is that
+ * spine with the guards removed; each failure path is the prefix up to one
+ * guard.
  *
  * Purely syntactic, per the rule in ts-utils.ts — every hop is a name looked up
- * in a map the model already built, never a checker query. The two terminal
- * cases are a `new SomeEvent(...)` and a method call on a known entity, whose
- * declared return type already names the event.
+ * in a map the model already built, never a checker query.
+ *
+ * `throw` sites are deliberately not paths. Every one in the corpus has the form
+ * `throw <repoResult>.error`: infrastructure failed, which is not a domain
+ * outcome and does not belong on a board.
  */
-function eventsEmittedIn(
-  body: ts.Node | undefined,
+function analyseBody(
+  body: ts.Block | undefined,
   sf: ts.SourceFile,
   bindings: Map<string, string>,
   entityByRepository: Map<string, string>,
   methodsByEntity: Map<string, Method[]>,
-): { emits: string[]; undetermined: boolean } {
-  if (!body) return { emits: [], undetermined: false };
+): { emits: string[]; undetermined: boolean; paths: UseCasePath[] } {
+  if (!body) return { emits: [], undetermined: false, paths: [] };
 
   /** `const x = <init>` — destructured names all point at the same initialiser. */
   const locals = new Map<string, ts.Expression>();
@@ -505,6 +513,11 @@ function eventsEmittedIn(
   const receiverText = (expression: ts.Expression): string =>
     expression.getText(sf).split(".").pop() ?? "";
 
+  const unwrapAwait = (expression: ts.Expression): ts.Expression =>
+    ts.isAwaitExpression(expression)
+      ? unwrapAwait(expression.expression)
+      : expression;
+
   /** Which entity an expression ultimately denotes, by written name. */
   const entityOf = (
     expression: ts.Expression,
@@ -513,8 +526,9 @@ function eventsEmittedIn(
     if (seen.has(expression)) return undefined;
     seen.add(expression);
 
-    if (ts.isAwaitExpression(expression))
+    if (ts.isAwaitExpression(expression)) {
       return entityOf(expression.expression, seen);
+    }
 
     if (ts.isPropertyAccessExpression(expression)) {
       // `lookup.value` — the Result wrapper is transparent here.
@@ -546,16 +560,27 @@ function eventsEmittedIn(
     return undefined;
   };
 
+  /** The method declared on `entity` with this name, if any. */
+  const methodOf = (
+    entity: string | undefined,
+    name: string,
+  ): Method | undefined =>
+    (methodsByEntity.get(entity ?? "") ?? []).find((m) => m.name === name);
+
   let undetermined = false;
   const emits = new Set<string>();
 
   /** Event class names an expression evaluates to. */
-  const resolve = (expression: ts.Expression, seen: Set<ts.Node>): void => {
+  const resolveEvents = (
+    expression: ts.Expression,
+    seen: Set<ts.Node>,
+  ): void => {
     if (seen.has(expression)) return;
     seen.add(expression);
 
-    if (ts.isAwaitExpression(expression))
-      return resolve(expression.expression, seen);
+    if (ts.isAwaitExpression(expression)) {
+      return resolveEvents(expression.expression, seen);
+    }
 
     if (ts.isNewExpression(expression)) {
       // The use case built the event itself.
@@ -565,7 +590,7 @@ function eventsEmittedIn(
 
     if (ts.isArrayLiteralExpression(expression)) {
       if (expression.elements.length === 0) return;
-      for (const element of expression.elements) resolve(element, seen);
+      for (const element of expression.elements) resolveEvents(element, seen);
       return;
     }
 
@@ -583,13 +608,13 @@ function eventsEmittedIn(
         return;
       }
 
-      resolve(bound, seen);
+      resolveEvents(bound, seen);
       return;
     }
 
     if (ts.isPropertyAccessExpression(expression)) {
       // `result.value` — unwrap and resolve what produced the Result.
-      resolve(expression.expression, seen);
+      resolveEvents(expression.expression, seen);
       return;
     }
 
@@ -598,10 +623,7 @@ function eventsEmittedIn(
       ts.isPropertyAccessExpression(expression.expression)
     ) {
       const entity = entityOf(expression.expression.expression, new Set());
-      const called = expression.expression.name.getText(sf);
-      const method = (methodsByEntity.get(entity ?? "") ?? []).find(
-        (m) => m.name === called,
-      );
+      const method = methodOf(entity, expression.expression.name.getText(sf));
 
       if (!method) {
         undetermined = true;
@@ -624,30 +646,163 @@ function eventsEmittedIn(
         n.expression.name.getText(sf) === "push" &&
         n.expression.expression.getText(sf) === name
       ) {
-        for (const argument of n.arguments) resolve(argument, seen);
+        for (const argument of n.arguments) resolveEvents(argument, seen);
       }
       ts.forEachChild(n, visit);
     };
     visit(body);
   };
 
-  const visit = (n: ts.Node): void => {
-    if (ts.isCallExpression(n) && ts.isPropertyAccessExpression(n.expression)) {
-      const called = n.expression.name.getText(sf);
-      const receiver = receiverText(n.expression.expression);
+  /**
+   * Error class names an `err(...)` argument evaluates to.
+   *
+   * Two shapes in practice: constructed inline, or propagated from an entity
+   * method's Result — `err(outcome.error)`, where the method's declared error
+   * union names them. A union with several members yields several errors from
+   * the one position.
+   */
+  const resolveErrors = (
+    expression: ts.Expression,
+    into: Set<string>,
+  ): void => {
+    if (ts.isNewExpression(expression)) {
+      into.add(expression.expression.getText(sf));
+      return;
+    }
 
-      if (called === "saveWithEvents" && bindings.has(receiver)) {
-        const argument = n.arguments[1];
+    if (ts.isPropertyAccessExpression(expression)) {
+      const produced = locals.get(receiverText(expression.expression));
 
-        if (!argument) undetermined = true;
-        else resolve(argument, new Set());
+      if (
+        produced &&
+        ts.isCallExpression(produced) &&
+        ts.isPropertyAccessExpression(produced.expression)
+      ) {
+        const entity = entityOf(produced.expression.expression, new Set());
+        const method = methodOf(entity, produced.expression.name.getText(sf));
+
+        if (method) {
+          for (const name of method.canFail) into.add(name);
+          return;
+        }
       }
     }
-    ts.forEachChild(n, visit);
-  };
-  visit(body);
 
-  return { emits: [...emits], undetermined };
+    if (ts.isIdentifier(expression)) {
+      const bound = locals.get(expression.text);
+      if (bound) return resolveErrors(bound, into);
+    }
+  };
+
+  /** Every error returned by an `err(...)` anywhere inside a statement. */
+  const errorsReturnedIn = (statement: ts.Node): string[] => {
+    const found = new Set<string>();
+
+    const visit = (n: ts.Node): void => {
+      if (
+        ts.isCallExpression(n) &&
+        n.expression.getText(sf) === "err" &&
+        n.arguments[0]
+      ) {
+        resolveErrors(n.arguments[0], found);
+      }
+      ts.forEachChild(n, visit);
+    };
+
+    visit(statement);
+    return [...found];
+  };
+
+  // ---- the ordered walk ----
+
+  const steps: UseCaseStep[] = [];
+  const guards: { at: number; errors: string[] }[] = [];
+
+  /** A call on a repository or an entity becomes a step. */
+  const stepFor = (expression: ts.Expression): UseCaseStep | undefined => {
+    const call = unwrapAwait(expression);
+
+    if (
+      !ts.isCallExpression(call) ||
+      !ts.isPropertyAccessExpression(call.expression)
+    ) {
+      return undefined;
+    }
+
+    const method = call.expression.name.getText(sf);
+    const receiver = receiverText(call.expression.expression);
+    const repository = bindings.get(receiver);
+
+    if (repository) {
+      const entity = entityByRepository.get(repository);
+      if (!entity) return undefined;
+
+      if (WRITE_METHODS.has(method)) {
+        // The write is also where the events are named.
+        const argument = call.arguments[1];
+        if (argument) resolveEvents(argument, new Set());
+        else if (method === "saveWithEvents") undetermined = true;
+
+        return { kind: "write", name: entity, detail: method };
+      }
+
+      if (READ_METHODS.has(method) || READ_PREFIXES.test(method)) {
+        return { kind: "read", name: entity, detail: method };
+      }
+
+      return undefined;
+    }
+
+    const entity = entityOf(call.expression.expression, new Set());
+    if (entity && methodOf(entity, method)) {
+      return { kind: "call", name: entity, detail: method };
+    }
+
+    return undefined;
+  };
+
+  for (const statement of body.statements) {
+    // A guard: an `if` whose branch returns a domain failure. `throw` branches
+    // are infrastructure and produce no `err(...)`, so they fall through here.
+    if (ts.isIfStatement(statement)) {
+      const errors = errorsReturnedIn(statement);
+      if (errors.length > 0) guards.push({ at: steps.length, errors });
+      continue;
+    }
+
+    const expressions: ts.Expression[] = [];
+
+    if (ts.isVariableStatement(statement)) {
+      for (const declaration of statement.declarationList.declarations) {
+        if (declaration.initializer) expressions.push(declaration.initializer);
+      }
+    } else if (ts.isExpressionStatement(statement)) {
+      expressions.push(statement.expression);
+    }
+
+    for (const expression of expressions) {
+      const step = stepFor(expression);
+      if (step) steps.push(step);
+    }
+  }
+
+  const paths: UseCasePath[] = [];
+
+  if (steps.length > 0 || emits.size > 0) {
+    // A query has no event: the renderer ends its path with the state it
+    // returns, which is the read model in event-storming terms.
+    paths.push({ kind: "success", steps: steps.slice(), outcome: [...emits] });
+  }
+
+  for (const guard of guards) {
+    paths.push({
+      kind: "failure",
+      steps: steps.slice(0, guard.at),
+      outcome: guard.errors,
+    });
+  }
+
+  return { emits: [...emits], undetermined, paths };
 }
 
 /** Which repositories the body reads from, and which it writes to. */

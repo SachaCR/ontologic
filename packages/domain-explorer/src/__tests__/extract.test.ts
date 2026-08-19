@@ -28,6 +28,18 @@ function event(model: DomainModel, name: string): EventNode {
   return found as EventNode;
 }
 
+/** "Book.getById -> Loan.create => LoanCreatedEvent", for readable assertions. */
+function pathsOf(model: DomainModel, name: string): string[] {
+  return useCase(model, name).paths.map((path) => {
+    const steps = path.steps.map((s) => s.name + "." + s.detail).join(" -> ");
+    const outcome = namesOf(model, path.outcome).join(" + ");
+
+    return (
+      path.kind + ": " + (steps || "(none)") + " => " + (outcome || "(none)")
+    );
+  });
+}
+
 function useCase(model: DomainModel, name: string): UseCaseNode {
   const found = model.nodes.find(
     (n) => n.kind === "useCase" && n.name === name,
@@ -241,6 +253,17 @@ describe("Given the Order example's application layer", () => {
       expect(namesOf(model, pay.canFail).sort()).toEqual([
         "EntityNotFound",
         "InvalidStatusTransition",
+      ]);
+    });
+
+    it("Then a switch on error.name resolves to one guard, not several", () => {
+      // `if (result.isErr()) { switch (...) { case: return err(...) } }` is one
+      // position — the switch is an exhaustiveness assertion, not a branch.
+      expect(pathsOf(model, "AddItemToOrderUseCase")).toEqual([
+        "success: Order.getById -> Order.addItem -> Order.saveWithEvents " +
+          "=> OrderItemAdded",
+        "failure: Order.getById => EntityNotFound",
+        "failure: Order.getById -> Order.addItem => InvalidStatusTransition",
       ]);
     });
 
@@ -562,6 +585,39 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
         ).toEqual([]);
       });
 
+      it("Then each failure path stops at the step that refused it", () => {
+        // The prefixes must differ. If they did not, this would just be
+        // `canFail` in a row, which is what the board replaced.
+        expect(pathsOf(model, "RegisterLoanUseCase")).toEqual([
+          "success: Book.getById -> Loan.findOutstandingLoanForBook -> " +
+            "Loan.findActiveLoansForMember -> Loan.create -> Loan.saveWithEvents " +
+            "=> LoanCreatedEvent",
+          "failure: Book.getById => BookNotFoundError",
+          "failure: Book.getById => BookLostCannotBeLoanedError",
+          "failure: Book.getById -> Loan.findOutstandingLoanForBook " +
+            "=> BookAlreadyOnLoanError",
+          "failure: Book.getById -> Loan.findOutstandingLoanForBook -> " +
+            "Loan.findActiveLoansForMember => MemberActiveLoanLimitExceededError",
+        ]);
+      });
+
+      it("Then an error propagated from an entity method is attributed to that call", () => {
+        // `return err(lostOutcome.error)` — the error is never named in the use
+        // case, only in the method's declared Result.
+        expect(pathsOf(model, "DeclareBookLostUseCase")).toEqual([
+          "success: Book.getById -> Book.declareLost -> Book.saveWithEvents " +
+            "=> BookLostEvent",
+          "failure: Book.getById => BookNotFoundError",
+          "failure: Book.getById -> Book.declareLost => BookAlreadyDeclaredLostError",
+        ]);
+      });
+
+      it("Then a query has one path and no failure", () => {
+        expect(pathsOf(model, "SearchBooksUseCase")).toEqual([
+          "success: Book.searchBook => (none)",
+        ]);
+      });
+
       it("Then no use case is left unmarked", () => {
         expect(
           model.findings.filter((f) => f.code === "use-case-not-marked"),
@@ -579,6 +635,29 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
     });
   },
 );
+
+describe("Given a use case propagating a multi-error entity method", () => {
+  let model: DomainModel;
+
+  beforeAll(() => {
+    model = extractModel({
+      paths: [resolve(__dirname, "fixtures/multiErrorGuard.ts")],
+      includeTests: true,
+    });
+  });
+
+  describe("When the domain model is extracted", () => {
+    it("Then both errors leave from the same step", () => {
+      expect(pathsOf(model, "EmptyBasketUseCase")).toEqual([
+        "success: Basket.getById -> Basket.empty -> Basket.saveWithEvents " +
+          "=> BasketEmptied",
+        "failure: Basket.getById => BasketNotFound",
+        "failure: Basket.getById -> Basket.empty " +
+          "=> BasketLocked + BasketAlreadyEmpty",
+      ]);
+    });
+  });
+});
 
 describe("Given a use case that builds its own event", () => {
   let model: DomainModel;

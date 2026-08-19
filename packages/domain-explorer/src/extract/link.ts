@@ -96,6 +96,20 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
       useCase.canFail = resolveAll(useCase.canFail, errorsByName);
       useCase.emits = resolveAll(useCase.emits, eventsByName);
 
+      // Paths carry written names until every node is known, the same two-pass
+      // shape as `emits` and `canFail`.
+      for (const path of useCase.paths) {
+        path.outcome = resolveAll(
+          path.outcome,
+          path.kind === "success" ? eventsByName : errorsByName,
+        );
+
+        for (const step of path.steps) {
+          const target = entitiesByName.get(step.name);
+          if (target) step.nodeId = target;
+        }
+      }
+
       for (const target of useCase.canFail) {
         edges.push({ from: node.id, to: target, kind: "canFail" });
       }

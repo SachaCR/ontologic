@@ -53,9 +53,21 @@ export const STYLES = `
   --c-error: #ef4444;          --c-error-soft: #fef2f2;
   --c-behaviour: #4f46e5;      --c-behaviour-soft: #eef2ff;
   --c-repository: #334155;     --c-repository-soft: #f8fafc;
-  --c-command: #8b5cf6;        --c-command-soft: #f5f3ff;
-  --c-query: #0ea5e9;          --c-query-soft: #f0f9ff;
+  --c-command: #2563eb;        --c-command-soft: #eff6ff;
+  --c-query: #0d9488;          --c-query-soft: #f0fdfa;
   --c-invariant: #db2777;      --c-invariant-soft: #fdf2f8;
+
+  /* Paper tints for the board. Mid-saturation so a note reads as paper and
+     still takes dark ink — the concept colour is too strong to write on and
+     the soft tint is too pale to read as a sticky. */
+  --n-aggregate: #fde68a;
+  --n-entity: #fcd34d;
+  --n-value: #e5e7eb;
+  --n-command: #bfdbfe;
+  --n-query: #99f6e4;
+  --n-event: #fed7aa;
+  --n-error: #fecaca;
+  --n-ink: #09090b;
 
   --danger: #dc2626;
   --danger-soft: #fef2f2;
@@ -107,9 +119,18 @@ export const STYLES = `
     --c-error: #f87171;          --c-error-soft: #2f1a1a;
     --c-behaviour: #818cf8;      --c-behaviour-soft: #21233d;
     --c-repository: #94a3b8;     --c-repository-soft: #222730;
-    --c-command: #a78bfa;        --c-command-soft: #26203c;
-    --c-query: #38bdf8;          --c-query-soft: #142834;
+    --c-command: #60a5fa;        --c-command-soft: #16233d;
+    --c-query: #2dd4bf;          --c-query-soft: #10312e;
     --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+
+    --n-aggregate: #5c4a10;
+    --n-entity: #5c3f0c;
+    --n-value: #33353b;
+    --n-command: #1e3a6b;
+    --n-query: #0f4a44;
+    --n-event: #5c3517;
+    --n-error: #5c1f1f;
+    --n-ink: #f4f4f5;
 
     --danger: #f87171;
     --danger-soft: #2f1a1a;
@@ -145,9 +166,18 @@ export const STYLES = `
   --c-error: #f87171;          --c-error-soft: #2f1a1a;
   --c-behaviour: #818cf8;      --c-behaviour-soft: #21233d;
   --c-repository: #94a3b8;     --c-repository-soft: #222730;
-  --c-command: #a78bfa;        --c-command-soft: #26203c;
-  --c-query: #38bdf8;          --c-query-soft: #142834;
+  --c-command: #60a5fa;        --c-command-soft: #16233d;
+  --c-query: #2dd4bf;          --c-query-soft: #10312e;
   --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+
+  --n-aggregate: #5c4a10;
+  --n-entity: #5c3f0c;
+  --n-value: #33353b;
+  --n-command: #1e3a6b;
+  --n-query: #0f4a44;
+  --n-event: #5c3517;
+  --n-error: #5c1f1f;
+  --n-ink: #f4f4f5;
 
   --danger: #f87171;
   --danger-soft: #2f1a1a;
@@ -156,18 +186,18 @@ export const STYLES = `
 }
 
 /* Per-kind roles. Every element that uses these also shows the kind as text. */
-[data-kind="entity"]      { --k: var(--c-aggregate);  --k-soft: var(--c-aggregate-soft); }
-[data-kind="subEntity"]   { --k: var(--c-entity);     --k-soft: var(--c-entity-soft); }
-[data-kind="valueObject"] { --k: var(--c-value);      --k-soft: var(--c-value-soft); }
-[data-kind="event"]       { --k: var(--c-event);      --k-soft: var(--c-event-soft); }
-[data-kind="error"]       { --k: var(--c-error);      --k-soft: var(--c-error-soft); }
-[data-kind="behaviour"]   { --k: var(--c-behaviour);  --k-soft: var(--c-behaviour-soft); }
-[data-kind="repository"]  { --k: var(--c-repository); --k-soft: var(--c-repository-soft); }
-[data-kind="useCase"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft); }
-[data-kind="command"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft); }
-[data-kind="query"]       { --k: var(--c-query);      --k-soft: var(--c-query-soft); }
-[data-kind="invariant"]   { --k: var(--c-invariant);  --k-soft: var(--c-invariant-soft); }
-[data-kind="family"]      { --k: var(--line-strong);  --k-soft: var(--surface-sunken); }
+[data-kind="entity"]      { --k: var(--c-aggregate);  --k-soft: var(--c-aggregate-soft); --k-note: var(--n-aggregate); }
+[data-kind="subEntity"]   { --k: var(--c-entity);     --k-soft: var(--c-entity-soft);    --k-note: var(--n-entity); }
+[data-kind="valueObject"] { --k: var(--c-value);      --k-soft: var(--c-value-soft);     --k-note: var(--n-value); }
+[data-kind="event"]       { --k: var(--c-event);      --k-soft: var(--c-event-soft);     --k-note: var(--n-event); }
+[data-kind="error"]       { --k: var(--c-error);      --k-soft: var(--c-error-soft);     --k-note: var(--n-error); }
+[data-kind="behaviour"]   { --k: var(--c-behaviour);  --k-soft: var(--c-behaviour-soft); --k-note: var(--n-command); }
+[data-kind="repository"]  { --k: var(--c-repository); --k-soft: var(--c-repository-soft); --k-note: var(--n-value); }
+[data-kind="useCase"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft);   --k-note: var(--n-command); }
+[data-kind="command"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft);   --k-note: var(--n-command); }
+[data-kind="query"]       { --k: var(--c-query);      --k-soft: var(--c-query-soft);     --k-note: var(--n-query); }
+[data-kind="invariant"]   { --k: var(--c-invariant);  --k-soft: var(--c-invariant-soft); --k-note: var(--n-error); }
+[data-kind="family"]      { --k: var(--line-strong);  --k-soft: var(--surface-sunken);   --k-note: var(--n-value); }
 
 * { box-sizing: border-box; }
 
@@ -507,6 +537,84 @@ pre .p { color: #a5b4fc; }
 .empty {
   padding: 18px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
   color: var(--ink-faint); font-size: 13px;
+}
+
+/* ---------- board ---------- */
+
+.board { display: flex; flex-direction: column; gap: var(--s3); }
+
+.board__row {
+  padding: var(--s3) var(--s4);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.board__row--failure { background: transparent; }
+
+.board__label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: var(--s2);
+}
+
+/* The path itself scrolls rather than wrapping — a wrapped path stops reading
+   as a sequence. */
+.board__path {
+  display: flex; align-items: center; gap: 6px;
+  overflow-x: auto; padding-bottom: 4px;
+}
+/* Make the scroll affordance visible — a clipped note reads as a bug. */
+.board__path::-webkit-scrollbar { height: 6px; }
+.board__path::-webkit-scrollbar-thumb {
+  background: var(--line-strong); border-radius: 3px;
+}
+
+/* A sticky note: solid paper, dark ink, barely rotated so the row looks placed
+   rather than printed. The concept colour survives as the bottom edge, which is
+   what keeps the legend meaningful. */
+.note {
+  flex: none; min-width: 96px; max-width: 168px;
+  padding: 8px 10px 7px;
+  background: var(--k-note, var(--surface-sunken));
+  color: var(--n-ink);
+  border-radius: 2px;
+  border-bottom: 3px solid var(--k, var(--line-strong));
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.16);
+  text-decoration: none;
+  transform: rotate(-0.5deg);
+}
+.note:nth-child(4n + 3) { transform: rotate(0.6deg); }
+.note:nth-child(4n + 1) { transform: rotate(0.3deg); }
+a.note:hover { box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.22); }
+
+.note__kind {
+  display: block; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6;
+}
+.note__name {
+  display: block; margin-top: 2px;
+  font-size: 13px; font-weight: 700; line-height: 1.25; word-break: break-word;
+}
+.note__detail {
+  display: block; margin-top: 1px;
+  font-family: var(--mono); font-size: 10.5px; opacity: 0.72;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+.board__arrow { flex: none; color: var(--ink-faint); font-size: 13px; }
+
+/* Several outcomes leave from one step: events saved together, or errors that
+   are alternatives. They share a rank, so they stack rather than following one
+   another — a row of them would imply an order that does not exist. */
+.board__rank { flex: none; display: flex; flex-direction: column; gap: 5px; }
+.board__rank--many { position: relative; padding-left: 11px; }
+.board__rank--many::before {
+  content: ""; position: absolute; left: 1px; top: 16px; bottom: 16px;
+  width: 1px; background: var(--line-strong);
+}
+.board__alt {
+  padding-left: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-faint);
 }
 
 /* ---------- flow ---------- */
