@@ -3,6 +3,7 @@ import { Result, err, ok } from "ontologic";
 
 import { Book, BookState } from "../../../domain/entities/book";
 import { LoanState } from "../../../domain/entities/loan";
+import { LibraryStatsState } from "../../../domain/entities/libraryStats";
 import {
   BookSearchCriteria,
   LibraryCollection,
@@ -10,6 +11,7 @@ import {
 import { LoanRegister } from "../../../domain/repositories/loanRegister.repository";
 import { AddBookUseCase } from "../../../domain/use-cases/addBook.use-case";
 import { DeclareBookLostUseCase } from "../../../domain/use-cases/declareBookLost.use-case";
+import { GetBookCountUseCase } from "../../../domain/use-cases/getBookCount.use-case";
 import { RecordBookReturnUseCase } from "../../../domain/use-cases/recordBookReturn.use-case";
 import { ListOutstandingLoansForMemberUseCase } from "../../../domain/use-cases/listOutstandingLoansForMember.use-case";
 import {
@@ -23,6 +25,7 @@ import { RecordBookReturnCommand } from "../../../domain/use-cases/commands/reco
 import { RegisterLoanCommand } from "../../../domain/use-cases/commands/registerLoan.command";
 import { SearchBooksQuery } from "../../../domain/use-cases/queries/searchBooks.query";
 import { ListOutstandingLoansForMemberQuery } from "../../../domain/use-cases/queries/listOutstandingLoansForMember.query";
+import { GetBookCountQuery } from "../../../domain/use-cases/queries/getBookCount.query";
 import {
   BookAlreadyDeclaredLostError,
   BookNotFoundError,
@@ -47,6 +50,7 @@ export class LibraryService implements OnModuleInit {
     private readonly registerLoanUseCase: RegisterLoanUseCase,
     private readonly recordBookReturnUseCase: RecordBookReturnUseCase,
     private readonly listOutstandingLoansForMemberUseCase: ListOutstandingLoansForMemberUseCase,
+    private readonly getBookCountUseCase: GetBookCountUseCase,
   ) {}
 
   onModuleInit() {
@@ -182,5 +186,13 @@ export class LibraryService implements OnModuleInit {
       return err(result.error);
     }
     return ok({ memberId, loans: result.value });
+  }
+
+  /**
+   * How many copies the library has taken in. Answered from the stats the
+   * projection has already folded, not by counting the collection.
+   */
+  async bookCount(): Promise<Result<LibraryStatsState, never>> {
+    return this.getBookCountUseCase.execute(new GetBookCountQuery());
   }
 }

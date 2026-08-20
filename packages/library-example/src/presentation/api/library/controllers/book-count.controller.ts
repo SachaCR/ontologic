@@ -1,13 +1,15 @@
 import { Controller, Get } from "@nestjs/common";
 
-import { BookCountService } from "../book-count.service";
+import { LibraryService } from "../library.service";
+import { unwrapResultOrThrow } from "../result-to-http";
 
-@Controller("books")
+@Controller("stats")
 export class BookCountController {
-  constructor(private readonly bookCountService: BookCountService) {}
+  constructor(private readonly libraryService: LibraryService) {}
 
-  @Get("count")
-  getBookCount() {
-    return { bookCount: this.bookCountService.getBookCount() };
+  @Get("books/count")
+  async getBookCount() {
+    const result = await this.libraryService.bookCount();
+    return unwrapResultOrThrow(result);
   }
 }

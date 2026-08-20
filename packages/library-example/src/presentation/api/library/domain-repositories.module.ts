@@ -8,8 +8,11 @@ import {
 
 import { LibraryCollection } from "../../../domain/repositories/libraryCollection.repository";
 import { LoanRegister } from "../../../domain/repositories/loanRegister.repository";
+import { StatsRegister } from "../../../domain/repositories/statsRegister.repository";
+import { StatsReport } from "../../../domain/read-models/statsReport.read-model";
 import { AddBookUseCase } from "../../../domain/use-cases/addBook.use-case";
 import { DeclareBookLostUseCase } from "../../../domain/use-cases/declareBookLost.use-case";
+import { GetBookCountUseCase } from "../../../domain/use-cases/getBookCount.use-case";
 import { ListOutstandingLoansForMemberUseCase } from "../../../domain/use-cases/listOutstandingLoansForMember.use-case";
 import { RecordBookReturnUseCase } from "../../../domain/use-cases/recordBookReturn.use-case";
 import { RegisterLoanUseCase } from "../../../domain/use-cases/registerLoan.use-case";
@@ -21,6 +24,7 @@ import {
   RELAY_REPO,
 } from "../../../infrastructure/infra.tokens";
 import { MessageRelayInitializer } from "../../../infrastructure/message-relay.initializer";
+import { StatsReportInitializer } from "../../../infrastructure/stats-report.initializer";
 import { validateDomainEvent } from "../../../infrastructure/event.validator";
 
 @Module({
@@ -59,6 +63,20 @@ import { validateDomainEvent } from "../../../infrastructure/event.validator";
       useFactory: () => new LoanRegister(),
     },
     MessageRelayInitializer,
+    {
+      provide: StatsRegister,
+      useFactory: () => new StatsRegister(),
+    },
+
+    // The read side. `StatsReport` is a plain domain class like the use cases
+    // below, so it is constructed here too; the initializer attaches it to the
+    // bus.
+    {
+      provide: StatsReport,
+      useFactory: (stats: StatsRegister) => new StatsReport(stats),
+      inject: [StatsRegister],
+    },
+    StatsReportInitializer,
 
     // Use cases are plain domain classes — they carry no framework decorators,
     // so they are constructed here rather than being `@Injectable()`.
@@ -97,6 +115,11 @@ import { validateDomainEvent } from "../../../infrastructure/event.validator";
         new ListOutstandingLoansForMemberUseCase(loans),
       inject: [LoanRegister],
     },
+    {
+      provide: GetBookCountUseCase,
+      useFactory: (stats: StatsRegister) => new GetBookCountUseCase(stats),
+      inject: [StatsRegister],
+    },
   ],
 
   exports: [
@@ -109,6 +132,7 @@ import { validateDomainEvent } from "../../../infrastructure/event.validator";
     RegisterLoanUseCase,
     RecordBookReturnUseCase,
     ListOutstandingLoansForMemberUseCase,
+    GetBookCountUseCase,
   ],
 })
 export class DomainRepositoriesModule {}

@@ -9,13 +9,12 @@ import { ListLoansController } from "./controllers/list-loans.controller";
 import { RecordBookReturnController } from "./controllers/record-book-return.controller";
 import { RegisterLoanController } from "./controllers/register-loan.controller";
 import { SearchBooksController } from "./controllers/search-books.controller";
-import { BookCountService } from "./book-count.service";
 import { DomainRepositoriesModule } from "./domain-repositories.module";
 import { LibraryService } from "./library.service";
 
 @Module({
   imports: [DomainRepositoriesModule],
-  providers: [BookCountService, LibraryService],
+  providers: [LibraryService],
   controllers: [
     SearchBooksController,
     ListBooksController,

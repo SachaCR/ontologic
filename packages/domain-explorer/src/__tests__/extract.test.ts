@@ -438,13 +438,16 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
     });
 
     describe("When the domain model is extracted", () => {
-      it("Then the aggregates are still found", () => {
+      it("Then the entities are still found", () => {
+        // LibraryStats is the read side: a DomainEntity the stats projection
+        // folds events into. It is an entity like the other two, and none of the
+        // three is an aggregate — nothing in this example holds anything.
         const names = model.nodes
           .filter((n) => n.kind === "entity")
           .map((n) => n.name)
           .sort();
 
-        expect(names).toEqual(["Book", "Loan"]);
+        expect(names).toEqual(["Book", "LibraryStats", "Loan"]);
       });
 
       it("Then state fields resolve even though `ontologic` cannot", () => {
@@ -508,8 +511,12 @@ describe.skipIf(!existsSync(LIBRARY_EXAMPLES))(
       });
 
       it("Then a repository query type is not mistaken for an event union", () => {
+        // BookSearchCriteria and the like are type aliases too, and must not be
+        // counted. LibraryEvent is kept because its members really are events —
+        // it is the vocabulary the stats read model declares.
         expect(model.eventUnions.map((u) => u.name).sort()).toEqual([
           "BookEvent",
+          "LibraryEvent",
           "LoanEvent",
         ]);
       });
