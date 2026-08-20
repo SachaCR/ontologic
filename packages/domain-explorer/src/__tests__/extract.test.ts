@@ -811,7 +811,37 @@ describe("Given a codebase with event consumers of every shape", () => {
 
       expect(view.consumedEventNames).toEqual(["SHELF_FILLED", "SHELF_CLEARED"]);
       expect(view.consumesEverything).toBe(false);
-      expect(view.queries.map((q) => q.name)).toEqual(["countOccupied"]);
+    });
+
+    it("Then whoever asks it something is recorded, however it got hold of it", () => {
+      // The two shapes that exist: injected as a dependency, and built with
+      // `new` inside a script. The second is the only one the workflow-v2
+      // consumers use, and it has no repository to be found through.
+      const view = readModel(model, "ShelfOccupancy");
+
+      expect(
+        view.queriedBy.map((site) => [site.name, site.kind, site.methods]),
+      ).toEqual([
+        ["ShelfDashboard", "class", ["countOccupied"]],
+        ["runShelfReport", "function", ["countOccupied"]],
+      ]);
+    });
+
+    it("Then wiring a view up does not count as asking it something", () => {
+      // `subscribe` is the contract and `onApplied` hands over a callback.
+      // Counting either would make every consumer a reader, which is what made
+      // the old method list useless.
+      const view = readModel(model, "ShelfOccupancy");
+
+      expect(view.queriedBy.map((site) => site.name)).not.toContain(
+        "wireShelfOccupancy",
+      );
+    });
+
+    it("Then a view nothing reads says so, rather than listing its methods", () => {
+      const view = readModel(model, "ShelfTypoWatcher");
+
+      expect(view.queriedBy).toEqual([]);
     });
 
     it("Then subscriptions become edges to the events themselves", () => {

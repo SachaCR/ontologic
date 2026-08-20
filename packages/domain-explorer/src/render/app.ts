@@ -489,11 +489,81 @@ export const APP_SCRIPT = String.raw`
     if (n.kind === "event") eventByClassName[n.name] = n;
   });
 
+  /**
+   * A node by its written name, for links to things named outside the graph.
+   * First match wins: two nodes can share a name across bounded contexts, and
+   * guessing which one a caller meant would be worse than linking either.
+   */
+  function nodeNamed(name) {
+    for (var i = 0; i < MODEL.nodes.length; i++) {
+      if (MODEL.nodes[i].name === name) return MODEL.nodes[i];
+    }
+    return null;
+  }
+
   /** Everything that consumes this event, the mirror of "Emitted by". */
   function consumersOf(id) {
     return MODEL.edges.filter(function (e) {
       return e.to === id && e.kind === "consumes";
     });
+  }
+
+  /**
+   * Everything that asks this read model something, by two routes — because a
+   * read model does not have to persist through a repository. The library
+   * example's does, so its readers are one hop through the repository it
+   * writes; the Postgres views in the workflow-v2 corpus write their own
+   * tables, and the only way to their readers is the calls queriedBy
+   * collected. (No backticks in here: this whole file is one template.)
+   *
+   * Shared with the overview card, so the count there is the list here.
+   */
+  function readersOf(node) {
+    var readers = [];
+    var seen = {};
+
+    function add(name, href, kind, note) {
+      if (seen[name]) return;
+      seen[name] = true;
+      readers.push({ name: name, href: href, kind: kind, note: note });
+    }
+
+    storesOf(node).forEach(function (storeId) {
+      edgesTo(storeId, "reads").forEach(function (edge) {
+        var asker = byId[edge.from];
+        if (!asker || asker.kind !== "useCase") return;
+        add(asker.name, hrefOf(asker), kindAttr(asker), "");
+      });
+    });
+
+    (node.queriedBy || []).forEach(function (site) {
+      // A reader is not necessarily a domain concept — it may be a service or a
+      // consumer script — so it becomes a page link only when the model holds a
+      // node by that name. When it does not, the file travels in the label:
+      // "repaint" alone says nothing, and there is no page to click through to.
+      var known = nodeNamed(site.name);
+      var label = known
+        ? site.name
+        : site.kind === "module"
+          ? site.location.file
+          : site.location.file + " \u00b7 " + site.name;
+
+      add(
+        label,
+        known ? hrefOf(known) : "",
+        known ? kindAttr(known) : "",
+        site.methods.join(", ")
+      );
+    });
+
+    return readers;
+  }
+
+  /** The repositories a read model saves through, as ids that resolve. */
+  function storesOf(node) {
+    return edgesFrom(node.id, "writes")
+      .map(function (edge) { return edge.to; })
+      .filter(function (id) { return !!byId[id]; });
   }
 
   function viewReadModel(node) {
@@ -536,11 +606,9 @@ export const APP_SCRIPT = String.raw`
         }).join("") + "</div></div>";
     }
 
-    // What it maintains, and who asks for it. Both are one hop through the
-    // repositories it writes to, so neither needs its own edge kind.
-    var stores = edgesFrom(node.id, "writes")
-      .map(function (edge) { return edge.to; })
-      .filter(function (id) { return !!byId[id]; });
+    // What it maintains is one hop through the repositories it writes to, so it
+    // needs no edge kind of its own.
+    var stores = storesOf(node);
 
     var built = [];
     var seenBuilt = {};
@@ -562,40 +630,26 @@ export const APP_SCRIPT = String.raw`
         "</div></div>";
     }
 
-    var askedBy = [];
-    var seenAsker = {};
+    var askedBy = readersOf(node);
 
-    stores.forEach(function (storeId) {
-      edgesTo(storeId, "reads").forEach(function (edge) {
-        var asker = byId[edge.from];
-        if (!asker || asker.kind !== "useCase" || seenAsker[edge.from]) return;
-        seenAsker[edge.from] = true;
-        askedBy.push(asker);
-      });
-    });
+    html += '<div class="section"><h2 class="section__head">Queried by</h2>' +
+      '<p class="subtitle">What reads this view. They ask; this decides ' +
+      "nothing.</p>";
 
-    if (askedBy.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Queried by</h2>' +
-        '<p class="subtitle">The use cases that read what it built. They ask; ' +
-        "this decides nothing.</p>" +
-        '<div class="flow">' + askedBy.map(function (useCase) {
-          return '<a class="flow__item" data-kind="' + esc(kindAttr(useCase)) +
-            '" href="' + hrefOf(useCase) + '">' + esc(useCase.name) + "</a>";
-        }).join("") + "</div></div>";
-    }
+    html += askedBy.length > 0
+      ? '<div class="flow">' + askedBy.map(function (asker) {
+          var attrs = (asker.kind ? ' data-kind="' + esc(asker.kind) + '"' : "") +
+            (asker.note ? ' title="' + esc(asker.note) + '"' : "");
 
-    if (node.queries.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Answers</h2>' +
-        '<p class="subtitle">What this view can be asked, once the events have landed.</p>' +
-        '<div class="scroll"><table><thead><tr><th>Query</th><th>Returns</th></tr></thead><tbody>' +
-        node.queries.map(function (q) {
-          var params = q.parameters.map(function (p) {
-            return p.name + ": " + p.type;
-          }).join(", ");
-          return '<tr><td class="mono nowrap">' + esc(q.name) + "(" + esc(params) + ")</td>" +
-            '<td class="mono muted">' + esc(q.returnType) + "</td></tr>";
-        }).join("") + "</tbody></table></div></div>";
-    }
+          return asker.href
+            ? '<a class="flow__item"' + attrs + ' href="' + asker.href + '">' +
+              esc(asker.name) + "</a>"
+            : '<span class="flow__item"' + attrs + ">" + esc(asker.name) +
+              "</span>";
+        }).join("") + "</div>"
+      : '<div class="empty">Nothing in this codebase asks it.</div>';
+
+    html += "</div>";
 
     return html + findingsFor(node.id);
   }
@@ -1219,9 +1273,8 @@ export const APP_SCRIPT = String.raw`
       var consumed = edgesFrom(node.id, "consumes").length;
       if (node.consumesEverything) parts.push("every event");
       else if (consumed) parts.push(consumed + " event" + (consumed === 1 ? "" : "s"));
-      if (node.queries.length) {
-        parts.push(node.queries.length + " quer" + (node.queries.length === 1 ? "y" : "ies"));
-      }
+      var readers = readersOf(node).length;
+      if (readers) parts.push(readers + " reader" + (readers === 1 ? "" : "s"));
     }
 
     return parts;

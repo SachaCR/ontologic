@@ -281,6 +281,23 @@ export interface UseCaseNode {
   location: SourceLocation;
 }
 
+/**
+ * Somewhere that holds a read model and asks it something.
+ *
+ * A caller is not necessarily a domain concept: a read model is a view, and a
+ * view is read by whatever needs to display it — a use case, a service, or a
+ * script. So this carries a name and a location rather than a node id, and the
+ * page links it only when the model happens to hold a node by that name.
+ */
+export interface QuerySite {
+  name: string;
+  /** What the caller is: a class, a named function, or the module itself. */
+  kind: "class" | "function" | "module";
+  /** The methods it calls, in the order written, deduped. */
+  methods: string[];
+  location: SourceLocation;
+}
+
 export interface ReadModelNode {
   id: NodeId;
   kind: "readModel";
@@ -302,8 +319,11 @@ export interface ReadModelNode {
   consumedEventNames: string[];
   /** Whether it registers a `listenTo("*")` handler, i.e. hears everything. */
   consumesEverything: boolean;
-  /** What it exposes to be asked — every public method that is not `subscribe`. */
-  queries: Method[];
+  /**
+   * Where it is asked something. Empty is a real answer rather than a gap: it
+   * says nothing in this codebase reads the view.
+   */
+  queriedBy: QuerySite[];
   /**
    * Repositories it saves through. A projection has to put what it worked out
    * somewhere, and that somewhere is what a reader wants to find from here.

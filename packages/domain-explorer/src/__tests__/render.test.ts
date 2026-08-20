@@ -145,6 +145,16 @@ describe("Given a domain model extracted from the Order example", () => {
       expect(html).toContain("--c-readmodel: #34d399");
     });
 
+    it("Then a read model's page always says who reads it", () => {
+      // "Answers" used to fill this slot with every public method, which on a
+      // view that keeps its internals in #private fields is most of the class.
+      // What a reader wants is who asks — and that has to show up whether or not
+      // the view happens to persist through a repository.
+      expect(html).toContain("Queried by");
+      expect(html).not.toContain("Answers");
+      expect(html).toContain("Nothing in this codebase asks it.");
+    });
+
     it("Then the board's consumer toggle is delegated, not bound", () => {
       // The board lives inside #main, which render() replaces wholesale. A
       // listener bound to the button survives exactly one navigation.

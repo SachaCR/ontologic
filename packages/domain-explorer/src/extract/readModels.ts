@@ -1,42 +1,22 @@
 import ts from "typescript";
 
-import type {
-  EventUnion,
-  Method,
-  ReadModelNode,
-  SourceLocation,
-} from "./model";
+import type { EventUnion, ReadModelNode, SourceLocation } from "./model";
 import { makeNodeId } from "./model";
 import {
   docFields,
   eachSourceFile,
   implementsNames,
-  isPrivate,
   locationOf,
   type ExtractContext,
 } from "./ts-utils";
+import { resolveQuerySites } from "./readModelAccess";
 import {
   analyseRepositoryAccess,
   repositoryBindingsOfClass,
 } from "./repositoryAccess";
 
 const READ_MODEL_INTERFACE = "ReadModel";
-const SUBSCRIBE = "subscribe";
 const LISTEN_TO = "listenTo";
-
-/**
- * Lifecycle hooks a container calls. They are how a read model gets wired, not
- * something a reader can ask it, so they are not part of its query surface.
- */
-const LIFECYCLE = new Set([
-  "onModuleInit",
-  "onModuleDestroy",
-  "onApplicationBootstrap",
-  "onApplicationShutdown",
-  "beforeApplicationShutdown",
-  "start",
-  "stop",
-]);
 
 /** Something that subscribes to events without declaring itself a read model. */
 export interface UndeclaredSubscriber {
@@ -63,6 +43,9 @@ export interface ReadModelExtractionResult {
  * What it consumes comes from the `listenTo` calls in the class body. Those
  * name events the way they travel — `BOOK_CREATED` — so linking matches on
  * `EventNode.eventName`, not on the class name.
+ *
+ * Who reads it comes from `readModelAccess.ts`, in a second pass: a call is only
+ * recognisable as a question once every read model name is known.
  */
 export function extractReadModels(
   ctx: ExtractContext,
@@ -107,6 +90,18 @@ export function extractReadModels(
     });
   });
 
+  // A second pass, because recognising `view.getTable(...)` as a question needs
+  // every read model name first — and the caller may live in a file that was
+  // already walked.
+  const sitesByName = resolveQuerySites(
+    ctx,
+    new Set(readModels.map((r) => r.name)),
+  );
+
+  for (const readModel of readModels) {
+    readModel.queriedBy = sitesByName.get(readModel.name) ?? [];
+  }
+
   return { readModels, undeclared };
 }
 
@@ -137,14 +132,9 @@ function toReadModelNode(
     declaredEventNames: declared ? (membersOfUnion.get(declared) ?? []) : [],
     consumedEventNames: subscriptions.filter((s) => s !== "*"),
     consumesEverything: subscriptions.includes("*"),
-    queries: node.members
-      .filter(ts.isMethodDeclaration)
-      .filter((m) => !isPrivate(m))
-      .filter((m) => {
-        const methodName = m.name.getText(sf);
-        return methodName !== SUBSCRIBE && !LIFECYCLE.has(methodName);
-      })
-      .map((m) => toQuery(m, ctx)),
+    // Filled by the second pass in `extractReadModels`, which needs every read
+    // model name before it can recognise a call on one.
+    queriedBy: [],
     writes: access.writes,
     location,
   };
@@ -204,23 +194,4 @@ function subscriptionsIn(node: ts.Node): string[] {
   visit(node);
 
   return names;
-}
-
-function toQuery(node: ts.MethodDeclaration, ctx: ExtractContext): Method {
-  const sf = node.getSourceFile();
-
-  return {
-    name: node.name.getText(sf),
-    isStatic: false,
-    returnType: node.type
-      ? node.type.getText(sf).replace(/\s+/g, " ")
-      : "unknown",
-    parameters: node.parameters.map((p) => ({
-      name: p.name.getText(sf),
-      type: p.type ? p.type.getText(sf).replace(/\s+/g, " ") : "unknown",
-    })),
-    emits: [],
-    canFail: [],
-    location: locationOf(node, ctx.root),
-  };
 }
