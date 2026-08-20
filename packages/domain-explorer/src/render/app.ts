@@ -399,34 +399,206 @@ export const APP_SCRIPT = String.raw`
     html += '<div class="section"><h2 class="section__head">Payload</h2>' +
       fieldsTable(node.payloadFields, "Payload type could not be resolved.") + "</div>";
 
-    var emitters = edgesTo(node.id, "emits");
-    if (emitters.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Emitted by</h2><div class="flow">' +
-        emitters.map(function (e) {
-          var from = byId[e.from];
-          return '<a class="flow__item"' +
-            (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
-            ' href="' + (from ? hrefOf(from) : "#") + '">' +
-            esc(from ? from.name : e.from) +
-            (e.via ? '<span class="faint">.' + esc(e.via) + "()</span>" : "") + "</a>";
-        }).join("") + "</div></div>";
-    }
-
-    var consumers = consumersOf(node.id);
-
-    if (consumers.length > 0) {
-      html += '<div class="section"><h2 class="section__head">Consumed by</h2>' +
-        '<p class="subtitle">Views built from this event. They read it; none of ' +
-        "them can refuse it.</p>" +
-        '<div class="flow">' + consumers.map(function (e) {
-          var from = byId[e.from];
-          return '<a class="flow__item" data-kind="readModel" href="' +
-            (from ? hrefOf(from) : "#") + '">' +
-            esc(from ? from.name : e.from) + "</a>";
-        }).join("") + "</div></div>";
-    }
+    html += choreographyHtml(node);
 
     return html + findingsFor(node.id);
+  }
+
+  /** Several notes at one stop. Alternatives get the word "or" between them. */
+  function rankHtml(notes, alternatives) {
+    if (notes.length === 0) return "";
+    if (notes.length === 1) return notes[0];
+
+    var html = '<div class="board__rank board__rank--many">';
+
+    notes.forEach(function (note, index) {
+      if (alternatives && index > 0) html += '<span class="board__alt">or</span>';
+      html += note;
+    });
+
+    return html + "</div>";
+  }
+
+  var ARROW = '<span class="board__arrow">&#8594;</span>';
+
+  /**
+   * What happens when this event fires, in the board's own vocabulary.
+   *
+   * A use case board draws the flow forwards and stops at the views built from
+   * its events. This is the same picture from the event's side, carried the rest
+   * of the way: what each view maintains, and who reads it. One row per view,
+   * repeating the upstream prefix, for the reason a failure row repeats it — a
+   * row should read on its own rather than as a branch you trace back.
+   */
+  function choreographyHtml(node) {
+    // Use cases carry an emits edge of their own, so the command that caused the
+    // event and the behaviour that produced it are both in here, undistinguished.
+    // Splitting them is what turns a bag of emitters into a sentence.
+    var commands = [];
+    var owners = {};
+    var ownerOrder = [];
+
+    edgesTo(node.id, "emits").forEach(function (edge) {
+      var from = byId[edge.from];
+      if (!from) return;
+
+      if (from.kind === "useCase") {
+        commands.push(from);
+        return;
+      }
+
+      if (!owners[from.id]) {
+        owners[from.id] = { node: from, methods: [] };
+        ownerOrder.push(from.id);
+      }
+
+      if (edge.via && owners[from.id].methods.indexOf(edge.via) === -1) {
+        owners[from.id].methods.push(edge.via);
+      }
+    });
+
+    function commandNotes() {
+      return commands.map(function (useCase) {
+        return noteHtml({
+          tone: kindAttr(useCase),
+          kind: useCase.actionKind === "query" ? "Query" : "Command",
+          name: useCase.actionName || useCase.name,
+          detail: useCase.actionName ? useCase.name : "",
+          href: hrefOf(useCase)
+        });
+      });
+    }
+
+    function behaviourNotes() {
+      return ownerOrder.map(function (id) {
+        var owner = owners[id];
+        var single = owner.methods.length === 1;
+
+        // One method is worth naming. Twelve are not a rank, they are a wall —
+        // NodeValueStatusChanged leaves twelve of them on one entity. The count
+        // links through to the entity, which lists them all anyway.
+        return noteHtml({
+          tone: kindAttr(owner.node),
+          kind: "Behaviour",
+          name: owner.node.name,
+          detail: single
+            ? owner.methods[0] + "()"
+            : owner.methods.length + " behaviours",
+          href: single
+            ? "#/domain/" + encodeURIComponent(owner.node.id + "::" + owner.methods[0])
+            : hrefOf(owner.node)
+        });
+      });
+    }
+
+    // Repeated at the head of every row.
+    //
+    // Two commands beside two behaviours cannot say which command reaches which
+    // method — the same pairing ambiguity that rules out one row with ranks at
+    // every stop. It is accepted here because it spans two adjacent stops rather
+    // than four, and the alternatives are worse: a row per cause and behaviour
+    // pair, or dropping the command stop that makes the row a sentence.
+    function prefixHtml() {
+      var stops = [];
+      var commandRank = rankHtml(commandNotes(), true);
+      var behaviourRank = rankHtml(behaviourNotes(), true);
+
+      if (commandRank) stops.push(commandRank);
+      if (behaviourRank) stops.push(behaviourRank);
+
+      stops.push(noteHtml({
+        tone: "event",
+        kind: "Event",
+        name: node.name,
+        detail: node.eventName || ""
+      }));
+
+      return stops.join(ARROW);
+    }
+
+    /** The view, then what it maintains, then who reads it. */
+    function tailHtml(view) {
+      var html = ARROW + noteHtml({
+        tone: "readModel",
+        kind: "Read model",
+        name: view.name,
+        detail: view.consumesEverything ? "every event" : "",
+        href: hrefOf(view)
+      });
+
+      // A view that writes its own tables rather than an Ontologic repository
+      // maintains something this model cannot see, so the stop is skipped rather
+      // than drawn empty.
+      var built = buildsOf(view);
+
+      if (built.length > 0) {
+        html += ARROW + rankHtml(built.map(function (entity) {
+          return noteHtml({
+            tone: kindAttr(entity),
+            kind: "Builds",
+            name: entity.name,
+            detail: "",
+            href: hrefOf(entity)
+          });
+        }), false);
+      }
+
+      var readers = readersOf(view);
+
+      // Never alternatives: every reader queries it. The board reserves "or" for
+      // failure paths, and this rank is the last stop, so nothing follows it that
+      // a reader could be wrongly paired with.
+      html += ARROW + (readers.length > 0
+        ? rankHtml(readers.map(function (reader) {
+            return noteHtml({
+              tone: reader.kind || "family",
+              kind: "Read by",
+              name: reader.name,
+              detail: reader.note,
+              href: reader.href
+            });
+          }), false)
+        : noteHtml({ tone: "family", kind: "Read by", name: "no one", detail: "" }));
+
+      return html;
+    }
+
+    var views = consumersOf(node.id)
+      .map(function (edge) { return byId[edge.from]; })
+      .filter(function (view) { return !!view; });
+
+    var html = '<div class="section"><h2 class="section__head">' +
+      "What happens when this fires</h2>" +
+      '<p class="subtitle">One row per view built from this event. They read it; ' +
+      "none of them can refuse it.</p>" +
+      '<div class="board"><div class="board__inner">';
+
+    if (views.length === 0) {
+      html += '<div class="board__row"><div class="board__label">Nothing hears it' +
+        "</div>" + '<div class="board__path">' + prefixHtml() + "</div></div>";
+    } else {
+      views.forEach(function (view) {
+        html += '<div class="board__row">' +
+          '<div class="board__label board__label--name">' + esc(view.name) +
+          "</div>" +
+          '<div class="board__path">' + prefixHtml() + tailHtml(view) +
+          "</div></div>";
+      });
+    }
+
+    html += "</div></div>";
+
+    if (commands.length === 0 && ownerOrder.length === 0) {
+      html += '<p class="subtitle" style="margin-top:10px">' +
+        "Nothing in this codebase publishes this event.</p>";
+    }
+
+    if (views.length === 0) {
+      html += '<p class="subtitle" style="margin-top:10px">' +
+        "No view is built from it, so nothing in this codebase reacts to it.</p>";
+    }
+
+    return html + "</div>";
   }
 
   function viewError(node) {
@@ -501,7 +673,7 @@ export const APP_SCRIPT = String.raw`
     return null;
   }
 
-  /** Everything that consumes this event, the mirror of "Emitted by". */
+  /** The views built from this event — the second half of its choreography. */
   function consumersOf(id) {
     return MODEL.edges.filter(function (e) {
       return e.to === id && e.kind === "consumes";
@@ -559,6 +731,26 @@ export const APP_SCRIPT = String.raw`
     return readers;
   }
 
+  /**
+   * The entities a read model keeps up to date, one hop through the repositories
+   * it saves into. Shared with the event page, so the two cannot disagree about
+   * what a view builds.
+   */
+  function buildsOf(node) {
+    var built = [];
+    var seen = {};
+
+    storesOf(node).forEach(function (storeId) {
+      edgesFrom(storeId, "persists").forEach(function (edge) {
+        if (seen[edge.to] || !byId[edge.to]) return;
+        seen[edge.to] = true;
+        built.push(byId[edge.to]);
+      });
+    });
+
+    return built;
+  }
+
   /** The repositories a read model saves through, as ids that resolve. */
   function storesOf(node) {
     return edgesFrom(node.id, "writes")
@@ -610,16 +802,7 @@ export const APP_SCRIPT = String.raw`
     // needs no edge kind of its own.
     var stores = storesOf(node);
 
-    var built = [];
-    var seenBuilt = {};
-
-    stores.forEach(function (storeId) {
-      edgesFrom(storeId, "persists").forEach(function (edge) {
-        if (seenBuilt[edge.to] || !byId[edge.to]) return;
-        seenBuilt[edge.to] = true;
-        built.push(byId[edge.to]);
-      });
-    });
+    var built = buildsOf(node);
 
     if (built.length > 0) {
       html += '<div class="section"><h2 class="section__head">Builds</h2>' +

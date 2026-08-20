@@ -7,6 +7,23 @@ import type { DomainModel } from "../extract/model";
 
 const REPO_ROOT = resolve(__dirname, "..", "..", "..", "..");
 
+/**
+ * One top-level function of the inlined app script, as source.
+ *
+ * Detail pages are rendered in the browser from the hash — `#main` ships empty
+ * (`html.ts`), so no event-page markup ever appears in the output file. Every
+ * assertion about one is an assertion about the script that will draw it, and
+ * scoping it to one function is what stops it passing on an unrelated match.
+ */
+function fnSource(name: string): string {
+  const start = APP_SCRIPT.indexOf("function " + name + "(");
+  expect(start).toBeGreaterThan(-1);
+
+  const end = APP_SCRIPT.indexOf("\n  function ", start + 1);
+
+  return APP_SCRIPT.slice(start, end === -1 ? undefined : end);
+}
+
 /** The JSON the page embeds, as text. */
 function embeddedModel(html: string): string {
   return /const MODEL = (\{[\s\S]*?\});\n<\/script>/.exec(html)?.[1] ?? "{}";
@@ -143,6 +160,57 @@ describe("Given a domain model extracted from the Order example", () => {
       // page agrees — its View note is #34D399.
       expect(html).toContain("--c-readmodel: #10b981");
       expect(html).toContain("--c-readmodel: #34d399");
+    });
+
+    it("Then an event page tells one story instead of two lists", () => {
+      // "Emitted by" and "Consumed by" named the ends of a chain and drew
+      // neither. One row per view now runs command, behaviour, event, view, what
+      // it builds, who reads it.
+      expect(html).toContain("What happens when this fires");
+      expect(html).not.toContain("Emitted by");
+      expect(html).not.toContain("Consumed by");
+    });
+
+    it("Then the command that caused an event is told from the behaviour that recorded it", () => {
+      // Use cases carry an emits edge of their own, so both arrive in one list
+      // and the old section rendered them side by side as equals. Partitioning
+      // on the node kind is what turns that bag into cause and effect.
+      expect(fnSource("choreographyHtml")).toContain('"useCase"');
+      expect(fnSource("choreographyHtml")).toContain("Behaviour");
+    });
+
+    it("Then an event's flow is not hidden behind the board's read-model toggle", () => {
+      // toggleConsumers writes onto every [data-consumers] element and the
+      // setting outlives navigation, so reusing it here would let a button on a
+      // use-case page silently empty this section — where the views are the
+      // subject rather than an aside.
+      expect(fnSource("choreographyHtml")).not.toContain("data-consumers");
+      expect(fnSource("choreographyHtml")).not.toContain("board__consumers");
+
+      // Paired, so this cannot pass by the board losing its toggle instead.
+      expect(fnSource("boardHtml")).toContain("data-consumers");
+    });
+
+    it("Then absence is stated rather than left as a blank row", () => {
+      expect(html).toContain("Nothing in this codebase publishes this event.");
+      expect(html).toContain(
+        "No view is built from it, so nothing in this codebase reacts to it.",
+      );
+      expect(html).toContain('name: "no one"');
+    });
+
+    it("Then one function decides what a view builds", () => {
+      // The event page and the read model page both draw it. Two copies could
+      // disagree, which is the reason readersOf was hoisted in the first place.
+      expect(fnSource("buildsOf")).toContain("persists");
+      expect(fnSource("viewReadModel")).not.toContain("persists");
+    });
+
+    it("Then nothing in the app script interpolates", () => {
+      // APP_SCRIPT is String.raw, which stops escapes but not substitutions. A
+      // stray ${...} whose identifier happens to resolve compiles silently and
+      // ships a corrupted page.
+      expect(APP_SCRIPT).not.toContain("$" + "{");
     });
 
     it("Then a read model's page always says who reads it", () => {

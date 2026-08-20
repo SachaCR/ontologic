@@ -56,6 +56,12 @@ the thing decides what the page shows, never the address it was reached by.
 **Use cases** — every command and query, each with its flow drawn as an event-storming
 board: the happy path and each failure path, with the events or errors they end on.
 
+An event's own page draws that board from the other side. For each view built from the event
+there is one row, running from the command that caused it, through the behaviour that recorded
+it and the event itself, to what the view maintains and who reads it — so a chain crossing
+three aggregates reads as one sentence instead of three pages. An event nothing consumes says
+so, which is usually the more interesting answer.
+
 ## Findings
 
 The same pass that builds the model reports where a codebase contradicts itself:

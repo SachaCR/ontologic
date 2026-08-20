@@ -158,6 +158,33 @@ describe("Given the library's own Order example", () => {
       });
     });
 
+    it("Then a use case records the events it caused, without a method", () => {
+      // Both an entity method and the use case that called it emit the same
+      // event, so one edge list holds cause and effect together. The event page
+      // partitions it on the node kind to draw the two as a sequence, and would
+      // draw a bag of equals if this second edge stopped arriving.
+      const pay = useCase(model, "PayOrderUseCase");
+      const paid = event(model, "OrderPaid");
+
+      expect(model.edges).toContainEqual({
+        from: pay.id,
+        to: paid.id,
+        kind: "emits",
+      });
+    });
+
+    it("Then a use case has one success path, whose outcome is what it emits", () => {
+      // The event page derives the commands behind an event from the emits edges
+      // rather than by scanning every path, which is only equivalent while this
+      // holds. If extraction ever grows a second success path, the cheaper route
+      // starts under-reporting and this is the test that says so.
+      const pay = useCase(model, "PayOrderUseCase");
+      const success = pay.paths.filter((path) => path.kind === "success");
+
+      expect(success).toHaveLength(1);
+      expect(success[0]?.outcome).toEqual(pay.emits);
+    });
+
     it("Then only the analysed codebase is documented, not its dependencies", () => {
       // The program follows imports into the library itself; none of its
       // internal type aliases should appear as domain event unions.

@@ -641,6 +641,9 @@ pre .p { color: #a5b4fc; }
   font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--ink-faint); margin-bottom: var(--s2);
 }
+/* A label that is a name rather than a phrase. Uppercasing StatsReport flattens
+   the humps that make it readable. */
+.board__label--name { text-transform: none; letter-spacing: 0.02em; }
 
 /* The path itself scrolls rather than wrapping — a wrapped path stops reading
    as a sequence. */
