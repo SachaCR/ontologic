@@ -212,7 +212,24 @@ function Hero(): ReactNode {
             One HTML file out, named after your codebase. Stylesheet, script and
             data all inlined, so it opens from disk and survives being emailed.
           </p>
+        </div>
 
+        {/* Inside the hero rather than below it: as its own section it carried a
+            second gradient, and the two met in a visible seam. */}
+        <div className={styles.cardGrid}>
+          {cards.map((card) => (
+            <div
+              key={card.id}
+              className={styles.card}
+              style={{ "--accent": card.accent } as React.CSSProperties}
+            >
+              <span className={styles.cardTag}>{card.tag}</span>
+              <Heading as="h2" className={styles.cardTitle}>
+                {card.title}
+              </Heading>
+              <p className={styles.cardBody}>{card.body}</p>
+            </div>
+          ))}
         </div>
       </div>
     </header>
@@ -238,26 +255,6 @@ export default function DomainExplorer(): ReactNode {
       <Hero />
 
       <main>
-        <section className={styles.cardsSection}>
-          <div className="container">
-            <div className={styles.cardGrid}>
-              {cards.map((card) => (
-                <div
-                  key={card.id}
-                  className={styles.card}
-                  style={{ "--accent": card.accent } as React.CSSProperties}
-                >
-                  <span className={styles.cardTag}>{card.tag}</span>
-                  <Heading as="h2" className={styles.cardTitle}>
-                    {card.title}
-                  </Heading>
-                  <p className={styles.cardBody}>{card.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {shots.map((shot, index) => (
           <section
             key={shot.id}
