@@ -21,15 +21,16 @@ export type LibraryEvent =
 /**
  * How many copies the library has taken in, kept up to date by listening rather
  * than by counting rows.
- *
- * A plain class: no framework, no decorators, and nothing that has to be running
- * for it to be tested. Whoever owns the listener calls `subscribe` once before
- * starting it — in the application that is `StatsReportInitializer`, and in a
- * test it is the test itself.
  */
 export class StatsReport implements ReadModel<LibraryEvent> {
   constructor(private readonly statsRegister: StatsRegister) {}
 
+  /**
+   * Whoever owns the listener calls this once, before starting it — handlers
+   * registered after the start never run. In the application that is
+   * StatsReportInitializer; in a test it is the test itself, which is why this
+   * class needs no framework to exercise.
+   */
   subscribe(listener: IDomainEventBusListener<LibraryEvent>) {
     listener.listenTo("BOOK_CREATED", async () => {
       const lookup = await this.statsRegister.getById(LIBRARY_STATS_ID);

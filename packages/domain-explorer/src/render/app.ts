@@ -376,6 +376,11 @@ export const APP_SCRIPT = String.raw`
     return '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(kindAttr(node)) +
       '">' + esc(label) + "</span></div>" +
       '<h1 class="title' + (prose ? " title--prose" : "") + '">' + esc(node.name) + "</h1>" +
+      // The doc comment, same as the card shows. Without it a reader loses the
+      // one sentence explaining the thing at the moment they open it.
+      (node.description
+        ? '<p class="subtitle">' + esc(node.description) + "</p>"
+        : "") +
       whereFound(node);
   }
 
@@ -528,6 +533,54 @@ export const APP_SCRIPT = String.raw`
           var event = eventByClassName[name];
           return '<a class="flow__item" data-kind="event" href="' +
             (event ? hrefOf(event) : "#") + '">' + esc(name) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    // What it maintains, and who asks for it. Both are one hop through the
+    // repositories it writes to, so neither needs its own edge kind.
+    var stores = edgesFrom(node.id, "writes")
+      .map(function (edge) { return edge.to; })
+      .filter(function (id) { return !!byId[id]; });
+
+    var built = [];
+    var seenBuilt = {};
+
+    stores.forEach(function (storeId) {
+      edgesFrom(storeId, "persists").forEach(function (edge) {
+        if (seenBuilt[edge.to] || !byId[edge.to]) return;
+        seenBuilt[edge.to] = true;
+        built.push(byId[edge.to]);
+      });
+    });
+
+    if (built.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Builds</h2>' +
+        '<p class="subtitle">What it keeps up to date, and where \u2014 through ' +
+        stores.map(function (id) { return linkTo(id); }).join(", ") + ".</p>" +
+        '<div class="cards">' +
+        built.map(function (entity) { return blockHtml(entity); }).join("") +
+        "</div></div>";
+    }
+
+    var askedBy = [];
+    var seenAsker = {};
+
+    stores.forEach(function (storeId) {
+      edgesTo(storeId, "reads").forEach(function (edge) {
+        var asker = byId[edge.from];
+        if (!asker || asker.kind !== "useCase" || seenAsker[edge.from]) return;
+        seenAsker[edge.from] = true;
+        askedBy.push(asker);
+      });
+    });
+
+    if (askedBy.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Queried by</h2>' +
+        '<p class="subtitle">The use cases that read what it built. They ask; ' +
+        "this decides nothing.</p>" +
+        '<div class="flow">' + askedBy.map(function (useCase) {
+          return '<a class="flow__item" data-kind="' + esc(kindAttr(useCase)) +
+            '" href="' + hrefOf(useCase) + '">' + esc(useCase.name) + "</a>";
         }).join("") + "</div></div>";
     }
 

@@ -15,6 +15,10 @@ import {
   locationOf,
   type ExtractContext,
 } from "./ts-utils";
+import {
+  analyseRepositoryAccess,
+  repositoryBindingsOfClass,
+} from "./repositoryAccess";
 
 const READ_MODEL_INTERFACE = "ReadModel";
 const SUBSCRIBE = "subscribe";
@@ -63,6 +67,7 @@ export interface ReadModelExtractionResult {
 export function extractReadModels(
   ctx: ExtractContext,
   unions: EventUnion[],
+  repositoryNames: Set<string>,
 ): ReadModelExtractionResult {
   const readModels: ReadModelNode[] = [];
   const undeclared: UndeclaredSubscriber[] = [];
@@ -74,7 +79,9 @@ export function extractReadModels(
       if (!ts.isClassDeclaration(node) || !node.name) return;
 
       if (implementsNames(node).includes(READ_MODEL_INTERFACE)) {
-        readModels.push(toReadModelNode(node, ctx, membersOfUnion));
+        readModels.push(
+          toReadModelNode(node, ctx, membersOfUnion, repositoryNames),
+        );
         return;
       }
 
@@ -107,6 +114,7 @@ function toReadModelNode(
   node: ts.ClassDeclaration,
   ctx: ExtractContext,
   membersOfUnion: Map<string, string[]>,
+  repositoryNames: Set<string>,
 ): ReadModelNode {
   const sf = node.getSourceFile();
   const name = node.name?.text ?? "(anonymous)";
@@ -114,6 +122,11 @@ function toReadModelNode(
 
   const declared = readModelTypeArgument(node, sf);
   const subscriptions = subscriptionsIn(node);
+
+  // The whole class, not just `subscribe`: the saves happen inside the handler
+  // callbacks, and the analysis recurses to find them.
+  const bindings = repositoryBindingsOfClass(node, repositoryNames);
+  const access = analyseRepositoryAccess(node, bindings, sf);
 
   return {
     id: makeNodeId("readModel", location.file, name),
@@ -132,6 +145,7 @@ function toReadModelNode(
         return methodName !== SUBSCRIBE && !LIFECYCLE.has(methodName);
       })
       .map((m) => toQuery(m, ctx)),
+    writes: access.writes,
     location,
   };
 }

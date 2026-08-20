@@ -304,6 +304,11 @@ export interface ReadModelNode {
   consumesEverything: boolean;
   /** What it exposes to be asked — every public method that is not `subscribe`. */
   queries: Method[];
+  /**
+   * Repositories it saves through. A projection has to put what it worked out
+   * somewhere, and that somewhere is what a reader wants to find from here.
+   */
+  writes: string[];
   location: SourceLocation;
 }
 

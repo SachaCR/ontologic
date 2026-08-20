@@ -47,7 +47,11 @@ export function extractModel(options: BuildProgramOptions): DomainModel {
 
   // Read models need the union aliases so `ReadModel<LibraryEvent>` can be
   // resolved to the events that alias names.
-  const { readModels, undeclared } = extractReadModels(ctx, unions);
+  const { readModels, undeclared } = extractReadModels(
+    ctx,
+    unions,
+    new Set(repositories.map((r) => r.name)),
+  );
 
   // Sub-entities are discovered through containment, so they can only be found
   // once the entities that hold them have been extracted.

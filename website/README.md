@@ -39,3 +39,19 @@ GIT_USER=<Your GitHub username> yarn deploy
 ```
 
 If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
+
+## Do not run a site build while the dev server is running
+
+`docusaurus build` and `docusaurus start` share `website/.docusaurus/`, and a
+build leaves it configured for the **last locale it built**. Docusaurus always
+builds the default locale first, so the last one is `fr` — and a dev server that
+was already running then serves the French route table, where `/domain-explorer`
+does not exist. The symptom is a "Page introuvable" 404 on a page that worked a
+minute earlier.
+
+Restarting the dev server fixes it; nothing is wrong with the site. Reordering
+the locales does not help either, because `docusaurus build --locale en` clears
+`build/` and would delete the French output.
+
+Note the root `pnpm build` runs this build too, so it hits the same thing
+whenever the site has changed since the last build.

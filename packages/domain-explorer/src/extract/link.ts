@@ -121,6 +121,12 @@ export function linkModel(nodes: DomainNode[]): Edge[] {
         if (eventId) edges.push({ from: node.id, to: eventId, kind: "consumes" });
       }
 
+      // Where it puts what it counted. Same edge a use case gets, so the
+      // repository's "Used by" lists the projection too.
+      for (const repositoryId of resolveAll(readModel.writes, repositoriesByName)) {
+        edges.push({ from: node.id, to: repositoryId, kind: "writes" });
+      }
+
       continue;
     }
 
