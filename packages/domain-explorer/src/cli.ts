@@ -10,6 +10,7 @@ import { writeFileSync } from "node:fs";
 import { relative, resolve } from "node:path";
 
 import { extractModel, renderHtml } from "./index";
+import { domainName } from "./render/html";
 import type {
   DomainModel,
   EntityNode,
@@ -23,6 +24,7 @@ interface Options {
   project?: string;
   out?: string;
   json?: string;
+  label?: string;
   includeTests: boolean;
 }
 
@@ -31,6 +33,7 @@ function parseArgs(argv: string[]): Options {
   let project: string | undefined;
   let out: string | undefined;
   let json: string | undefined;
+  let label: string | undefined;
   let includeTests = false;
 
   for (let i = 0; i < argv.length; i++) {
@@ -49,6 +52,10 @@ function parseArgs(argv: string[]): Options {
       json = argv[++i];
     } else if (arg.startsWith("--json=")) {
       json = arg.slice("--json=".length);
+    } else if (arg === "--label") {
+      label = argv[++i];
+    } else if (arg.startsWith("--label=")) {
+      label = arg.slice("--label=".length);
     } else if (arg === "--include-tests") {
       includeTests = true;
     } else if (!arg.startsWith("-")) {
@@ -60,6 +67,7 @@ function parseArgs(argv: string[]): Options {
   if (project !== undefined) options.project = project;
   if (out !== undefined) options.out = out;
   if (json !== undefined) options.json = json;
+  if (label !== undefined) options.label = label;
 
   return options;
 }
@@ -73,16 +81,19 @@ Usage:
   domain-explorer --project <tsconfig.json> [options]
 
 Options:
-  -o, --out <file>       Write self-contained HTML documentation
+  -o, --out <file>       Where to write the HTML (default: <codebase>.html)
   -p, --project <file>   Analyse the files of a tsconfig instead of scanning paths
       --json <file>      Write the extracted model as JSON
+      --label <text>     Name the analysed codebase, instead of its path on disk
       --include-tests    Include __tests__ directories (excluded by default)
   -h, --help             Show this message
 
 Examples:
-  domain-explorer ./src/domain --out domain.html
-  domain-explorer --project ./tsconfig.json --out domain.html
+  domain-explorer ./src/domain
+  domain-explorer --project ./tsconfig.json
+  domain-explorer ./src/domain --out docs/domain.html
   domain-explorer ./src/domain --json model.json
+  domain-explorer ./src/domain --label "Billing"
 `);
 }
 
@@ -253,10 +264,26 @@ function main(): number {
     return 1;
   }
 
+  // One argument should be enough to get a page, so the output file is named
+  // after the codebase rather than demanded. Asking for JSON is a different
+  // intent, and does not also produce HTML nobody asked for.
+  //
+  // Derived from the real path, before --label renames what the page displays.
+  const outFile =
+    options.out ??
+    (options.json === undefined
+      ? `${domainName(model.root).replace(/\s+/g, "-")}.html`
+      : undefined);
+
+  // The analysed path is an absolute one on the machine that ran this, and the
+  // page displays it. A report meant to be shared — attached to an email, put
+  // behind a URL — should carry a name instead of someone's home directory.
+  if (options.label !== undefined) model.root = options.label;
+
   printSummary(model);
 
-  if (options.out) {
-    const target = resolve(options.out);
+  if (outFile) {
+    const target = resolve(outFile);
     writeFileSync(target, renderHtml(model), "utf8");
     console.log(`\nDocumentation written to ${displayPath(target)}`);
   }
@@ -265,10 +292,6 @@ function main(): number {
     const target = resolve(options.json);
     writeFileSync(target, `${JSON.stringify(model, null, 2)}\n`, "utf8");
     console.log(`Model written to ${displayPath(target)}`);
-  }
-
-  if (!options.out && !options.json) {
-    console.log("\nPass --out <file.html> to generate the documentation page.");
   }
 
   return 0;

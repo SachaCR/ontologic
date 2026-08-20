@@ -1,0 +1,449 @@
+/**
+ * Domain Explorer landing page.
+ *
+ * Shares the homepage's visual language deliberately: the dotted-navy hero,
+ * accent-topped cards, the 996px breakpoint. The homepage keeps everything
+ * inline in one file, so this page does the same rather than being the first to
+ * extract shared components for a single reuse.
+ */
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.hero {
+  padding: 5rem 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%);
+  background-size: 24px 24px, 100% 100%;
+  color: white;
+}
+
+.heroTitle {
+  font-size: 3.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: white;
+  margin-bottom: 1rem;
+}
+
+.heroSubtitle {
+  max-width: 620px;
+  margin: 0 auto 2.5rem;
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.heroButtons {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btnPrimary {
+  background: white;
+  color: #4f46e5 !important;
+  font-weight: 600;
+  border: none;
+}
+
+.btnPrimary:hover {
+  background: #e0e7ff;
+  color: #4338ca !important;
+}
+
+.btnSecondary {
+  background: rgba(255, 255, 255, 0.12);
+  color: white !important;
+  font-weight: 600;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.btnSecondary:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: white !important;
+}
+
+.heroCommand {
+  max-width: 620px;
+  margin: 1.25rem auto 0;
+  text-align: left;
+}
+
+.heroCommand :global(.theme-code-block) {
+  margin-bottom: 0.6rem;
+}
+
+.heroNote {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+  text-align: center;
+}
+
+/* The npx command above does not work yet, and that has to be visible before
+   anyone copies it — but it does not need a paragraph. One line, and the
+   commands that do work are a disclosure away. Native <details>, so it opens
+   with no JavaScript and no state. */
+.callout {
+  max-width: 620px;
+  margin: 1.75rem auto 0;
+  padding: 0.6rem 0.9rem;
+  text-align: left;
+  border-radius: 8px;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.28);
+  border-left: 3px solid #f59e0b;
+}
+
+.calloutSummary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.86rem;
+  color: rgba(255, 255, 255, 0.78);
+  list-style: none;
+}
+
+/* Safari still paints the default triangle without this. */
+.calloutSummary::-webkit-details-marker {
+  display: none;
+}
+
+.calloutBadge {
+  flex: none;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #fcd34d;
+  background: rgba(245, 158, 11, 0.16);
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.calloutLead {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.calloutMore {
+  flex: none;
+  font-weight: 600;
+  color: #fcd34d;
+}
+
+.calloutMore::after {
+  content: " \25b8";
+}
+
+.callout[open] .calloutMore::after {
+  content: " \25be";
+}
+
+.calloutSummary:hover .calloutMore,
+.calloutSummary:focus-visible .calloutMore {
+  text-decoration: underline;
+}
+
+.calloutCode {
+  margin: 0.8rem 0 0.2rem;
+  padding: 0.8rem 0.95rem;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.8rem;
+  line-height: 1.7;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+/* ── What it gives you ────────────────────────────────────────────────────── */
+
+.cardsSection {
+  padding: 4rem 0;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  background-size: 24px 24px, 100% 100%;
+  color: white;
+}
+
+.cardGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 3px solid var(--accent);
+}
+
+.cardTag {
+  display: inline-block;
+  align-self: flex-start;
+  margin-bottom: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  color: color-mix(in srgb, var(--accent) 70%, white);
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+}
+
+.cardTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.6rem;
+  color: white;
+}
+
+.cardBody {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: rgba(255, 255, 255, 0.75);
+  margin: 0;
+}
+
+@media screen and (max-width: 996px) {
+  .cardGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Alternating shots ────────────────────────────────────────────────────── */
+
+.shotSection {
+  padding: 5rem 0;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.shotSectionAlt {
+  background: var(--ifm-background-surface-color);
+}
+
+.shotInner {
+  display: grid;
+  grid-template-columns: 5fr 7fr;
+  gap: 3.5rem;
+  align-items: center;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.shotInnerReverse {
+  grid-template-columns: 7fr 5fr;
+}
+
+.shotInnerReverse .shotText {
+  order: 2;
+}
+
+.shotTag {
+  display: inline-block;
+  margin-bottom: 0.9rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent);
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, transparent);
+}
+
+.shotTitle {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin-bottom: 1rem;
+}
+
+.shotBody {
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--ifm-color-content-secondary);
+}
+
+.shotBody:last-child {
+  margin-bottom: 0;
+}
+
+.shotFigure {
+  margin: 0;
+}
+
+/* The screenshots are 1500px wide and shown at about half that, so the detail is
+   there but unreadable. The anchor opens the image itself rather than a
+   lightbox: no dependency, works without JS, and the browser's own image viewer
+   already zooms. */
+.shotLink {
+  position: relative;
+  display: block;
+  border-radius: 10px;
+}
+
+.shotZoom {
+  position: absolute;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: white;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.shotLink:hover .shotZoom,
+.shotLink:focus-visible .shotZoom {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.shotImage {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 10px;
+  border: 1px solid var(--ifm-toc-border-color);
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.28);
+  transition: box-shadow 0.2s ease;
+}
+
+.shotLink:hover .shotImage,
+.shotLink:focus-visible .shotImage {
+  box-shadow: 0 22px 52px rgba(15, 23, 42, 0.4);
+}
+
+@media screen and (max-width: 996px) {
+  .shotInner,
+  .shotInnerReverse {
+    grid-template-columns: 1fr;
+    gap: 2rem;
+  }
+
+  .shotInnerReverse .shotText {
+    order: 0;
+  }
+}
+
+/* ── Detected concepts ────────────────────────────────────────────────────── */
+
+.detectSection {
+  padding: 5rem 0;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.detectHead {
+  text-align: center;
+  max-width: 680px;
+  margin: 0 auto 2.5rem;
+}
+
+.detectTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.detectList {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0;
+  list-style: none;
+}
+
+.detectItem {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 8px;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-toc-border-color);
+  font-size: 0.92rem;
+}
+
+.detectDot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+@media screen and (max-width: 996px) {
+  .detectList {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media screen and (max-width: 600px) {
+  .detectList {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── Closing call to action ───────────────────────────────────────────────── */
+
+.closing {
+  padding: 4.5rem 0;
+  text-align: center;
+  background:
+    radial-gradient(circle, rgba(255, 255, 255, 0.07) 1px, transparent 1px),
+    linear-gradient(135deg, #0f172a 0%, #1e1b4b 60%, #312e81 100%);
+  background-size: 24px 24px, 100% 100%;
+  color: white;
+}
+
+.closingTitle {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 0.75rem;
+}
+
+.closingBody {
+  max-width: 560px;
+  margin: 0 auto 2rem;
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.7;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .shotImage,
+  .shotZoom {
+    transition: none;
+  }
+}

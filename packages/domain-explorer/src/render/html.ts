@@ -93,13 +93,13 @@ const MODEL = ${embedJson(model)};
 }
 
 /**
- * A readable page title from the analysed path.
+ * What to call the codebase, from the path it was analysed at.
  *
- * `basename` alone produced "domain domain model" for any path ending in
- * `/domain` or `/src`, which is most of them — so a generic leaf borrows its
- * parent instead.
+ * `basename` alone produced "domain" for any path ending in `/domain` or
+ * `/src`, which is most of them — so a generic leaf borrows its parent instead.
+ * Shared with the CLI, which names the output file the same way.
  */
-function domainTitle(root: string): string {
+export function domainName(root: string): string {
   const GENERIC = new Set(["domain", "src", "app", "lib", "packages"]);
 
   const parts = root.split(/[\\/]+/).filter(Boolean);
@@ -113,7 +113,11 @@ function domainTitle(root: string): string {
     leaf = parts[i - 1] ?? leaf;
   }
 
-  return `${leaf || "Domain"} domain model`;
+  return leaf || "Domain";
+}
+
+function domainTitle(root: string): string {
+  return `${domainName(root)} domain model`;
 }
 
 /**

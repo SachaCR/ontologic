@@ -16,7 +16,8 @@
     "write-translations": "docusaurus write-translations",
     "write-heading-ids": "docusaurus write-heading-ids",
     "typecheck": "tsc",
-    "test": "echo \"website has no tests\""
+    "test": "echo \"website has no tests\"",
+    "generate:demo": "node scripts/generate-demo.mjs"
   },
   "dependencies": {
     "@docusaurus/core": "3.9.2",

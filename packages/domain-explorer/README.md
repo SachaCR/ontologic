@@ -4,10 +4,10 @@ Reads a codebase built on [Ontologic](https://ontologic.site) and generates a si
 self-contained HTML page documenting its domain model.
 
 ```bash
-npx @ontologic/domain-explorer ./src/domain --out domain.html
+npx @ontologic/domain-explorer ./src/domain
 ```
 
-One file. Stylesheet, script and data are all inlined, so it opens from disk, survives
+One file, named after your codebase. Stylesheet, script and data are all inlined, so it opens from disk, survives
 being emailed, and works in a sandbox that blocks every external host.
 
 ## What it finds
@@ -75,12 +75,17 @@ The same pass that builds the model reports where a codebase contradicts itself:
 domain-explorer <path...> [options]
 domain-explorer --project <tsconfig.json> [options]
 
-  -o, --out <file>       Write self-contained HTML documentation
+  -o, --out <file>       Where to write the HTML (default: <codebase>.html)
   -p, --project <file>   Analyse the files of a tsconfig instead of scanning paths
       --json <file>      Write the extracted model as JSON
+      --label <text>     Name the analysed codebase, instead of its path on disk
       --include-tests    Include __tests__ directories (excluded by default)
   -h, --help             Show this message
 ```
+
+The HTML is written whether or not you ask for it: pointing the tool at a directory is the
+whole invocation. `--out` only matters when you want it somewhere specific. Asking for
+`--json` is a different intent, and does not also write a page.
 
 `--project` gives the fullest picture, since it analyses exactly what your build does.
 Passing paths instead scans them directly, which is useful for documenting one bounded
@@ -88,6 +93,10 @@ context out of a larger repository.
 
 `--json` writes the extracted model as plain data, if you would rather feed it to something
 other than the bundled renderer.
+
+`--label` replaces the analysed path shown on the page. The default is the absolute path on
+the machine that generated the report, which is not what you want on a report you are about
+to email or put behind a URL.
 
 ## Programmatic use
 

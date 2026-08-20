@@ -79,6 +79,7 @@ const config: Config = {
           label: "Documentation",
         },
         { to: "/examples", label: "Examples", position: "left" },
+        { to: "/domain-explorer", label: "Domain Explorer", position: "left" },
         { to: "/blog", label: "Blog", position: "left" },
         {
           href: "https://github.com/sachacr/ontologic",

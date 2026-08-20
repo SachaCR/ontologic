@@ -1,0 +1,2951 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>library-example domain model</title>
+<style>
+:root {
+  --ground: #fafafa;
+  --surface: #ffffff;
+  --surface-sunken: #f4f4f5;
+  --line: #e4e4e7;
+  --line-strong: #d4d4d8;
+
+  --ink: #09090b;
+  --ink-muted: #52525b;
+  --ink-faint: #71717a;
+
+  --accent: #4f46e5;
+  --accent-soft: #eef2ff;
+  --accent-ink: #4338ca;
+
+  /* The rail has its own surface so it can sit against the content area in
+     either theme. Tokenised because it follows the theme — nothing in here may
+     be a literal. */
+  --rail-bg: #f4f4f5;
+  --rail-ink: #18181b;
+  --rail-ink-muted: #52525b;
+  --rail-ink-faint: #6b6b73;
+  --rail-line: #e4e4e7;
+  --rail-active: #e4e4e7;
+  --rail-active-ink: #09090b;
+  --rail-field: #ffffff;
+  --rail-field-line: #d4d4d8;
+
+  /* Concept colours. Applied through --k / --k-soft, never referenced directly. */
+  --c-aggregate: #eab308;      --c-aggregate-soft: #fffbeb;
+  --c-entity: #b45309;         --c-entity-soft: #fef3c7;
+  --c-value: #6b7280;          --c-value-soft: #f3f4f6;
+  --c-event: #f97316;          --c-event-soft: #fff7ed;
+  --c-error: #ef4444;          --c-error-soft: #fef2f2;
+  --c-behaviour: #4f46e5;      --c-behaviour-soft: #eef2ff;
+  --c-repository: #334155;     --c-repository-soft: #f8fafc;
+  --c-command: #2563eb;        --c-command-soft: #eff6ff;
+  --c-query: #0d9488;          --c-query-soft: #f0fdfa;
+  --c-invariant: #db2777;      --c-invariant-soft: #fdf2f8;
+  --c-readmodel: #10b981;      --c-readmodel-soft: #ecfdf5;
+
+  /* Paper tints for the board. Mid-saturation so a note reads as paper and
+     still takes dark ink — the concept colour is too strong to write on and
+     the soft tint is too pale to read as a sticky. */
+  --n-aggregate: #fde68a;
+  --n-entity: #fcd34d;
+  --n-value: #e5e7eb;
+  --n-command: #bfdbfe;
+  --n-query: #99f6e4;
+  --n-readmodel: #a7f3d0;
+  --n-event: #fed7aa;
+  --n-error: #fecaca;
+  --n-ink: #09090b;
+
+  --danger: #dc2626;
+  --danger-soft: #fef2f2;
+  --warn: #b45309;
+  --warn-soft: #fffbeb;
+
+  --radius: 8px;
+  --radius-sm: 6px;
+  --rail: 260px;
+  --inspector: 320px;
+
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+
+  --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --ground: #0d0d10;
+    --surface: #17171b;
+    --surface-sunken: #1e1e24;
+    --line: #2a2a32;
+    --line-strong: #3d3d47;
+
+    --ink: #f4f4f5;
+    --ink-muted: #b4b4bd;
+    --ink-faint: #8b8b96;
+
+    --accent: #818cf8;
+    --accent-soft: #23233a;
+    --accent-ink: #a5b4fc;
+
+    --rail-bg: #101014;
+    --rail-ink: #fafafa;
+    --rail-ink-muted: #a1a1aa;
+    --rail-ink-faint: #82828d;
+    --rail-line: #26262e;
+    --rail-active: #27272a;
+    --rail-active-ink: #ffffff;
+    --rail-field: #27272a;
+    --rail-field-line: #3f3f46;
+
+    --c-aggregate: #facc15;      --c-aggregate-soft: #2a2410;
+    --c-entity: #f59e0b;         --c-entity-soft: #2e2210;
+    --c-value: #9ca3af;          --c-value-soft: #24252a;
+    --c-event: #fb923c;          --c-event-soft: #2e2013;
+    --c-error: #f87171;          --c-error-soft: #2f1a1a;
+    --c-behaviour: #818cf8;      --c-behaviour-soft: #21233d;
+    --c-repository: #94a3b8;     --c-repository-soft: #222730;
+    --c-command: #60a5fa;        --c-command-soft: #16233d;
+    --c-query: #2dd4bf;          --c-query-soft: #10312e;
+    --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+    --c-readmodel: #34d399;      --c-readmodel-soft: #0d2a20;
+
+    --n-aggregate: #5c4a10;
+    --n-entity: #5c3f0c;
+    --n-value: #33353b;
+    --n-command: #1e3a6b;
+    --n-query: #0f4a44;
+    --n-readmodel: #0f3d2c;
+    --n-event: #5c3517;
+    --n-error: #5c1f1f;
+    --n-ink: #f4f4f5;
+
+    --danger: #f87171;
+    --danger-soft: #2f1a1a;
+    --warn: #fbbf24;
+    --warn-soft: #2a2410;
+  }
+}
+
+:root[data-theme="dark"] {
+  --ground: #0d0d10;
+  --surface: #17171b;
+  --surface-sunken: #1e1e24;
+  --line: #2a2a32;
+  --line-strong: #3d3d47;
+
+  --ink: #f4f4f5;
+  --ink-muted: #b4b4bd;
+  --ink-faint: #8b8b96;
+
+  --accent: #818cf8;
+  --accent-soft: #23233a;
+  --accent-ink: #a5b4fc;
+
+  --rail-bg: #101014;
+  --rail-ink: #fafafa;
+  --rail-ink-muted: #a1a1aa;
+  --rail-ink-faint: #82828d;
+  --rail-line: #26262e;
+  --rail-active: #27272a;
+  --rail-active-ink: #ffffff;
+  --rail-field: #27272a;
+  --rail-field-line: #3f3f46;
+
+  --c-aggregate: #facc15;      --c-aggregate-soft: #2a2410;
+  --c-entity: #f59e0b;         --c-entity-soft: #2e2210;
+  --c-value: #9ca3af;          --c-value-soft: #24252a;
+  --c-event: #fb923c;          --c-event-soft: #2e2013;
+  --c-error: #f87171;          --c-error-soft: #2f1a1a;
+  --c-behaviour: #818cf8;      --c-behaviour-soft: #21233d;
+  --c-repository: #94a3b8;     --c-repository-soft: #222730;
+  --c-command: #60a5fa;        --c-command-soft: #16233d;
+  --c-query: #2dd4bf;          --c-query-soft: #10312e;
+  --c-invariant: #f472b6;      --c-invariant-soft: #2e1622;
+  --c-readmodel: #34d399;      --c-readmodel-soft: #0d2a20;
+
+  --n-aggregate: #5c4a10;
+  --n-entity: #5c3f0c;
+  --n-value: #33353b;
+  --n-command: #1e3a6b;
+  --n-query: #0f4a44;
+  --n-readmodel: #0f3d2c;
+  --n-event: #5c3517;
+  --n-error: #5c1f1f;
+  --n-ink: #f4f4f5;
+
+  --danger: #f87171;
+  --danger-soft: #2f1a1a;
+  --warn: #fbbf24;
+  --warn-soft: #2a2410;
+}
+
+/* Per-kind roles. Every element that uses these also shows the kind as text. */
+[data-kind="entity"]      { --k: var(--c-aggregate);  --k-soft: var(--c-aggregate-soft); --k-note: var(--n-aggregate); }
+[data-kind="subEntity"]   { --k: var(--c-entity);     --k-soft: var(--c-entity-soft);    --k-note: var(--n-entity); }
+[data-kind="valueObject"] { --k: var(--c-value);      --k-soft: var(--c-value-soft);     --k-note: var(--n-value); }
+[data-kind="event"]       { --k: var(--c-event);      --k-soft: var(--c-event-soft);     --k-note: var(--n-event); }
+[data-kind="error"]       { --k: var(--c-error);      --k-soft: var(--c-error-soft);     --k-note: var(--n-error); }
+[data-kind="behaviour"]   { --k: var(--c-behaviour);  --k-soft: var(--c-behaviour-soft); --k-note: var(--n-command); }
+[data-kind="repository"]  { --k: var(--c-repository); --k-soft: var(--c-repository-soft); --k-note: var(--n-value); }
+[data-kind="useCase"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft);   --k-note: var(--n-command); }
+[data-kind="command"]     { --k: var(--c-command);    --k-soft: var(--c-command-soft);   --k-note: var(--n-command); }
+[data-kind="query"]       { --k: var(--c-query);      --k-soft: var(--c-query-soft);     --k-note: var(--n-query); }
+[data-kind="invariant"]   { --k: var(--c-invariant);  --k-soft: var(--c-invariant-soft); --k-note: var(--n-error); }
+[data-kind="readModel"]   { --k: var(--c-readmodel);  --k-soft: var(--c-readmodel-soft); --k-note: var(--n-readmodel); }
+[data-kind="family"]      { --k: var(--line-strong);  --k-soft: var(--surface-sunken);   --k-note: var(--n-value); }
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent-ink); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100vh; }
+
+/* ---------- rail ---------- */
+
+.rail {
+  position: sticky; top: 0; align-self: start;
+  height: 100vh; display: flex; flex-direction: column;
+  background: var(--rail-bg);
+  color: var(--rail-ink);
+  border-right: 1px solid var(--rail-line);
+}
+
+.rail__head { padding: 20px var(--s4) var(--s3); }
+
+.rail__brand { display: flex; align-items: center; gap: 10px; }
+/* The Ontologic mark, inlined in html.ts — it carries its own colours, so it
+   needs no plate behind it. */
+.rail__mark { width: 34px; height: 34px; flex: none; display: block; }
+.rail__mark svg { width: 100%; height: 100%; display: block; }
+.rail__title {
+  margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.01em; color: var(--rail-ink);
+}
+.rail__tag { margin: 2px 0 0; font-size: 11px; color: var(--rail-ink-faint); }
+
+.rail__project {
+  margin-top: var(--s4); padding: 9px 11px;
+  background: var(--rail-field); border-radius: var(--radius-sm);
+}
+.rail__project-label {
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--rail-ink-faint);
+}
+.rail__root {
+  margin: 2px 0 0; font-family: var(--mono); font-size: 11px;
+  color: var(--rail-ink-muted); word-break: break-all; line-height: 1.4;
+}
+
+.search {
+  width: 100%; margin-top: var(--s3); padding: 7px 10px;
+  font: inherit; font-size: 12.5px;
+  color: var(--rail-ink); background: var(--rail-field);
+  border: 1px solid var(--rail-field-line); border-radius: var(--radius-sm);
+}
+.search::placeholder { color: var(--rail-ink-faint); }
+
+.filters { display: flex; flex-wrap: wrap; gap: 4px; margin-top: var(--s2); }
+
+.filter {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 8px 2px 6px; border-radius: 999px;
+  font-size: 10.5px; font-weight: 600; cursor: pointer;
+  color: var(--rail-ink-muted); background: transparent;
+  border: 1px solid var(--rail-field-line);
+}
+.filter:hover { color: var(--rail-ink); }
+.filter[aria-pressed="true"] { background: var(--rail-active); border-color: var(--k); color: var(--rail-ink); }
+.filter::before {
+  content: ""; width: 7px; height: 7px; border-radius: 2px;
+  background: var(--k, var(--rail-ink-faint)); flex: none;
+}
+
+.rail__fixed {
+  padding: var(--s2) 10px; display: flex; flex-direction: column; gap: 2px;
+  border-top: 1px solid var(--rail-line);
+}
+.rail__nav { overflow-y: auto; padding: var(--s2) 10px 28px; flex: 1; }
+
+.group { margin-top: var(--s3); }
+.group:first-child { margin-top: 2px; }
+.group__label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 0 8px 4px;
+  font-size: 9.5px; font-weight: 600; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--rail-ink-faint);
+}
+.group__count { font-variant-numeric: tabular-nums; font-weight: 500; }
+.group--aggregate .group__label {
+  font-family: var(--mono); font-size: 11px; letter-spacing: 0;
+  text-transform: none; color: var(--c-aggregate);
+}
+
+.navlink {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 10px; border-radius: var(--radius-sm);
+  font-size: 13px; color: var(--rail-ink-muted); text-decoration: none;
+}
+.navlink:hover { background: var(--rail-active); color: var(--rail-ink); }
+.navlink[aria-current="page"], .navlink.is-active {
+  background: var(--rail-active); color: var(--rail-active-ink); font-weight: 600;
+}
+.navlink--view { font-weight: 500; }
+.navlink--concept { font-family: var(--mono); font-size: 12px; padding: 4px 10px; }
+.navlink__dot { width: 7px; height: 7px; border-radius: 2px; flex: none; background: var(--k, var(--rail-ink-faint)); }
+.navlink__text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.navlink--flagged .navlink__text::after { content: " ●"; color: var(--c-aggregate); font-size: 9px; }
+
+.rail__foot { border-top: 1px solid var(--rail-line); }
+
+.theme {
+  display: flex; gap: 2px; padding: 10px 12px 0;
+}
+.theme__btn {
+  flex: 1; padding: 5px 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--rail-ink-muted); background: transparent;
+  border: 1px solid var(--rail-field-line); border-radius: var(--radius-sm);
+}
+.theme__btn:hover { color: var(--rail-ink); }
+.theme__btn[aria-pressed="true"] {
+  background: var(--rail-active); color: var(--rail-active-ink); border-color: var(--rail-ink-faint);
+}
+
+.hint { padding: 8px 12px; font-size: 10.5px; color: var(--rail-ink-faint); }
+kbd {
+  font-family: var(--mono); font-size: 10px; padding: 1px 4px;
+  border: 1px solid var(--rail-field-line); border-radius: 3px; background: var(--rail-field); color: var(--rail-ink-muted);
+}
+
+/* ---------- main ---------- */
+
+.main { min-width: 0; padding: var(--s6); background: var(--ground); }
+.main--split {
+  display: grid; grid-template-columns: minmax(0, 1fr) var(--inspector);
+  gap: var(--s5); align-items: start;
+}
+.main__body { min-width: 0; }
+
+.crumb { display: flex; align-items: center; gap: var(--s2); margin-bottom: var(--s2); flex-wrap: wrap; }
+
+.title {
+  margin: 0 0 var(--s1); font-size: 28px; font-weight: 700;
+  letter-spacing: -0.02em; text-wrap: balance; word-break: break-word;
+}
+.title--mono { font-family: var(--mono); font-size: 25px; }
+
+.subtitle { margin: 0 0 var(--s5); color: var(--ink-muted); font-size: 13px; }
+.subtitle code { font-family: var(--mono); font-size: 12px; }
+
+.section { margin-top: var(--s5); }
+.section__head {
+  margin: 0 0 var(--s3); font-size: 12px; font-weight: 600;
+  letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* A heading with a control beside it. */
+.section__bar { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s3); }
+
+.toggle {
+  flex: none; padding: 4px 10px; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--ink-muted); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius-sm);
+}
+.toggle:hover { color: var(--ink); border-color: var(--line-strong); }
+.toggle[aria-pressed="true"] {
+  color: var(--k, var(--ink)); border-color: var(--k, var(--line-strong));
+  background: var(--k-soft, var(--surface));
+}
+
+/* ---------- legend bar ---------- */
+
+.legend {
+  display: flex; flex-wrap: wrap; align-items: center; gap: var(--s4);
+  padding: 10px var(--s4); margin-bottom: var(--s5);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  font-size: 12px;
+}
+.legend__title {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+.legend__item { display: inline-flex; align-items: center; gap: 6px; color: var(--ink-muted); }
+.legend__swatch {
+  width: 11px; height: 11px; border-radius: 3px;
+  background: var(--k-soft); border: 1.5px solid var(--k);
+}
+
+/* ---------- cards ---------- */
+
+/* Every card is the same height, so a grid reads as a set rather than a
+   ragged column. Overlong text truncates; the card links to the full detail. */
+.cards {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--s3);
+  grid-auto-rows: 142px;
+}
+.cards--one { grid-auto-rows: 112px; }
+.cards--wide { grid-template-columns: repeat(auto-fill, minmax(440px, 1fr)); }
+.cards--one { grid-template-columns: minmax(0, 1fr); }
+
+.card {
+  display: flex; flex-direction: column; gap: 6px;
+  min-width: 0; overflow: hidden;
+  padding: var(--s4); padding-left: var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--k, var(--line-strong));
+  border-radius: var(--radius);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  text-decoration: none; color: inherit;
+}
+a.card:hover { border-color: var(--k); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.card--tinted { background: var(--k-soft); }
+.card--flat { box-shadow: none; }
+
+.card__top { display: flex; align-items: baseline; gap: var(--s2); flex: none; min-width: 0; }
+.card__name {
+  font-size: 16px; font-weight: 700; color: var(--ink);
+  word-break: break-word; line-height: 1.3; min-width: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.card__name--mono { font-family: var(--mono); font-size: 14.5px; }
+.card__go {
+  margin-left: auto; flex: none;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--accent-ink);
+}
+.card__desc {
+  margin: 0; font-size: 13px; line-height: 1.45;
+  color: var(--ink-muted); flex: none; min-height: 0;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+.card__stats {
+  margin-top: auto; flex: none;
+  display: flex; gap: 6px; align-items: center;
+  font-size: 11px; font-weight: 500;
+  overflow: hidden;
+}
+.card__stat { flex: none; white-space: nowrap; }
+.card__stat {
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--k-soft); color: var(--k);
+  font-variant-numeric: tabular-nums;
+}
+.card--tinted .card__stat { background: var(--surface); }
+.card__dash { color: var(--ink-faint); font-size: 11px; }
+
+.badge {
+  flex: none; padding: 1px 7px; border-radius: 5px;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  background: var(--k); color: #ffffff;
+}
+.badge--soft { background: var(--k-soft); color: var(--k); }
+
+/* ---------- chips ---------- */
+
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  background: var(--surface-sunken); color: var(--ink-muted);
+  border: 1px solid var(--line);
+}
+.chip--kind { background: var(--k-soft); color: var(--k); border-color: var(--k); }
+.chip--accent { background: var(--accent-soft); color: var(--accent-ink); border-color: transparent; }
+.chip--danger { background: var(--danger-soft); color: var(--danger); border-color: transparent; }
+.chip--warn { background: var(--warn-soft); color: var(--warn); border-color: transparent; }
+
+.tag {
+  display: inline-flex; padding: 2px 9px; border-radius: var(--radius-sm);
+  font-size: 11px; font-weight: 500;
+  border: 1px solid var(--c-aggregate); color: var(--c-aggregate);
+  text-decoration: none;
+}
+.tags {
+  display: flex; gap: 6px; flex: none; margin-top: auto;
+  overflow: hidden;
+}
+.tag { flex: none; white-space: nowrap; }
+
+/* ---------- tiles ---------- */
+
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: var(--s3); }
+.tile {
+  display: block; padding: var(--s3) var(--s4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  border-left: 6px solid var(--k, var(--line-strong));
+  color: inherit; text-decoration: none;
+}
+a.tile:hover { border-color: var(--k); box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); }
+.tile__n {
+  font-size: 26px; font-weight: 700;
+  font-variant-numeric: tabular-nums; line-height: 1.1;
+}
+.tile__k {
+  margin-top: 2px; font-size: 11px; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+.gfold { cursor: pointer; }
+
+/* ---------- inspector ---------- */
+
+.inspector {
+  position: sticky; top: var(--s6);
+  padding: var(--s4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.inspector__top { display: flex; align-items: baseline; gap: var(--s2); margin-bottom: var(--s2); }
+.inspector__name { font-size: 17px; font-weight: 700; word-break: break-word; }
+.inspector__label {
+  margin: var(--s4) 0 var(--s2); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-faint);
+}
+.field {
+  padding: 9px 11px; border: 1px solid var(--line);
+  border-radius: var(--radius-sm); background: var(--surface);
+}
+.field + .field { margin-top: 6px; }
+.field__top { display: flex; align-items: baseline; gap: var(--s2); }
+.field__name { font-family: var(--mono); font-size: 12.5px; font-weight: 600; }
+.field__type {
+  margin-left: auto; font-family: var(--mono); font-size: 12px; color: var(--accent-ink);
+  word-break: break-all; text-align: right;
+}
+.field__note { margin: 2px 0 0; font-size: 11.5px; color: var(--ink-faint); }
+
+/* ---------- tables ---------- */
+
+.scroll {
+  overflow-x: auto; border: 1px solid var(--line);
+  border-radius: var(--radius); background: var(--surface);
+}
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  text-align: left; padding: 9px var(--s4);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--ink-faint);
+  border-bottom: 1px solid var(--line); white-space: nowrap;
+}
+td { padding: 10px var(--s4); border-bottom: 1px solid var(--line); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+
+.mono { font-family: var(--mono); font-size: 12.5px; }
+.muted { color: var(--ink-muted); }
+.faint { color: var(--ink-faint); }
+.nowrap { white-space: nowrap; }
+.dash { color: var(--ink-faint); }
+.sig { font-family: var(--mono); font-size: 12px; color: var(--ink-muted); display: block; margin-top: 2px; }
+.sig b { color: var(--ink); font-weight: 600; }
+
+/* ---------- findings ---------- */
+
+.finding {
+  display: grid; grid-template-columns: 4px 1fr;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); overflow: hidden;
+}
+.finding + .finding { margin-top: var(--s2); }
+.finding__stripe { background: var(--warn); }
+.finding--danger .finding__stripe { background: var(--danger); }
+.finding__body { padding: var(--s3) var(--s4); }
+.finding__code { font-family: var(--mono); font-size: 11px; font-weight: 600; color: var(--warn); }
+.finding--danger .finding__code { color: var(--danger); }
+.finding__msg { margin: 4px 0 0; font-size: 13px; }
+.finding__where { margin-top: 5px; font-family: var(--mono); font-size: 11.5px; color: var(--ink-faint); }
+
+/* ---------- code ---------- */
+
+pre {
+  margin: 0; padding: var(--s4) 18px; overflow-x: auto;
+  background: #0b0b0e; color: #e4e4e7;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.6;
+}
+pre .k { color: #f472b6; }
+pre .t { color: #7dd3fc; }
+pre .p { color: #a5b4fc; }
+
+.empty {
+  padding: 18px; border: 1px dashed var(--line-strong); border-radius: var(--radius);
+  color: var(--ink-faint); font-size: 13px;
+}
+
+/* ---------- board ---------- */
+
+/* The board scrolls as one, not row by row: failure paths share their prefix
+   with the happy path, so the columns have to stay aligned to be comparable. */
+.board {
+  display: flex; flex-direction: column; gap: var(--s3);
+  overflow-x: auto; padding-bottom: 4px;
+}
+.board__inner { display: flex; flex-direction: column; gap: var(--s3); min-width: max-content; }
+.board::-webkit-scrollbar { height: 8px; }
+.board::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 4px; }
+
+.board__row {
+  min-width: max-content;
+  padding: var(--s3) var(--s4);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+.board__row--failure { background: transparent; }
+
+.board__label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--ink-faint); margin-bottom: var(--s2);
+}
+
+/* The path itself scrolls rather than wrapping — a wrapped path stops reading
+   as a sequence. */
+.board__path { display: flex; align-items: center; gap: 6px; }
+
+/* A sticky note: solid paper, dark ink, barely rotated so the row looks placed
+   rather than printed. The concept colour survives as the bottom edge, which is
+   what keeps the legend meaningful. */
+.note {
+  /* Every note is the same size, so a row reads as a sequence of equal beats
+     rather than a ragged skyline. Text that does not fit is truncated; the note
+     links through to the full detail. */
+  flex: none;
+  width: 172px; height: 110px;
+  display: flex; flex-direction: column;
+  padding: 11px 13px 10px;
+  background: var(--k-note, var(--surface-sunken));
+  color: var(--n-ink);
+  border-radius: 2px;
+  border-bottom: 3px solid var(--k, var(--line-strong));
+  box-shadow: 1px 2px 4px rgba(0, 0, 0, 0.16);
+  text-decoration: none;
+  overflow: hidden;
+  transform: rotate(-0.5deg);
+}
+.note:nth-child(4n + 3) { transform: rotate(0.6deg); }
+.note:nth-child(4n + 1) { transform: rotate(0.3deg); }
+a.note:hover { box-shadow: 2px 4px 8px rgba(0, 0, 0, 0.22); }
+
+.note__kind {
+  display: block; flex: none; font-size: 9px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.6;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.note__name {
+  margin-top: 3px; flex: none; min-height: 0;
+  font-size: 14px; font-weight: 700; line-height: 1.3;
+  word-break: break-word;
+  /* Three lines, then an ellipsis. */
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.note__detail {
+  display: block; flex: none; margin-top: auto; padding-top: 2px;
+  font-family: var(--mono); font-size: 10.5px; opacity: 0.72;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+
+/* A note that leads somewhere lifts on hover; one that does not, stays put. */
+a.note { cursor: pointer; }
+
+.board__arrow { flex: none; color: var(--ink-faint); font-size: 13px; }
+
+/* Several outcomes leave from one step: events saved together, or errors that
+   are alternatives. They share a rank, so they stack rather than following one
+   another — a row of them would imply an order that does not exist. */
+.board__rank { flex: none; display: flex; flex-direction: column; gap: 5px; }
+.board__rank--many { position: relative; padding-left: 11px; }
+.board__rank--many::before {
+  content: ""; position: absolute; left: 1px; top: 16px; bottom: 16px;
+  width: 1px; background: var(--line-strong);
+}
+/* Wrapped so the group can be hidden as one. The wrapper is display:contents so
+   the arrow and the rank stay direct flex items of the path — showing and hiding
+   never changes the row's spacing, or the notes' tilt. */
+.board__consumers { display: contents; }
+.board[data-consumers="off"] .board__consumers { display: none; }
+
+.board__alt {
+  padding-left: 2px;
+  font-size: 9px; font-weight: 700; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ink-faint);
+}
+
+/* ---------- flow ---------- */
+
+.flow { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.flow__item {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 6px 12px; border-radius: var(--radius-sm);
+  font-family: var(--mono); font-size: 12.5px;
+  background: var(--surface); border: 1px solid var(--k, var(--line));
+  color: var(--k, inherit); font-weight: 600; text-decoration: none;
+}
+.flow__item--read { border-style: dashed; }
+.flow__verb {
+  font-family: var(--sans); font-size: 10px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.75;
+}
+.flow__arrow { color: var(--ink-faint); font-size: 14px; }
+
+/* ---------- trail ---------- */
+
+.trail {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  margin-bottom: var(--s3); font-size: 12.5px;
+}
+.trail a { color: var(--accent-ink); text-decoration: none; }
+.trail a:hover { text-decoration: underline; }
+.trail__sep { color: var(--ink-faint); }
+.trail__here { font-weight: 600; color: var(--ink); }
+
+/* ---------- family ---------- */
+
+.family {
+  padding: var(--s3) var(--s4); background: var(--surface-sunken);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.family__label { font-family: var(--mono); font-size: 11.5px; color: var(--ink-muted); margin-bottom: var(--s2); }
+.family__label b { color: var(--ink); font-weight: 600; }
+
+@media (max-width: 1100px) {
+  .main--split { grid-template-columns: minmax(0, 1fr); }
+  .inspector { position: static; }
+}
+
+@media (max-width: 860px) {
+  .shell { grid-template-columns: 1fr; }
+  .rail { position: static; height: auto; }
+  .rail__nav { max-height: 320px; }
+  .main { padding: var(--s5) var(--s4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}
+</style>
+<script>
+// Restore the saved theme before first paint, so a forced light page on a dark
+// machine never flashes dark. Only documentElement exists at this point.
+(function () {
+  try {
+    var saved = localStorage.getItem("ontologic-theme");
+    if (saved === "light" || saved === "dark") {
+      document.documentElement.setAttribute("data-theme", saved);
+    }
+  } catch (e) {
+    // A file:// page may have storage blocked entirely; follow the system then.
+  }
+})();
+const MODEL = {"root":"library-example","nodes":[{"id":"entity:domain/entities/book/book.entity.ts#Book","kind":"entity","name":"Book","description":"A single copy the library owns and can lend out. Two copies of the same ISBN are two Books, and only one of them can be out at a time.","stateTypeName":"BookState","stateFields":[{"name":"title","type":"string","optional":false},{"name":"author","type":"string","optional":false},{"name":"isbn","type":"string","optional":false},{"name":"category","type":"string","optional":false},{"name":"tags","type":"string[]","optional":false},{"name":"lost","type":"boolean","optional":false}],"methods":[{"name":"fromState","isStatic":true,"returnType":"Book","parameters":[{"name":"id","type":"string"},{"name":"state","type":"BookState"}],"emits":[],"canFail":[],"location":{"file":"domain/entities/book/book.entity.ts","line":27}},{"name":"create","description":"Registers a new copy in the collection. A copy is never added already lost.","isStatic":true,"returnType":"{ book: Book; event: BookCreatedEvent; }","parameters":[{"name":"state","type":"Omit\u003cBookState, \"lost\">"}],"emits":["event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent"],"canFail":[],"location":{"file":"domain/entities/book/book.entity.ts","line":32}},{"name":"declareLost","description":"Marks the copy as lost and takes it out of circulation. Declaring it a second time is refused, so the loss is never recorded twice.","isStatic":false,"returnType":"Result\u003cBookLostEvent, BookAlreadyDeclaredLostError>","parameters":[],"emits":["event:domain/entities/book/events/bookLost.event.ts#BookLostEvent"],"canFail":["error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError"],"location":{"file":"domain/entities/book/book.entity.ts","line":53}}],"containedRefs":[],"invariants":[],"invariantAttachment":"none","location":{"file":"domain/entities/book/book.entity.ts","line":22}},{"id":"entity:domain/entities/loan/loan.entity.ts#Loan","kind":"entity","name":"Loan","description":"One member's borrowing of one copy, from the day it leaves the shelf until it comes back. A loan stays open until the copy is returned, which is how the library knows what is still out.","stateTypeName":"LoanState","stateFields":[{"name":"bookId","type":"string","optional":false},{"name":"memberId","type":"string","optional":false},{"name":"loanDate","type":"string","optional":false},{"name":"dueDate","type":"string","optional":false},{"name":"returnedAt","type":"string | null","optional":false}],"methods":[{"name":"fromState","isStatic":true,"returnType":"Loan","parameters":[{"name":"id","type":"string"},{"name":"state","type":"LoanState"}],"emits":[],"canFail":[],"location":{"file":"domain/entities/loan/loan.entity.ts","line":36}},{"name":"create","description":"Lends the copy to a member and sets the date it is due back. The term comes from the library's lending policy, so every loan gets the same one.","isStatic":true,"returnType":"{ loan: Loan; event: LoanCreatedEvent; }","parameters":[{"name":"params","type":"{ bookId: string; memberId: string }"}],"emits":["event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent"],"canFail":[],"location":{"file":"domain/entities/loan/loan.entity.ts","line":44}},{"name":"returnBook","description":"Records the copy coming back and closes the loan. The moment of return is passed in rather than read from the clock here, which keeps this testable.","isStatic":false,"returnType":"Result\u003cLoanReturnedEvent, LoanAlreadyReturnedError>","parameters":[{"name":"returnedAt","type":"string"}],"emits":["event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent"],"canFail":["error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError"],"location":{"file":"domain/entities/loan/loan.entity.ts","line":80}},{"name":"calculateDueDate","isStatic":true,"returnType":"{ dueDate: Date }","parameters":[{"name":"startDate","type":"Date"}],"emits":[],"canFail":[],"location":{"file":"domain/entities/loan/loan.entity.ts","line":100}}],"containedRefs":[],"invariants":["invariant:domain/entities/loan/invariants/dueDateAfterLoanDate.invariant.ts#dueDateAfterLoanDate","invariant:domain/entities/loan/invariants/returnDateAfterLoanDate.invariant.ts#returnDateAfterLoanDate"],"invariantAttachment":"optionsObject","location":{"file":"domain/entities/loan/loan.entity.ts","line":29}},{"id":"event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent","kind":"event","name":"BookCreatedEvent","description":"A copy joined the collection. Carries the whole catalogue record, so readers need not load the book.","eventName":"BOOK_CREATED","version":1,"payloadTypeName":"BookCreatedPayload","payloadFields":[{"name":"title","type":"string","optional":false},{"name":"author","type":"string","optional":false},{"name":"isbn","type":"string","optional":false},{"name":"category","type":"string","optional":false},{"name":"tags","type":"string[]","optional":false},{"name":"lost","type":"boolean","optional":false}],"location":{"file":"domain/entities/book/events/bookCreated.event.ts","line":14}},{"id":"event:domain/entities/book/events/bookLost.event.ts#BookLostEvent","kind":"event","name":"BookLostEvent","description":"A copy was declared lost and can no longer be lent. It stays in the collection with its history.","eventName":"BOOK_LOST","version":1,"payloadTypeName":"BookLostPayload","payloadFields":[{"name":"bookId","type":"string","optional":false}],"location":{"file":"domain/entities/book/events/bookLost.event.ts","line":9}},{"id":"event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent","kind":"event","name":"LoanCreatedEvent","description":"A member borrowed a copy. Carries the due date, so nothing downstream repeats the lending policy.","eventName":"LOAN_CREATED","version":1,"payloadTypeName":"LoanCreatedPayload","payloadFields":[{"name":"bookId","type":"string","optional":false},{"name":"memberId","type":"string","optional":false},{"name":"loanDate","type":"string","optional":false},{"name":"dueDate","type":"string","optional":false}],"location":{"file":"domain/entities/loan/events/loanCreated.event.ts","line":12}},{"id":"event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent","kind":"event","name":"LoanReturnedEvent","description":"A member brought a copy back. Carries the book and member ids, so a reader can close its own view.","eventName":"LOAN_RETURNED","version":1,"payloadTypeName":"LoanReturnedPayload","payloadFields":[{"name":"bookId","type":"string","optional":false},{"name":"memberId","type":"string","optional":false},{"name":"returnedAt","type":"string","optional":false}],"location":{"file":"domain/entities/loan/events/loanReturned.event.ts","line":11}},{"id":"error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError","kind":"error","name":"BookAlreadyDeclaredLostError","description":"The copy has already been declared lost, so there is nothing new to record.","errorName":"BOOK_ALREADY_DECLARED_LOST","contextTypeName":"{ bookId: string }","contextFields":[{"name":"bookId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/book/errors/book.errors.ts","line":4}},{"id":"error:domain/entities/book/errors/book.errors.ts#BookNotFoundError","kind":"error","name":"BookNotFoundError","description":"The library has no copy with this id.","errorName":"BOOK_NOT_FOUND","contextTypeName":"{ bookId: string }","contextFields":[{"name":"bookId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/book/errors/book.errors.ts","line":20}},{"id":"error:domain/entities/book/errors/book.errors.ts#BookLostCannotBeLoanedError","kind":"error","name":"BookLostCannotBeLoanedError","description":"A copy declared lost cannot be lent — it is not on the shelf to lend.","errorName":"BOOK_LOST_CANNOT_BE_LOANED","contextTypeName":"{ bookId: string }","contextFields":[{"name":"bookId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/book/errors/book.errors.ts","line":36}},{"id":"error:domain/entities/book/errors/book.errors.ts#BookAlreadyOnLoanError","kind":"error","name":"BookAlreadyOnLoanError","description":"The copy is already out with another member. One physical copy, one open loan.","errorName":"BOOK_ALREADY_ON_LOAN","contextTypeName":"{ bookId: string }","contextFields":[{"name":"bookId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/book/errors/book.errors.ts","line":52}},{"id":"error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError","kind":"error","name":"LoanAlreadyReturnedError","description":"The copy has already come back and this loan is closed.","errorName":"LOAN_ALREADY_RETURNED","contextTypeName":"{ loanId: string }","contextFields":[{"name":"loanId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/loan/errors/loan.errors.ts","line":4}},{"id":"error:domain/entities/loan/errors/loan.errors.ts#MemberActiveLoanLimitExceededError","kind":"error","name":"MemberActiveLoanLimitExceededError","description":"The member already has as many copies out as the library allows. The limit travels with the error.","errorName":"MEMBER_ACTIVE_LOAN_LIMIT_EXCEEDED","contextTypeName":"{ memberId: string; limit: number }","contextFields":[{"name":"memberId","type":"string","optional":false},{"name":"limit","type":"number","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/loan/errors/loan.errors.ts","line":21}},{"id":"error:domain/entities/loan/errors/loan.errors.ts#LoanNotFoundError","kind":"error","name":"LoanNotFoundError","description":"The register has no loan with this id.","errorName":"LOAN_NOT_FOUND","contextTypeName":"{ loanId: string }","contextFields":[{"name":"loanId","type":"string","optional":false}],"setsPrototype":true,"location":{"file":"domain/entities/loan/errors/loan.errors.ts","line":37}},{"id":"invariant:domain/entities/loan/invariants/dueDateAfterLoanDate.invariant.ts#dueDateAfterLoanDate","kind":"invariant","name":"dueDateAfterLoanDate","description":"Due date must be after loan date","stateTypeName":"LoanState","predicate":"(state) => new Date(state.dueDate) > new Date(state.loanDate)","location":{"file":"domain/entities/loan/invariants/dueDateAfterLoanDate.invariant.ts","line":5}},{"id":"invariant:domain/entities/loan/invariants/returnDateAfterLoanDate.invariant.ts#returnDateAfterLoanDate","kind":"invariant","name":"returnDateAfterLoanDate","description":"Return date must be after loan date","stateTypeName":"LoanState","predicate":"(state) => state.returnedAt === null || new Date(state.returnedAt) >= new Date(state.loanDate)","location":{"file":"domain/entities/loan/invariants/returnDateAfterLoanDate.invariant.ts","line":5}},{"id":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"repository","name":"LibraryCollection","description":"The shelves: every copy the library owns, and the only way to reach one. In-memory here so the example runs anywhere; a real deployment swaps the implementation without the domain noticing.","entityTypeName":"Book","eventUnionTypeName":"BookEvent","isPort":false,"implementations":[],"finders":[{"name":"searchBook","isStatic":false,"returnType":"Promise\u003cResult\u003cBook[], Error>>","parameters":[{"name":"criteria","type":"BookSearchCriteria"}],"emits":[],"canFail":[],"location":{"file":"domain/repositories/libraryCollection.repository.ts","line":27}}],"location":{"file":"domain/repositories/libraryCollection.repository.ts","line":15}},{"id":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"repository","name":"LoanRegister","description":"Every loan the library has made, open or closed. Its finders answer questions about loans as a set, which no single loan can answer about itself.","entityTypeName":"Loan","eventUnionTypeName":"LoanEvent","isPort":false,"implementations":[],"finders":[{"name":"findOutstandingLoanForBook","isStatic":false,"returnType":"Promise\u003cResult\u003cLoan | undefined, Error>>","parameters":[{"name":"bookId","type":"string"}],"emits":[],"canFail":[],"location":{"file":"domain/repositories/loanRegister.repository.ts","line":15}},{"name":"findActiveLoansForMember","isStatic":false,"returnType":"Promise\u003cResult\u003cLoan[], Error>>","parameters":[{"name":"memberId","type":"string"}],"emits":[],"canFail":[],"location":{"file":"domain/repositories/loanRegister.repository.ts","line":28}}],"location":{"file":"domain/repositories/loanRegister.repository.ts","line":9}},{"id":"useCase:domain/use-cases/addBook.use-case.ts#AddBookUseCase","kind":"useCase","name":"AddBookUseCase","description":"Adds a copy to the library's collection. Nothing can refuse it, so this use case has no domain errors at all.","actionTypeName":"AddBookCommand","actionKind":"command","actionFields":[{"name":"title","type":"string","optional":false},{"name":"author","type":"string","optional":false},{"name":"isbn","type":"string","optional":false},{"name":"category","type":"string","optional":false},{"name":"tags","type":"string[]","optional":false}],"dependencies":[{"name":"libraryCollection","type":"LibraryCollection"}],"returnType":"Promise\u003cResult\u003cBookState, never>>","errorUnionErased":false,"canFail":[],"reads":[],"writes":["LibraryCollection"],"emits":["event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent"],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"call","name":"Book","detail":"create","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"write","name":"Book","detail":"saveWithEvents","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent"]}],"location":{"file":"domain/use-cases/addBook.use-case.ts","line":11},"actionName":"ADD_BOOK","returnsStateTypeName":"BookState"},{"id":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","kind":"useCase","name":"DeclareBookLostUseCase","description":"Records that a copy has gone missing, taking it out of circulation. Refused if the copy is unknown, or was already declared lost.","actionTypeName":"DeclareBookLostCommand","actionKind":"command","actionFields":[{"name":"bookId","type":"string","optional":false}],"dependencies":[{"name":"libraryCollection","type":"LibraryCollection"}],"returnType":"Promise\u003c Result\u003cBookState, BookNotFoundError | BookAlreadyDeclaredLostError> >","errorUnionErased":false,"canFail":["error:domain/entities/book/errors/book.errors.ts#BookNotFoundError","error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError"],"reads":["LibraryCollection"],"writes":["LibraryCollection"],"emits":["event:domain/entities/book/events/bookLost.event.ts#BookLostEvent"],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"call","name":"Book","detail":"declareLost","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"write","name":"Book","detail":"saveWithEvents","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["event:domain/entities/book/events/bookLost.event.ts#BookLostEvent"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["error:domain/entities/book/errors/book.errors.ts#BookNotFoundError"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"call","name":"Book","detail":"declareLost","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError"]}],"location":{"file":"domain/use-cases/declareBookLost.use-case.ts","line":15},"actionName":"DECLARE_BOOK_LOST","returnsStateTypeName":"BookState"},{"id":"useCase:domain/use-cases/listOutstandingLoansForMember.use-case.ts#ListOutstandingLoansForMemberUseCase","kind":"useCase","name":"ListOutstandingLoansForMemberUseCase","description":"Lists the copies a member still has out. The filtering lives in the register, since it is a question about all loans at once.","actionTypeName":"ListOutstandingLoansForMemberQuery","actionKind":"query","actionFields":[{"name":"memberId","type":"string","optional":false}],"dependencies":[{"name":"loanRegister","type":"LoanRegister"}],"returnType":"Promise\u003cResult\u003cArray\u003c{ id: string } & LoanState>, never>>","errorUnionErased":false,"canFail":[],"reads":["LoanRegister"],"writes":[],"emits":[],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"read","name":"Loan","detail":"findActiveLoansForMember","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":[]}],"location":{"file":"domain/use-cases/listOutstandingLoansForMember.use-case.ts","line":11},"actionName":"LIST_OUTSTANDING_LOANS_FOR_MEMBER","returnsStateTypeName":"Array\u003c{ id: string } & LoanState>"},{"id":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","kind":"useCase","name":"RecordBookReturnUseCase","description":"Takes a copy back from a member and closes their loan. The copy itself is never touched — the loan is the thing that knows it was out.","actionTypeName":"RecordBookReturnCommand","actionKind":"command","actionFields":[{"name":"loanId","type":"string","optional":false}],"dependencies":[{"name":"loanRegister","type":"LoanRegister"}],"returnType":"Promise\u003cResult\u003cLoanState, LoanNotFoundError | LoanAlreadyReturnedError>>","errorUnionErased":false,"canFail":["error:domain/entities/loan/errors/loan.errors.ts#LoanNotFoundError","error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError"],"reads":["LoanRegister"],"writes":["LoanRegister"],"emits":["event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent"],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"read","name":"Loan","detail":"getById","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"call","name":"Loan","detail":"returnBook","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"write","name":"Loan","detail":"saveWithEvents","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent"]},{"kind":"failure","steps":[{"kind":"read","name":"Loan","detail":"getById","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["error:domain/entities/loan/errors/loan.errors.ts#LoanNotFoundError"]},{"kind":"failure","steps":[{"kind":"read","name":"Loan","detail":"getById","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"call","name":"Loan","detail":"returnBook","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError"]}],"location":{"file":"domain/use-cases/recordBookReturn.use-case.ts","line":15},"actionName":"RECORD_BOOK_RETURN","returnsStateTypeName":"LoanState"},{"id":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","kind":"useCase","name":"RegisterLoanUseCase","description":"Lends a copy to a member. Refused if the copy is already out, or if the member is at their borrowing limit.","actionTypeName":"RegisterLoanCommand","actionKind":"command","actionFields":[{"name":"bookId","type":"string","optional":false},{"name":"memberId","type":"string","optional":false}],"dependencies":[{"name":"libraryCollection","type":"LibraryCollection"},{"name":"loanRegister","type":"LoanRegister"}],"returnType":"Promise\u003cResult\u003cLoanState, RegisterLoanError>>","errorUnionErased":false,"canFail":["error:domain/entities/book/errors/book.errors.ts#BookNotFoundError","error:domain/entities/book/errors/book.errors.ts#BookLostCannotBeLoanedError","error:domain/entities/book/errors/book.errors.ts#BookAlreadyOnLoanError","error:domain/entities/loan/errors/loan.errors.ts#MemberActiveLoanLimitExceededError"],"reads":["LibraryCollection","LoanRegister"],"writes":["LoanRegister"],"emits":["event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent"],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"read","name":"Loan","detail":"findOutstandingLoanForBook","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"read","name":"Loan","detail":"findActiveLoansForMember","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"call","name":"Loan","detail":"create","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"write","name":"Loan","detail":"saveWithEvents","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["error:domain/entities/book/errors/book.errors.ts#BookNotFoundError"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":["error:domain/entities/book/errors/book.errors.ts#BookLostCannotBeLoanedError"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"read","name":"Loan","detail":"findOutstandingLoanForBook","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["error:domain/entities/book/errors/book.errors.ts#BookAlreadyOnLoanError"]},{"kind":"failure","steps":[{"kind":"read","name":"Book","detail":"getById","nodeId":"entity:domain/entities/book/book.entity.ts#Book"},{"kind":"read","name":"Loan","detail":"findOutstandingLoanForBook","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"kind":"read","name":"Loan","detail":"findActiveLoansForMember","nodeId":"entity:domain/entities/loan/loan.entity.ts#Loan"}],"outcome":["error:domain/entities/loan/errors/loan.errors.ts#MemberActiveLoanLimitExceededError"]}],"location":{"file":"domain/use-cases/registerLoan.use-case.ts","line":27},"actionName":"REGISTER_LOAN","returnsStateTypeName":"LoanState"},{"id":"useCase:domain/use-cases/searchBooks.use-case.ts#SearchBooksUseCase","kind":"useCase","name":"SearchBooksUseCase","description":"Finds copies in the collection by title or author. Declared over a `Query`, so the tooling can tell it writes nothing without reading the body.","actionTypeName":"SearchBooksQuery","actionKind":"query","actionFields":[{"name":"title","type":"string","optional":true},{"name":"author","type":"string","optional":true}],"dependencies":[{"name":"libraryCollection","type":"LibraryCollection"}],"returnType":"Promise\u003cResult\u003cBookState[], never>>","errorUnionErased":false,"canFail":[],"reads":["LibraryCollection"],"writes":[],"emits":[],"eventsUndetermined":false,"paths":[{"kind":"success","steps":[{"kind":"read","name":"Book","detail":"searchBook","nodeId":"entity:domain/entities/book/book.entity.ts#Book"}],"outcome":[]}],"location":{"file":"domain/use-cases/searchBooks.use-case.ts","line":11},"actionName":"SEARCH_BOOKS","returnsStateTypeName":"BookState[]"},{"id":"readModel:presentation/api/library/book-count.service.ts#BookCountService","kind":"readModel","name":"BookCountService","description":"How many copies the library has ever taken in, kept up to date by listening rather than by counting rows.","eventUnionTypeName":"LibraryEvent","declaredEventNames":["BookCreatedEvent","BookLostEvent","LoanCreatedEvent","LoanReturnedEvent"],"consumedEventNames":["BOOK_CREATED"],"consumesEverything":false,"queries":[{"name":"getBookCount","isStatic":false,"returnType":"number","parameters":[],"emits":[],"canFail":[],"location":{"file":"presentation/api/library/book-count.service.ts","line":58}}],"location":{"file":"presentation/api/library/book-count.service.ts","line":30}}],"edges":[{"from":"entity:domain/entities/book/book.entity.ts#Book","to":"event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent","kind":"emits","via":"create"},{"from":"entity:domain/entities/book/book.entity.ts#Book","to":"event:domain/entities/book/events/bookLost.event.ts#BookLostEvent","kind":"emits","via":"declareLost"},{"from":"entity:domain/entities/book/book.entity.ts#Book","to":"error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError","kind":"canFail","via":"declareLost"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent","kind":"emits","via":"create"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent","kind":"emits","via":"returnBook"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError","kind":"canFail","via":"returnBook"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"invariant:domain/entities/loan/invariants/dueDateAfterLoanDate.invariant.ts#dueDateAfterLoanDate","kind":"protectedBy"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"invariant:domain/entities/loan/invariants/returnDateAfterLoanDate.invariant.ts#returnDateAfterLoanDate","kind":"protectedBy"},{"from":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","to":"entity:domain/entities/book/book.entity.ts#Book","kind":"persists"},{"from":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","to":"entity:domain/entities/loan/loan.entity.ts#Loan","kind":"persists"},{"from":"useCase:domain/use-cases/addBook.use-case.ts#AddBookUseCase","to":"event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent","kind":"emits"},{"from":"useCase:domain/use-cases/addBook.use-case.ts#AddBookUseCase","to":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"writes"},{"from":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","to":"error:domain/entities/book/errors/book.errors.ts#BookNotFoundError","kind":"canFail"},{"from":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","to":"error:domain/entities/book/errors/book.errors.ts#BookAlreadyDeclaredLostError","kind":"canFail"},{"from":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","to":"event:domain/entities/book/events/bookLost.event.ts#BookLostEvent","kind":"emits"},{"from":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","to":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"reads"},{"from":"useCase:domain/use-cases/declareBookLost.use-case.ts#DeclareBookLostUseCase","to":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"writes"},{"from":"useCase:domain/use-cases/listOutstandingLoansForMember.use-case.ts#ListOutstandingLoansForMemberUseCase","to":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"reads"},{"from":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","to":"error:domain/entities/loan/errors/loan.errors.ts#LoanNotFoundError","kind":"canFail"},{"from":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","to":"error:domain/entities/loan/errors/loan.errors.ts#LoanAlreadyReturnedError","kind":"canFail"},{"from":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","to":"event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent","kind":"emits"},{"from":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","to":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"reads"},{"from":"useCase:domain/use-cases/recordBookReturn.use-case.ts#RecordBookReturnUseCase","to":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"writes"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"error:domain/entities/book/errors/book.errors.ts#BookNotFoundError","kind":"canFail"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"error:domain/entities/book/errors/book.errors.ts#BookLostCannotBeLoanedError","kind":"canFail"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"error:domain/entities/book/errors/book.errors.ts#BookAlreadyOnLoanError","kind":"canFail"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"error:domain/entities/loan/errors/loan.errors.ts#MemberActiveLoanLimitExceededError","kind":"canFail"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent","kind":"emits"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"reads"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"reads"},{"from":"useCase:domain/use-cases/registerLoan.use-case.ts#RegisterLoanUseCase","to":"repository:domain/repositories/loanRegister.repository.ts#LoanRegister","kind":"writes"},{"from":"useCase:domain/use-cases/searchBooks.use-case.ts#SearchBooksUseCase","to":"repository:domain/repositories/libraryCollection.repository.ts#LibraryCollection","kind":"reads"},{"from":"readModel:presentation/api/library/book-count.service.ts#BookCountService","to":"event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent","kind":"consumes"},{"from":"entity:domain/entities/loan/loan.entity.ts#Loan","to":"entity:domain/entities/book/book.entity.ts#Book","kind":"references","via":"bookId"}],"eventUnions":[{"name":"BookEvent","memberNames":["BookLostEvent","BookCreatedEvent"],"location":{"file":"domain/entities/book/book.entity.ts","line":7}},{"name":"LoanEvent","memberNames":["LoanCreatedEvent","LoanReturnedEvent"],"location":{"file":"domain/entities/loan/loan.entity.ts","line":11}},{"name":"LibraryEvent","memberNames":["BookCreatedEvent","BookLostEvent","LoanCreatedEvent","LoanReturnedEvent"],"location":{"file":"presentation/api/library/book-count.service.ts","line":20}}],"findings":[],"aggregateRoots":["entity:domain/entities/book/book.entity.ts#Book","entity:domain/entities/loan/loan.entity.ts#Loan"],"graphs":[{"rootId":"entity:domain/entities/book/book.entity.ts#Book","title":"Book","nodes":[{"label":"Book","kind":"subEntity","x":16,"y":15,"id":"entity:domain/entities/book/book.entity.ts#Book"},{"label":"BookCreatedEvent","kind":"event","x":224,"y":0,"id":"event:domain/entities/book/events/bookCreated.event.ts#BookCreatedEvent"},{"label":"BookLostEvent","kind":"event","x":224,"y":30,"id":"event:domain/entities/book/events/bookLost.event.ts#BookLostEvent"}],"edges":[{"from":0,"to":1},{"from":0,"to":2}],"width":412,"height":92},{"rootId":"entity:domain/entities/loan/loan.entity.ts#Loan","title":"Loan","nodes":[{"label":"Loan","kind":"subEntity","x":16,"y":15,"id":"entity:domain/entities/loan/loan.entity.ts#Loan"},{"label":"LoanCreatedEvent","kind":"event","x":224,"y":0,"id":"event:domain/entities/loan/events/loanCreated.event.ts#LoanCreatedEvent"},{"label":"LoanReturnedEvent","kind":"event","x":224,"y":30,"id":"event:domain/entities/loan/events/loanReturned.event.ts#LoanReturnedEvent"}],"edges":[{"from":0,"to":1},{"from":0,"to":2}],"width":412,"height":92}]};
+</script>
+</head>
+<body>
+<div class="shell">
+  <aside class="rail">
+    <div class="rail__head">
+      <div class="rail__brand">
+        <span class="rail__mark" aria-hidden="true">
+          <svg viewBox="0 0 240 240" fill="none">
+            <defs>
+              <marker id="ol-amber" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#FBBF24"/></marker>
+              <marker id="ol-sky" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#38BDF8"/></marker>
+              <marker id="ol-orange" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#F97316"/></marker>
+              <marker id="ol-green" viewBox="0 0 8 8" markerWidth="9" markerHeight="9" refX="7" refY="4" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0 L8 4 L0 8 Z" fill="#34D399"/></marker>
+            </defs>
+            <path d="M 146.7 46.7 A 78 78 0 0 1 193.3 93.3" stroke="#38BDF8" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-sky)"/>
+            <path d="M 193.3 146.7 A 78 78 0 0 1 146.7 193.3" stroke="#F97316" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-orange)"/>
+            <path d="M 93.3 193.3 A 78 78 0 0 1 46.7 146.7" stroke="#34D399" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-green)"/>
+            <path d="M 46.7 93.3 A 78 78 0 0 1 93.3 46.7" stroke="#FBBF24" stroke-width="7" stroke-linecap="round" marker-end="url(#ol-amber)"/>
+            <rect x="100" y="22" width="40" height="40" rx="10" fill="#FBBF24" transform="rotate(-7 120 42)"/>
+            <rect x="178" y="100" width="40" height="40" rx="10" fill="#38BDF8" transform="rotate(7 198 120)"/>
+            <rect x="100" y="178" width="40" height="40" rx="10" fill="#F97316" transform="rotate(7 120 198)"/>
+            <rect x="22" y="100" width="40" height="40" rx="10" fill="#34D399" transform="rotate(-7 42 120)"/>
+          </svg>
+        </span>
+        <span>
+          <h1 class="rail__title">Domain Explorer</h1>
+          <p class="rail__tag">Ontologic</p>
+        </span>
+      </div>
+      <div class="rail__project">
+        <div class="rail__project-label">Analysed</div>
+        <p class="rail__root">library-example</p>
+      </div>
+      <input id="search" class="search" type="search" placeholder="Search the model…  /"
+             aria-label="Search the model" autocomplete="off" spellcheck="false">
+      <div id="filters" class="filters" role="group" aria-label="Filter by type"></div>
+    </div>
+    <nav class="rail__fixed" aria-label="Views">
+      <a class="navlink navlink--view" data-view="" href="#/">Overview</a>
+      <a class="navlink navlink--view" data-view="use-cases" href="#/use-cases">Use Cases</a>
+    </nav>
+    <nav id="nav" class="rail__nav" aria-label="Domain concepts"></nav>
+    <div class="rail__foot">
+      <div id="theme" class="theme" role="group" aria-label="Colour theme">
+        <button class="theme__btn" type="button" data-theme-set="system" aria-pressed="true">System</button>
+        <button class="theme__btn" type="button" data-theme-set="light" aria-pressed="false">Light</button>
+        <button class="theme__btn" type="button" data-theme-set="dark" aria-pressed="false">Dark</button>
+      </div>
+      <p class="hint"><kbd>/</kbd> search · <kbd>↑</kbd><kbd>↓</kbd> move · <kbd>↵</kbd> open · <kbd>esc</kbd> clear</p>
+    </div>
+  </aside>
+  <main id="main" class="main"></main>
+</div>
+<script>
+(function () {
+  "use strict";
+
+  var KINDS = [
+    { key: "entity",      label: "Aggregates & entities", route: "entity" },
+    { key: "valueObject", label: "Value objects", route: "value-object" },
+    { key: "useCase",     label: "Use cases",     route: "use-case" },
+    { key: "event",       label: "Events",        route: "event" },
+    { key: "error",       label: "Errors",        route: "error" },
+    { key: "invariant",   label: "Invariants",    route: "invariant" },
+    { key: "repository",  label: "Repositories",  route: "repository" },
+    { key: "readModel",   label: "Read models",   route: "read-model" }
+  ];
+
+  var byId = {};
+  MODEL.nodes.forEach(function (n) { byId[n.id] = n; });
+
+  /**
+   * Whether a use-case board shows the views built from its events. Kept in
+   * module scope rather than storage, like the kind filters: it should outlive
+   * navigation, and there is nothing to gain from outliving a reload.
+   */
+  var showConsumers = true;
+
+  var findingsByNode = {};
+  MODEL.findings.forEach(function (f) {
+    (findingsByNode[f.nodeId] = findingsByNode[f.nodeId] || []).push(f);
+  });
+
+  var routeToKind = {};
+  KINDS.forEach(function (k) { routeToKind[k.route] = k.key; });
+
+  /**
+   * Aggregate roots, as a lookup.
+   *
+   * "entity" in the model means "extends DomainEntity", which is not the same
+   * question as "is an aggregate root": an entity held by another entity is
+   * contained, and must not wear the same badge or colour as the root that
+   * holds it.
+   */
+  var rootIds = {};
+  (function () {
+    var declared = (MODEL.aggregateRoots || []).filter(function (id) { return byId[id]; });
+
+    // Nothing contains anything: there is no hierarchy to distinguish, so every
+    // entity stands on its own. The rail and the graph layout assume the same.
+    if (declared.length === 0) {
+      MODEL.nodes.forEach(function (n) { if (n.kind === "entity") rootIds[n.id] = true; });
+      return;
+    }
+
+    declared.forEach(function (id) { rootIds[id] = true; });
+  })();
+
+  /**
+   * Top level: nothing holds this. Structural only — it says where a thing sits,
+   * not what it is called. The rail groups by it, the diagrams are keyed by it,
+   * and every breadcrumb starts at one.
+   */
+  function isRoot(node) {
+    return node.kind === "entity" && rootIds[node.id] === true;
+  }
+
+  /**
+   * An aggregate is an entity that actually aggregates: a top-level one holding
+   * at least one entity or value object of its own.
+   *
+   * A top-level entity holding nothing is just an entity. It is still a root —
+   * it still anchors a diagram and a rail group — but calling it an aggregate
+   * claims a structure it does not have.
+   */
+  function isAggregate(node) {
+    return isRoot(node) && containedOf(node.id).length > 0;
+  }
+
+  function sortByName(nodes) {
+    return nodes.sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  function rootNodes() {
+    return sortByName(MODEL.nodes.filter(isRoot));
+  }
+
+  function aggregateNodes() {
+    return sortByName(MODEL.nodes.filter(isAggregate));
+  }
+
+  /** Everything with identity that is not an aggregate. */
+  function plainEntities() {
+    return sortByName(MODEL.nodes.filter(function (n) {
+      return n.kind === "subEntity" || (n.kind === "entity" && !isAggregate(n));
+    }));
+  }
+
+  function esc(value) {
+    return String(value == null ? "" : value)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function nodesOfKind(kind) {
+    return MODEL.nodes.filter(function (n) { return n.kind === kind; })
+      .sort(function (a, b) { return a.name.localeCompare(b.name); });
+  }
+
+  function routeOf(node) {
+    // Anything with state and identity is one object with one page, whatever
+    // route it came in on. "domain" is that page.
+    if (node.kind === "entity" || node.kind === "subEntity" ||
+        node.kind === "valueObject") {
+      return "domain";
+    }
+
+    // The router branch is plural; KINDS says "use-case". Both resolve, which is
+    // exactly the kind of accident this function now exists to prevent.
+    if (node.kind === "useCase") return "use-cases";
+
+    for (var i = 0; i < KINDS.length; i++) {
+      if (KINDS[i].key === node.kind) return KINDS[i].route;
+    }
+
+    return node.kind;
+  }
+
+  /**
+   * The address of a node. The only one — every link to an object goes through
+   * here, so clicking the same thing in the rail, in a list, on the board or in
+   * the diagram lands on the same page.
+   */
+  function hrefOf(node) {
+    return "#/" + routeOf(node) + "/" + encodeURIComponent(node.id);
+  }
+
+  function linkTo(id, fallback) {
+    var node = byId[id];
+    if (!node) return '<span class="mono faint">' + esc(fallback || id) + "</span>";
+    return '<a class="mono" href="' + hrefOf(node) + '">' + esc(node.name) + "</a>";
+  }
+
+  function linkList(ids, emptyText) {
+    if (!ids || ids.length === 0) return '<span class="dash">' + esc(emptyText || "—") + "</span>";
+    return ids.map(function (id) { return linkTo(id); }).join('<span class="faint">, </span>');
+  }
+
+  function edgesFrom(id, kind) {
+    return MODEL.edges.filter(function (e) { return e.from === id && e.kind === kind; });
+  }
+
+  function edgesTo(id, kind) {
+    return MODEL.edges.filter(function (e) { return e.to === id && e.kind === kind; });
+  }
+
+  // ---------- rail ----------
+
+  var activeKinds = {};   // empty means "everything"
+  var railItems = [];     // flat, in display order — the keyboard walks this
+  var cursor = -1;
+
+  function anyFilterOn() {
+    for (var key in activeKinds) if (activeKinds[key]) return true;
+    return false;
+  }
+
+  function passesFilter(node) {
+    return !anyFilterOn() || activeKinds[node.kind];
+  }
+
+  function navlinkHtml(node) {
+    var flagged = findingsByNode[node.id] ? " navlink--flagged" : "";
+
+    return '<a class="navlink' + flagged + '" data-kind="' + esc(kindAttr(node)) +
+      '" data-id="' + esc(node.id) + '" href="' + hrefOf(node) + '">' +
+      '<span class="navlink__dot"></span>' +
+      '<span class="navlink__text">' + esc(node.name) + "</span></a>";
+  }
+
+  function groupHtml(label, nodes, className) {
+    var html = '<div class="group ' + (className || "") + '">' +
+      '<div class="group__label"><span>' + esc(label) + "</span>" +
+      '<span class="group__count">' + nodes.length + "</span></div>";
+
+    nodes.forEach(function (node) {
+      railItems.push(node);
+      html += navlinkHtml(node);
+    });
+
+    return html + "</div>";
+  }
+
+  /**
+   * The rail is grouped by aggregate rather than by kind, so it reads as the
+   * domain rather than as a type index: everything belonging to an aggregate sits
+   * under it. Anything not reachable from a root falls into a trailing group.
+   */
+  function renderRail(filter) {
+    var needle = (filter || "").trim().toLowerCase();
+    railItems = [];
+
+    var matches = function (node) {
+      return passesFilter(node) &&
+        (!needle || node.name.toLowerCase().indexOf(needle) !== -1);
+    };
+
+    var claimed = {};
+    var html = "";
+
+    var roots = rootNodes();
+
+    roots.forEach(function (root) {
+      var members = [root].concat(descendantsOf(root.id));
+      var shown = [];
+
+      members.forEach(function (node) {
+        if (claimed[node.id]) return;
+        claimed[node.id] = true;
+        if (matches(node)) shown.push(node);
+      });
+
+      if (shown.length > 0) html += groupHtml(root.name, shown, "group--aggregate");
+    });
+
+    var rest = MODEL.nodes.filter(function (n) {
+      return !claimed[n.id] && matches(n);
+    });
+
+    KINDS.forEach(function (kind) {
+      var nodes = rest.filter(function (n) { return n.kind === kind.key; })
+        .sort(function (a, b) { return a.name.localeCompare(b.name); });
+
+      if (nodes.length > 0) html += groupHtml(kind.label, nodes);
+    });
+
+    if (html === "") {
+      html = '<div class="group"><div class="group__label"><span>No matches</span></div></div>';
+    }
+
+    document.getElementById("nav").innerHTML = html;
+    cursor = -1;
+    markCurrent();
+  }
+
+  /** Everything reachable from an aggregate by containment, plus what it emits. */
+  function descendantsOf(rootId) {
+    var seen = {};
+    var out = [];
+    var queue = [rootId];
+
+    while (queue.length > 0) {
+      var id = queue.shift();
+
+      MODEL.edges.forEach(function (edge) {
+        if (edge.from !== id) return;
+        if (edge.kind !== "contains" && edge.kind !== "emits" &&
+            edge.kind !== "protectedBy" && edge.kind !== "canFail") return;
+        if (seen[edge.to] || edge.to === rootId) return;
+
+        var node = byId[edge.to];
+        if (!node) return;
+
+        seen[edge.to] = true;
+        out.push(node);
+        queue.push(edge.to);
+      });
+    }
+
+    var order = { entity: 0, subEntity: 1, valueObject: 2, event: 3, invariant: 4, error: 5 };
+
+    return out.sort(function (a, b) {
+      var d = (order[a.kind] === undefined ? 9 : order[a.kind]) -
+        (order[b.kind] === undefined ? 9 : order[b.kind]);
+      return d !== 0 ? d : a.name.localeCompare(b.name);
+    });
+  }
+
+  function renderFilters() {
+    var html = KINDS.map(function (kind) {
+      var on = !!activeKinds[kind.key];
+      return '<button class="filter" type="button" data-kind="' + esc(kind.key) +
+        '" data-filter="' + esc(kind.key) + '" aria-pressed="' + on + '">' +
+        esc(kind.label) + "</button>";
+    }).join("");
+
+    document.getElementById("filters").innerHTML = html;
+  }
+
+  function markCurrent() {
+    var parts = location.hash.replace(/^#\/?/, "").split("/");
+    var route = parts[0] || "";
+    var current = decodeURIComponent(parts[1] || "");
+    var links = document.querySelectorAll(".navlink");
+
+    for (var i = 0; i < links.length; i++) {
+      var link = links[i];
+      var view = link.getAttribute("data-view");
+
+      // Concept links match on the node they point at; the two view links match
+      // on the branch, since everything that is not a use case hangs off the
+      // overview.
+      var on = view === null
+        ? link.getAttribute("data-id") === current
+        : view === (route === "use-cases" ? "use-cases" : "");
+
+      if (on) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
+    }
+  }
+
+  /** Move the keyboard cursor through the visible rail results. */
+  function moveCursor(delta) {
+    if (railItems.length === 0) return;
+
+    cursor += delta;
+    if (cursor < 0) cursor = 0;
+    if (cursor >= railItems.length) cursor = railItems.length - 1;
+
+    var links = document.querySelectorAll(".navlink[data-id]");
+    for (var i = 0; i < links.length; i++) links[i].classList.remove("is-active");
+
+    var target = links[cursor];
+    if (target) {
+      target.classList.add("is-active");
+      target.scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  // ---------- shared blocks ----------
+
+  function fieldsTable(fields, caption) {
+    if (!fields || fields.length === 0) {
+      return '<div class="empty">' + esc(caption) + "</div>";
+    }
+
+    var rows = fields.map(function (f) {
+      return "<tr><td class=\"mono\">" + esc(f.name) + "</td>" +
+        '<td class="mono muted">' + esc(f.type) + "</td>" +
+        '<td class="nowrap">' + (f.optional ? '<span class="chip">optional</span>' : '<span class="dash">—</span>') + "</td></tr>";
+    }).join("");
+
+    return '<div class="scroll"><table><thead><tr><th>Field</th><th>Type</th><th>Required</th></tr></thead><tbody>' +
+      rows + "</tbody></table></div>";
+  }
+
+  function findingsFor(id) {
+    var list = findingsByNode[id];
+    if (!list) return "";
+
+    return '<div class="section"><h2 class="section__head">Findings</h2>' +
+      list.map(renderFinding).join("") + "</div>";
+  }
+
+  function renderFinding(finding) {
+    var severe = finding.code === "error-missing-set-prototype" ||
+      finding.code === "invariant-never-attached";
+
+    return '<div class="finding' + (severe ? " finding--danger" : "") + '">' +
+      '<div class="finding__stripe"></div><div class="finding__body">' +
+      '<div class="finding__code">' + esc(finding.code) + "</div>" +
+      '<p class="finding__msg">' + esc(finding.message) + "</p>" +
+      '<div class="finding__where">' + esc(finding.location.file) + ":" + finding.location.line + "</div>" +
+      "</div></div>";
+  }
+
+  function whereFound(node) {
+    return '<p class="subtitle"><code>' + esc(node.location.file) + ":" + node.location.line + "</code></p>";
+  }
+
+  function header(node, label, prose) {
+    return '<div class="crumb"><span class="chip chip--kind" data-kind="' + esc(kindAttr(node)) +
+      '">' + esc(label) + "</span></div>" +
+      '<h1 class="title' + (prose ? " title--prose" : "") + '">' + esc(node.name) + "</h1>" +
+      whereFound(node);
+  }
+
+  // ---------- detail views ----------
+
+  function viewEvent(node) {
+    var html = header(node, "Domain event");
+
+    html += '<div class="section"><h2 class="section__head">Contract</h2>' +
+      '<div class="scroll"><table><tbody>' +
+      '<tr><td class="faint nowrap">Wire name</td><td class="mono">' + esc(node.eventName) + "</td></tr>" +
+      '<tr><td class="faint nowrap">Version</td><td class="mono">' + esc(node.version) + "</td></tr>" +
+      '<tr><td class="faint nowrap">Payload</td><td class="mono">' + esc(node.payloadTypeName) + "</td></tr>" +
+      "</tbody></table></div></div>";
+
+    html += '<div class="section"><h2 class="section__head">Payload</h2>' +
+      fieldsTable(node.payloadFields, "Payload type could not be resolved.") + "</div>";
+
+    var emitters = edgesTo(node.id, "emits");
+    if (emitters.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Emitted by</h2><div class="flow">' +
+        emitters.map(function (e) {
+          var from = byId[e.from];
+          return '<a class="flow__item"' +
+            (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
+            esc(from ? from.name : e.from) +
+            (e.via ? '<span class="faint">.' + esc(e.via) + "()</span>" : "") + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    var consumers = consumersOf(node.id);
+
+    if (consumers.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Consumed by</h2>' +
+        '<p class="subtitle">Views built from this event. They read it; none of ' +
+        "them can refuse it.</p>" +
+        '<div class="flow">' + consumers.map(function (e) {
+          var from = byId[e.from];
+          return '<a class="flow__item" data-kind="readModel" href="' +
+            (from ? hrefOf(from) : "#") + '">' +
+            esc(from ? from.name : e.from) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    return html + findingsFor(node.id);
+  }
+
+  function viewError(node) {
+    var html = header(node, "Domain error");
+
+    html += '<div class="section"><h2 class="section__head">Contract</h2>' +
+      '<div class="scroll"><table><tbody>' +
+      '<tr><td class="faint nowrap">Discriminant</td><td class="mono">' + esc(node.errorName) + "</td></tr>" +
+      '<tr><td class="faint nowrap">Context</td><td class="mono">' + esc(node.contextTypeName) + "</td></tr>" +
+      '<tr><td class="faint nowrap">instanceof</td><td>' +
+      (node.setsPrototype
+        ? '<span class="chip chip--accent">works</span>'
+        : '<span class="chip chip--danger">broken</span>') +
+      "</td></tr></tbody></table></div></div>";
+
+    html += '<div class="section"><h2 class="section__head">Context</h2>' +
+      fieldsTable(node.contextFields, "No structured context.") + "</div>";
+
+    var raisers = edgesTo(node.id, "canFail");
+    if (raisers.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Returned by</h2><div class="flow">' +
+        raisers.map(function (e) {
+          var from = byId[e.from];
+          return '<a class="flow__item"' +
+            (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
+            esc(from ? from.name : e.from) +
+            (e.via ? '<span class="faint">.' + esc(e.via) + "()</span>" : "") + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    return html + findingsFor(node.id);
+  }
+
+  function viewInvariant(node) {
+    var html = '<div class="crumb"><span class="chip chip--kind" data-kind="invariant">Invariant</span></div>' +
+      '<h1 class="title">' + esc(node.description) + "</h1>" +
+      '<p class="subtitle"><code>' + esc(node.name) + "</code> · <code>" +
+      esc(node.location.file) + ":" + node.location.line + "</code></p>";
+
+    html += '<div class="section"><h2 class="section__head">Rule</h2><pre>' +
+      esc(node.predicate || "(not available)") + "</pre></div>";
+
+    var protects = edgesTo(node.id, "protectedBy");
+    html += '<div class="section"><h2 class="section__head">Protects</h2><p>' +
+      (protects.length > 0
+        ? linkList(protects.map(function (e) { return e.from; }))
+        : '<span class="dash">Not attached to any entity — this rule is never enforced.</span>') +
+      "</p></div>";
+
+    return html + findingsFor(node.id);
+  }
+
+  /**
+   * Events by class name. A read model's declared union names classes, while
+   * its subscriptions name wire names, so comparing the two needs both.
+   */
+  var eventByClassName = {};
+  MODEL.nodes.forEach(function (n) {
+    if (n.kind === "event") eventByClassName[n.name] = n;
+  });
+
+  /** Everything that consumes this event, the mirror of "Emitted by". */
+  function consumersOf(id) {
+    return MODEL.edges.filter(function (e) {
+      return e.to === id && e.kind === "consumes";
+    });
+  }
+
+  function viewReadModel(node) {
+    var html = header(node, "Read model");
+
+    var consumed = edgesFrom(node.id, "consumes");
+
+    html += '<div class="section"><h2 class="section__head">Built from</h2>';
+
+    if (node.consumesEverything) {
+      html += '<p class="subtitle">Listens with a wildcard, so every event in ' +
+        "the model reaches it.</p>";
+    }
+
+    html += consumed.length > 0
+      ? '<div class="cards">' + consumed.map(function (edge) {
+          return byId[edge.to] ? detailCard(byId[edge.to]) : "";
+        }).join("") + "</div>"
+      : '<div class="empty">No event this codebase publishes reaches it.</div>';
+
+    html += "</div>";
+
+    // The gap between the two is worth showing: a union wider than the handlers
+    // is either room left for later or a subscription someone forgot to write.
+    var heard = node.declaredEventNames || [];
+    var unheard = heard.filter(function (name) {
+      var event = eventByClassName[name];
+      return !node.consumesEverything && event &&
+        node.consumedEventNames.indexOf(event.eventName) === -1;
+    });
+
+    if (unheard.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Declared but not heard</h2>' +
+        '<p class="subtitle"><code>' + esc(node.eventUnionTypeName) +
+        "</code> admits these too, but no handler is registered for them.</p>" +
+        '<div class="flow">' + unheard.map(function (name) {
+          var event = eventByClassName[name];
+          return '<a class="flow__item" data-kind="event" href="' +
+            (event ? hrefOf(event) : "#") + '">' + esc(name) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    if (node.queries.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Answers</h2>' +
+        '<p class="subtitle">What this view can be asked, once the events have landed.</p>' +
+        '<div class="scroll"><table><thead><tr><th>Query</th><th>Returns</th></tr></thead><tbody>' +
+        node.queries.map(function (q) {
+          var params = q.parameters.map(function (p) {
+            return p.name + ": " + p.type;
+          }).join(", ");
+          return '<tr><td class="mono nowrap">' + esc(q.name) + "(" + esc(params) + ")</td>" +
+            '<td class="mono muted">' + esc(q.returnType) + "</td></tr>";
+        }).join("") + "</tbody></table></div></div>";
+    }
+
+    return html + findingsFor(node.id);
+  }
+
+  function viewRepository(node) {
+    var html = header(node, node.isPort ? "Repository port" : "Repository");
+
+    html += '<div class="section"><h2 class="section__head">Contract</h2>' +
+      '<div class="scroll"><table><tbody>' +
+      '<tr><td class="faint nowrap">Entity</td><td class="mono">' + esc(node.entityTypeName) + "</td></tr>" +
+      '<tr><td class="faint nowrap">Event union</td><td class="mono">' + esc(node.eventUnionTypeName) + "</td></tr>" +
+      (node.implementations && node.implementations.length
+        ? '<tr><td class="faint nowrap">Implemented by</td><td class="mono">' +
+          esc(node.implementations.join(", ")) + "</td></tr>"
+        : "") +
+      "</tbody></table></div></div>";
+
+    if (node.finders.length > 0) {
+      var rows = node.finders.map(function (f) {
+        var params = f.parameters.map(function (p) { return p.name + ": " + p.type; }).join(", ");
+        return '<tr><td class="mono nowrap">' + esc(f.name) + "(" + esc(params) + ")</td>" +
+          '<td class="mono muted">' + esc(f.returnType) + "</td></tr>";
+      }).join("");
+
+      html += '<div class="section"><h2 class="section__head">Domain queries</h2>' +
+        '<p class="subtitle">Predicates that name a domain concept live here rather than in each use case.</p>' +
+        '<div class="scroll"><table><thead><tr><th>Query</th><th>Returns</th></tr></thead><tbody>' +
+        rows + "</tbody></table></div></div>";
+    }
+
+    var users = MODEL.edges.filter(function (e) {
+      return e.to === node.id && (e.kind === "reads" || e.kind === "writes");
+    });
+
+    if (users.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Used by</h2><div class="flow">' +
+        users.map(function (e) {
+          var from = byId[e.from];
+          return '<a class="flow__item flow__item--' + (e.kind === "writes" ? "write" : "read") +
+            '"' + (from ? ' data-kind="' + esc(kindAttr(from)) + '"' : "") +
+            ' href="' + (from ? hrefOf(from) : "#") + '">' +
+            '<span class="flow__verb">' + esc(e.kind) + "</span>" +
+            esc(from ? from.name : e.from) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    return html + findingsFor(node.id);
+  }
+
+  /** Screen 5 — every command and query in the model. */
+  function viewUseCases() {
+    var all = nodesOfKind("useCase");
+    var commands = all.filter(function (n) { return n.actionKind !== "query"; });
+    var queries = all.filter(function (n) { return n.actionKind === "query"; });
+
+    var html = trailHtml([{ label: "Use Cases", href: "#/use-cases" }]) +
+      '<h1 class="title">Use Cases</h1>' +
+      '<p class="subtitle">All commands and queries in your domain. Click to see what each ' +
+      "use case touches.</p>" +
+      legendHtml([
+        ["command", "Command"],
+        ["query", "Query"],
+        ["entity", "Aggregate"],
+        ["event", "Event"],
+        ["error", "Error"]
+      ]);
+
+    if (all.length === 0) {
+      return html + '<div class="empty">No use cases found. A use case declares itself with ' +
+        "<code>implements UseCase&lt;Action, Output, Errors&gt;</code>; without that marker its " +
+        "action cannot be determined. See the Overview for anything flagged as unmarked.</div>";
+    }
+
+    if (commands.length) {
+      html += '<div class="section"><h2 class="section__head">Commands</h2>' +
+        '<div class="cards cards--wide">' +
+        commands.map(useCaseCard).join("") + "</div></div>";
+    }
+
+    if (queries.length) {
+      html += '<div class="section"><h2 class="section__head">Queries</h2>' +
+        '<div class="cards cards--wide">' +
+        queries.map(useCaseCard).join("") + "</div></div>";
+    }
+
+    return html;
+  }
+
+  /** The aggregates a use case touches, as the design's outlined tags. */
+  function touchTags(node) {
+    var seen = {};
+    var tags = [];
+
+    edgesFrom(node.id, "writes").concat(edgesFrom(node.id, "reads")).forEach(function (edge) {
+      aggregatesBehind(edge.to).forEach(function (entity) {
+        if (seen[entity.id]) return;
+        seen[entity.id] = true;
+        tags.push('<span class="tag">' + esc(entity.name) + "</span>");
+      });
+    });
+
+    return tags.join("");
+  }
+
+  /**
+   * A use case names repositories, not aggregates. The design shows aggregates,
+   * so follow the port to what it persists.
+   */
+  function aggregatesBehind(repositoryId) {
+    return edgesFrom(repositoryId, "persists")
+      .map(function (edge) { return byId[edge.to]; })
+      .filter(Boolean);
+  }
+
+  function useCaseCard(node) {
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      tags: touchTags(node),
+      href: hrefOf(node)
+    });
+  }
+
+  /** One sticky note. */
+  function noteHtml(o) {
+    var inner =
+      '<span class="note__kind">' + esc(o.kind) + "</span>" +
+      '<span class="note__name">' + esc(o.name) + "</span>" +
+      (o.detail ? '<span class="note__detail">' + esc(o.detail) + "</span>" : "");
+
+    // Notes are a fixed size, so long names are clipped. The full text stays
+    // reachable: the title shows it on hover, and the note links through to the
+    // detail page.
+    var full = o.name + (o.detail ? " \u00b7 " + o.detail : "");
+    var title = ' title="' + esc(full) + '"';
+
+    return o.href
+      ? '<a class="note" data-kind="' + esc(o.tone) + '"' + title +
+        ' href="' + o.href + '">' + inner + "</a>"
+      : '<span class="note" data-kind="' + esc(o.tone) + '"' + title + ">" +
+        inner + "</span>";
+  }
+
+  /**
+   * The views built from a rank's events, once each.
+   *
+   * Deduped across the rank: two events landing in one write often feed the same
+   * view, and drawing it twice would suggest two of them.
+   */
+  function consumerTailHtml(outcomeIds) {
+    var seen = {};
+    var models = [];
+
+    outcomeIds.forEach(function (id) {
+      var event = byId[id];
+      if (!event || event.kind !== "event") return;
+
+      consumersOf(event.id).forEach(function (edge) {
+        if (seen[edge.from]) return;
+        seen[edge.from] = true;
+        if (byId[edge.from]) models.push(byId[edge.from]);
+      });
+    });
+
+    if (models.length === 0) return "";
+
+    return '<span class="board__consumers">' +
+      '<span class="board__arrow">&#8594;</span>' +
+      '<div class="board__rank' + (models.length > 1 ? " board__rank--many" : "") + '">' +
+      models.map(function (model) {
+        return noteHtml({
+          tone: "readModel",
+          kind: "Read model",
+          name: model.name,
+          detail: model.consumesEverything ? "every event" : "",
+          href: hrefOf(model)
+        });
+      }).join("") +
+      "</div></span>";
+  }
+
+  /**
+   * The board: the happy path, then one row per way the use case can be refused.
+   *
+   * Each row reads left to right as a complete story — the steps taken, then
+   * where it ended. Repeating the prefix is the point: a failure row is a
+   * scenario you can read on its own.
+   */
+  function boardHtml(node) {
+    if (!node.paths || node.paths.length === 0) return "";
+
+    var isQuery = node.actionKind === "query";
+    var actionTone = isQuery ? "query" : "command";
+
+    function pathHtml(path) {
+      var html = '<div class="board__path">' +
+        noteHtml({
+          tone: actionTone,
+          kind: isQuery ? "Query" : "Command",
+          name: node.actionName || node.actionTypeName,
+          detail: ""
+        });
+
+      path.steps.forEach(function (step) {
+        var target = step.nodeId ? byId[step.nodeId] : null;
+
+        html += '<span class="board__arrow">&#8594;</span>' +
+          noteHtml({
+            tone: target ? kindAttr(target) : "entity",
+            kind: step.kind === "write" ? "Writes" : step.kind === "read" ? "Reads" : "Calls",
+            name: step.name,
+            detail: step.detail,
+            href: target ? hrefOf(target) : ""
+          });
+      });
+
+      if (path.outcome.length > 0) {
+        // One rank, not a sequence: events reaching the same saveWithEvents are
+        // written together, and errors leaving the same guard are alternatives.
+        // Either way none of them follows another.
+        var many = path.outcome.length > 1;
+        var isSuccess = path.kind === "success";
+
+        html += '<span class="board__arrow">&#8594;</span>' +
+          '<div class="board__rank' + (many ? " board__rank--many" : "") + '">';
+
+        path.outcome.forEach(function (id, index) {
+          var outcome = byId[id];
+
+          if (many && index > 0 && !isSuccess) {
+            html += '<span class="board__alt">or</span>';
+          }
+
+          html += noteHtml({
+            tone: isSuccess ? "event" : "error",
+            kind: isSuccess ? "Event" : "Error",
+            name: outcome ? outcome.name : id,
+            detail: outcome && outcome.eventName ? outcome.eventName : "",
+            href: outcome ? hrefOf(outcome) : ""
+          });
+        });
+
+        html += "</div>";
+
+        // Downstream of the events, so a second arrow and a second rank. Folding
+        // these into the rank above would say they happen alongside the events
+        // rather than because of them.
+        if (isSuccess) html += consumerTailHtml(path.outcome);
+      } else if (path.kind === "success" && isQuery && node.returnsStateTypeName) {
+        // A query hands back state rather than recording an event. This is not
+        // the read-model concept — that is a view built from events, and it has
+        // its own pages.
+        html += '<span class="board__arrow">&#8594;</span>' +
+          noteHtml({
+            tone: "query",
+            kind: "Returns",
+            name: node.returnsStateTypeName,
+            detail: ""
+          });
+      }
+
+      return html + "</div>";
+    }
+
+    var success = node.paths.filter(function (p) { return p.kind === "success"; });
+    var failures = node.paths.filter(function (p) { return p.kind === "failure"; });
+
+    // Only worth a control if this codebase has views to show.
+    var hasConsumers = MODEL.edges.some(function (e) { return e.kind === "consumes"; });
+
+    var head = hasConsumers
+      ? '<div class="section__bar"><h2 class="section__head">Board</h2>' +
+        '<button class="toggle" type="button" data-kind="readModel" data-consumers-toggle ' +
+        'aria-pressed="' + showConsumers + '">Read models</button></div>'
+      : '<h2 class="section__head">Board</h2>';
+
+    var html = '<div class="section">' + head +
+      '<div class="board" data-consumers="' + (showConsumers ? "on" : "off") +
+      '"><div class="board__inner">';
+
+    success.forEach(function (path) {
+      html += '<div class="board__row"><div class="board__label">Happy path</div>' +
+        pathHtml(path) + "</div>";
+    });
+
+    failures.forEach(function (path, index) {
+      html += '<div class="board__row board__row--failure">' +
+        '<div class="board__label">Failure path ' + (index + 1) + "</div>" +
+        pathHtml(path) + "</div>";
+    });
+
+    html += "</div></div>";
+
+    if (failures.length === 0) {
+      html += '<p class="subtitle" style="margin-top:10px">No domain failure \u2014 ' +
+        "this use case cannot be refused.</p>";
+    }
+
+    if (node.eventsUndetermined) {
+      html += '<p class="subtitle" style="margin-top:10px">Something passed to ' +
+        "<code>saveWithEvents</code> could not be traced to an event class, so the " +
+        "happy path may be incomplete.</p>";
+    }
+
+    return html + "</div>";
+  }
+
+  /** Screen 6 — one use case in full. */
+  function viewUseCase(node) {
+    var isQuery = node.actionKind === "query";
+
+    var html = trailHtml([
+      { label: "Use Cases", href: "#/use-cases" },
+      { label: node.name, href: "#" }
+    ]) +
+      '<div class="crumb"><span class="badge" data-kind="' + esc(kindAttr(node)) + '">' +
+      esc(badgeOf(node)) + "</span>" +
+      (node.actionKind === "unknown"
+        ? '<span class="chip chip--warn">action declared outside this codebase</span>'
+        : "") + "</div>" +
+      '<h1 class="title">' + esc(node.name) + "</h1>" +
+      '<p class="subtitle">' + esc(node.description ||
+        (isQuery
+          ? "A query: it reads and writes nothing."
+          : "A command: an intent to change state, which the domain may refuse.")) +
+      "</p>";
+
+    html += boardHtml(node);
+
+    // The action, as the shape a caller has to supply.
+    html += '<div class="section"><h2 class="section__head">' +
+      (isQuery ? "Query input" : "Command input") + "</h2><pre>" +
+      '<span class="k">' + esc(node.actionTypeName) + "</span> {" +
+      (node.actionFields.length
+        ? node.actionFields.map(function (f) {
+            return "\n  " + esc(f.name) + (f.optional ? "?" : "") +
+              ': <span class="t">' + esc(f.type) + "</span>";
+          }).join(",") + "\n"
+        : "") +
+      "}</pre>" +
+      (node.actionName
+        ? '<p class="subtitle" style="margin-top:10px">Dispatched as <code>' +
+          esc(node.actionName) + "</code></p>"
+        : "") +
+      "</div>";
+
+    var rows = node.dependencies.map(function (dep) {
+      return '<tr><td class="mono nowrap">' + esc(dep.name) + "</td>" +
+        '<td class="mono muted">' + esc(dep.type) + "</td></tr>";
+    }).join("");
+
+    html += '<div class="section"><h2 class="section__head">Dependencies</h2>' +
+      '<div class="scroll"><table><thead><tr><th>Constructor parameter</th><th>Type</th></tr></thead><tbody>' +
+      (rows || '<tr><td colspan="2" class="dash">No dependencies</td></tr>') +
+      "</tbody></table></div>" +
+      '<p class="subtitle" style="margin-top:10px">Returns <code>' +
+      esc(node.returnType) + "</code></p></div>";
+
+    return html + findingsFor(node.id);
+  }
+
+  // ---------- overview ----------
+
+  /**
+   * The groups the overview counts, in the order it counts them.
+   *
+   * One entry drives both the counter and the screen it opens, so the number and
+   * the page behind it cannot disagree. Aggregates and entities share one kind
+   * in the model and are split here on containment.
+   *
+   * An entry carrying a blurb is served by the generic list screen; the two
+   * without one — aggregates and use cases — have hand-written screens the
+   * router reaches first.
+   */
+  var GROUPS = [
+    {
+      route: "domain", kind: "entity", label: "Aggregates",
+      nodes: aggregateNodes
+    },
+    {
+      route: "entity", kind: "subEntity", label: "Entities",
+      blurb: "Objects with an identity that hold nothing of their own \u2014 either " +
+        "inside an aggregate, or standing alone.",
+      nodes: plainEntities
+    },
+    {
+      route: "value-object", kind: "valueObject", label: "Value objects",
+      blurb: "Immutable and compared by value \u2014 two with the same contents are the " +
+        "same thing.",
+      nodes: function () { return nodesOfKind("valueObject"); }
+    },
+    {
+      route: "use-cases", kind: "command", label: "Use cases",
+      nodes: function () { return nodesOfKind("useCase"); }
+    },
+    {
+      route: "event", kind: "event", label: "Events",
+      blurb: "Facts already recorded. Each one is named in the past tense.",
+      nodes: function () { return nodesOfKind("event"); }
+    },
+    {
+      route: "error", kind: "error", label: "Errors",
+      blurb: "Refusals a behaviour can return \u2014 expected outcomes, not exceptions.",
+      nodes: function () { return nodesOfKind("error"); }
+    },
+    {
+      route: "invariant", kind: "invariant", label: "Invariants",
+      blurb: "Rules that must hold before a change is allowed through.",
+      nodes: function () { return nodesOfKind("invariant"); }
+    },
+    {
+      route: "repository", kind: "repository", label: "Repositories",
+      blurb: "The ports through which aggregates are loaded and saved.",
+      nodes: function () { return nodesOfKind("repository"); }
+    },
+    {
+      route: "read-model", kind: "readModel", label: "Read models",
+      blurb: "Views built by listening to events rather than written to directly. " +
+        "They answer questions; they decide nothing.",
+      nodes: function () { return nodesOfKind("readModel"); }
+    }
+  ];
+
+  var groupByRoute = {};
+  GROUPS.forEach(function (g) { groupByRoute[g.route] = g; });
+
+  function viewOverview() {
+    var html = '<h1 class="title">Overview</h1>' +
+      '<p class="subtitle">Extracted from <code>' + esc(MODEL.root) + "</code>. " +
+      "Every count opens what it counted.</p>";
+
+    html += '<div class="section"><div class="tiles">';
+    GROUPS.forEach(function (group) {
+      var count = group.nodes().length;
+      if (count === 0) return;
+      html += '<a class="tile" data-kind="' + esc(group.kind) +
+        '" href="#/' + esc(group.route) + '"><div class="tile__n">' +
+        count + "</div>" +
+        '<div class="tile__k">' + esc(group.label) + "</div></a>";
+    });
+    html += "</div></div>";
+
+    if (MODEL.findings.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Findings — ' +
+        MODEL.findings.length + "</h2>" +
+        '<p class="subtitle">Places where the codebase contradicts itself. Each links to the concept it affects.</p>' +
+        MODEL.findings.map(renderFinding).join("") + "</div>";
+    } else {
+      html += '<div class="section"><h2 class="section__head">Findings</h2>' +
+        '<div class="empty">No contradictions found.</div></div>';
+    }
+
+    return html;
+  }
+
+  /**
+   * Every node in one group, as a grid — where an overview counter leads.
+   */
+  function viewKindList(route) {
+    var group = groupByRoute[route];
+    if (!group || !group.blurb) return "";
+
+    var nodes = group.nodes();
+
+    return trailHtml([
+        { label: "Overview", href: "#/" },
+        { label: group.label }
+      ]) +
+      '<h1 class="title">' + esc(group.label) + " \u2014 " + nodes.length + "</h1>" +
+      '<p class="subtitle">' + esc(group.blurb) + "</p>" +
+      '<div class="section">' +
+      (nodes.length
+        ? '<div class="cards">' + nodes.map(function (n) { return blockHtml(n); }).join("") +
+          "</div>"
+        : '<div class="empty">None found.</div>') +
+      "</div>";
+  }
+
+  // ---------- explorer ----------
+
+  var KIND_LABEL = {
+    entity: "Aggregate",
+    subEntity: "Sub-entity",
+    valueObject: "Value object",
+    event: "Event",
+    error: "Error",
+    invariant: "Invariant",
+    repository: "Repository",
+    useCase: "Use case",
+    readModel: "Read model",
+    behaviour: "Behaviour"
+  };
+
+  /** Short badge, the way the design labels a card. */
+  var KIND_BADGE = {
+    entity: "AGG",
+    subEntity: "ENT",
+    valueObject: "VO",
+    event: "EVENT",
+    error: "ERROR",
+    invariant: "INV",
+    repository: "REPO",
+    readModel: "RM",
+    behaviour: "FN"
+  };
+
+  /**
+   * The colour channel for a node. Use cases split by what they are asked to do,
+   * so a command and a query never share a colour.
+   */
+  function kindAttr(node) {
+    if (node.kind === "useCase") {
+      return node.actionKind === "query" ? "query" : "command";
+    }
+    // A contained entity reads as an entity; only a root wears the aggregate colour.
+    if (node.kind === "entity" && !isAggregate(node)) return "subEntity";
+    return node.kind;
+  }
+
+  function badgeOf(node) {
+    if (node.kind === "useCase") {
+      return node.actionKind === "query" ? "QRY" : "CMD";
+    }
+    if (node.kind === "entity" && !isAggregate(node)) return "ENT";
+    return KIND_BADGE[node.kind] || "";
+  }
+
+  function labelOf(node) {
+    if (node.kind === "entity" && !isAggregate(node)) return "Entity";
+    return KIND_LABEL[node.kind] || node.kind;
+  }
+
+  /**
+   * One card. Every grid on the page is built from this.
+   *
+   * The description slot collapses when the codebase has no doc comment, which
+   * is the common case rather than the exception — the name, badge and stats row
+   * have to carry the card on their own.
+   */
+  function cardHtml(o) {
+    var cls = "card" +
+      (o.tinted ? " card--tinted" : "") +
+      (o.extra ? " " + o.extra : "");
+
+    var inner =
+      '<div class="card__top">' +
+      '<span class="card__name' + (o.mono ? " card__name--mono" : "") + '">' +
+      esc(o.name) + "</span>" +
+      (o.badge ? '<span class="badge">' + esc(o.badge) + "</span>" : "") +
+      (o.href ? '<span class="card__go">Explore &#8594;</span>' : "") +
+      "</div>" +
+      (o.desc ? '<p class="card__desc">' + esc(o.desc) + "</p>" : "") +
+      (o.tags ? '<div class="tags">' + o.tags + "</div>" : "") +
+      (o.stats && o.stats.length
+        ? '<div class="card__stats"><span class="card__stat">' +
+          esc(o.stats.join(" \u00b7 ")) + "</span></div>"
+        : "");
+
+    // Cards are a fixed height, so long names and descriptions are clipped. The
+    // full text stays reachable: the title shows it on hover, and the card links
+    // through to the detail page.
+    var full = o.name + (o.desc ? " \u2014 " + o.desc : "");
+    var title = ' title="' + esc(full) + '"';
+
+    return o.href
+      ? '<a class="' + cls + '" data-kind="' + esc(o.kind) + '"' + title +
+        ' href="' + o.href + '">' + inner + "</a>"
+      : '<div class="' + cls + '" data-kind="' + esc(o.kind) + '"' + title + ">" +
+        inner + "</div>";
+  }
+
+  function containedOf(id) {
+    return MODEL.edges.filter(function (e) { return e.from === id && e.kind === "contains"; });
+  }
+
+  /** Everything an aggregate holds, transitively. */
+  function containedTree(id, seen) {
+    seen = seen || {};
+    var out = [];
+
+    containedOf(id).forEach(function (edge) {
+      if (seen[edge.to]) return;
+      seen[edge.to] = true;
+
+      var node = byId[edge.to];
+      if (!node) return;
+
+      out.push(node);
+      out = out.concat(containedTree(node.id, seen));
+    });
+
+    return out;
+  }
+
+  /** "6 behaviours · 4 events · 3 errors", counted across the whole aggregate. */
+  function statsOf(node) {
+    var all = [node].concat(containedTree(node.id));
+    var behaviours = 0;
+    var events = {};
+    var errors = {};
+
+    all.forEach(function (n) {
+      (n.methods || []).forEach(function (m) {
+        if (m.emits.length > 0 || m.canFail.length > 0) behaviours++;
+        m.emits.forEach(function (id) { events[id] = true; });
+        m.canFail.forEach(function (id) { errors[id] = true; });
+      });
+    });
+
+    var eventCount = Object.keys(events).length;
+    var errorCount = Object.keys(errors).length;
+    var parts = [];
+
+    if (behaviours) parts.push(behaviours + " behaviour" + (behaviours === 1 ? "" : "s"));
+    if (eventCount) parts.push(eventCount + " event" + (eventCount === 1 ? "" : "s"));
+    if (errorCount) parts.push(errorCount + " error" + (errorCount === 1 ? "" : "s"));
+
+    if (node.kind === "readModel") {
+      var consumed = edgesFrom(node.id, "consumes").length;
+      if (node.consumesEverything) parts.push("every event");
+      else if (consumed) parts.push(consumed + " event" + (consumed === 1 ? "" : "s"));
+      if (node.queries.length) {
+        parts.push(node.queries.length + " quer" + (node.queries.length === 1 ? "y" : "ies"));
+      }
+    }
+
+    return parts;
+  }
+
+  function referencesOf(id) {
+    return MODEL.edges.filter(function (e) { return e.from === id && e.kind === "references"; });
+  }
+
+  /** Behaviours are addressed as '<entityId>::<method>' — they are not model nodes. */
+  function behaviourId(node, method) { return node.id + "::" + method.name; }
+
+  function behaviourOf(ref) {
+    var parts = ref.split("::");
+    var owner = byId[parts[0]];
+    if (!owner || !owner.methods) return null;
+
+    for (var i = 0; i < owner.methods.length; i++) {
+      if (owner.methods[i].name === parts[1]) {
+        return { owner: owner, method: owner.methods[i] };
+      }
+    }
+    return null;
+  }
+
+  function blockHtml(node, extraClass) {
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      mono: true,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      stats: statsOf(node),
+      tinted: true,
+      extra: extraClass,
+      href: hrefOf(node)
+    });
+  }
+
+  function behaviourBlockHtml(node, method) {
+    var stats = [];
+    if (method.emits.length) {
+      stats.push(method.emits.length + " event" + (method.emits.length === 1 ? "" : "s"));
+    }
+    if (method.canFail.length) {
+      stats.push(method.canFail.length + " error" + (method.canFail.length === 1 ? "" : "s"));
+    }
+
+    return cardHtml({
+      kind: "behaviour",
+      name: method.name + "()",
+      mono: true,
+      desc: method.description || "",
+      stats: stats,
+      tinted: true,
+      href: "#/domain/" + encodeURIComponent(behaviourId(node, method))
+    });
+  }
+
+  /**
+   * Group children that came from the same union alias. A tool holds
+   * 'WorkflowNodeOutputType' — nine classes — and nine sibling blocks per tool
+   * says less than one labelled family does.
+   */
+  function groupedBlocks(edges) {
+    var families = {};
+    var loose = [];
+
+    edges.forEach(function (edge) {
+      var node = byId[edge.to];
+      if (!node) return;
+
+      var family = familyFor(edge.from, node);
+      if (family) {
+        (families[family] = families[family] || []).push(node);
+      } else {
+        loose.push(node);
+      }
+    });
+
+    var html = loose.length
+      ? '<div class="cards">' + loose.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+      : "";
+
+    Object.keys(families).forEach(function (name) {
+      var members = families[name];
+      html += '<div class="family" style="margin-top:12px">' +
+        '<div class="family__label">any one of <b>' + esc(name) + "</b> \u00b7 " +
+        members.length + " kinds</div>" +
+        '<div class="cards">' +
+        members.map(function (n) { return blockHtml(n); }).join("") +
+        "</div></div>";
+    });
+
+    return html;
+  }
+
+  function familyFor(holderId, target) {
+    var holder = byId[holderId];
+    if (!holder || !holder.containedRefs) return null;
+
+    for (var i = 0; i < holder.containedRefs.length; i++) {
+      var ref = holder.containedRefs[i];
+      if (ref.symbol === target.name && ref.family) return ref.family;
+    }
+    return null;
+  }
+
+  function trailHtml(segments) {
+    var html = '<nav class="trail" aria-label="Explorer path">';
+
+    segments.forEach(function (segment, index) {
+      if (index > 0) html += '<span class="trail__sep">›</span>';
+
+      if (index === segments.length - 1) {
+        html += '<span class="trail__here">' + esc(segment.label) + "</span>";
+      } else {
+        html += '<a href="' + segment.href + '">' + esc(segment.label) + "</a>";
+      }
+    });
+
+    return html + "</nav>";
+  }
+
+  /**
+   * The head of a breadcrumb: which list this object belongs to. A lone entity
+   * is not in the aggregates screen, so its trail must not claim it is.
+   */
+  function trailHead(node) {
+    var top = pathTo(node)[0];
+
+    return top && isAggregate(top)
+      ? [{ label: "Overview", href: "#/" }, { label: "Aggregates", href: "#/domain" }]
+      : [{ label: "Overview", href: "#/" }, { label: "Entities", href: "#/entity" }];
+  }
+
+  /** The chain from an aggregate root down to 'node', following contains edges. */
+  function pathTo(node) {
+    var chain = [node];
+    var guard = 0;
+
+    while (guard++ < 20) {
+      var parent = MODEL.edges.filter(function (e) {
+        return e.kind === "contains" && e.to === chain[0].id;
+      })[0];
+
+      if (!parent) break;
+      var parentNode = byId[parent.from];
+      if (!parentNode || chain.indexOf(parentNode) !== -1) break;
+      chain.unshift(parentNode);
+    }
+
+    return chain;
+  }
+
+  /** Every id a node's methods name, once each, in the order they appear. */
+  function acrossMethods(node, field) {
+    var seen = {};
+    var ids = [];
+
+    (node.methods || []).forEach(function (method) {
+      (method[field] || []).forEach(function (id) {
+        if (seen[id]) return;
+        seen[id] = true;
+        ids.push(id);
+      });
+    });
+
+    return ids;
+  }
+
+  function detailCards(ids) {
+    return '<div class="cards">' + ids.map(function (id) {
+      return byId[id] ? detailCard(byId[id]) : "";
+    }).join("") + "</div>";
+  }
+
+  /**
+   * The page for one object that carries state and identity — an aggregate, an
+   * entity inside one, a sub-entity, or a value object.
+   *
+   * There is exactly one of these per object. There used to be two: a structural
+   * view reached from the lists and the diagram, and a detail view reached from
+   * the rail. Which one you got depended on where you clicked, which is not a
+   * property of the thing you clicked. The sections below are the union of both,
+   * ordered as: what it is, what shape it has, what it does, what it holds.
+   */
+  function viewObject(node) {
+    var segments = pathTo(node).map(function (n) {
+      return { label: n.name, href: hrefOf(n) };
+    });
+
+    segments = trailHead(node).concat(segments);
+
+    var body = trailHtml(segments) +
+      '<h1 class="title">' + esc(node.name) + " " + esc(labelOf(node)) + "</h1>" +
+      (node.description ? '<p class="subtitle">' + esc(node.description) + "</p>" : "") +
+      whereFound(node) +
+      legendHtml(DOMAIN_LEGEND);
+
+    var invariants = node.invariants || [];
+
+    // What is always true of this object comes first — it frames everything
+    // below rather than trailing it.
+    if (invariants.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Invariants</h2>' +
+        '<div class="flow">' + invariants.map(function (id) {
+          var inv = byId[id];
+          return '<a class="flow__item" data-kind="invariant" href="' +
+            (inv ? hrefOf(inv) : "#") + '">' +
+            esc(inv ? inv.description : id) + "</a>";
+        }).join("") + "</div></div>";
+    }
+
+    // Then the shape: the lists further down only make sense once you can see
+    // what holds what.
+    var graph = graphFor(node);
+
+    if (graph) {
+      body += '<div class="section"><h2 class="section__head">Structure</h2>' +
+        '<p class="subtitle">' +
+        (isAggregate(node)
+          ? "What this aggregate holds, and the events those produce. " +
+            "Errors are left out — this is about structure."
+          : isRoot(node)
+            ? "This entity holds nothing of its own. The events it produces, " +
+              "and nothing else."
+            : "Where " + esc(node.name) + " sits inside " + esc(graph.title) + ".") +
+        "</p>" +
+        graphBlockHtml(graph, node.id) +
+        legendHtml(GRAPH_LEGEND) +
+        "</div>";
+    }
+
+    var behaviours = (node.methods || []).filter(function (m) {
+      return m.emits.length > 0 || m.canFail.length > 0;
+    });
+
+    if (behaviours.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Behaviours</h2>' +
+        '<div class="cards">' +
+        behaviours.map(function (m) { return behaviourBlockHtml(node, m); }).join("") +
+        "</div></div>";
+    }
+
+    // The roll-up: a behaviour card carries only counts, and this is what those
+    // count. Everything here is also reachable one level deeper, per behaviour.
+    var emitted = acrossMethods(node, "emits");
+    var raised = acrossMethods(node, "canFail");
+
+    if (emitted.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Events emitted</h2>' +
+        detailCards(emitted) + "</div>";
+    }
+
+    if (raised.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Errors raised</h2>' +
+        detailCards(raised) + "</div>";
+    }
+
+    // The design separates what an aggregate holds by kind rather than listing
+    // it as one mixed grid.
+    var contained = containedOf(node.id);
+    var entityEdges = contained.filter(function (e) {
+      var to = byId[e.to];
+      return to && to.kind !== "valueObject";
+    });
+    var valueEdges = contained.filter(function (e) {
+      var to = byId[e.to];
+      return to && to.kind === "valueObject";
+    });
+
+    if (entityEdges.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Entities</h2>' +
+        groupedBlocks(entityEdges) + "</div>";
+    }
+
+    if (valueEdges.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Value objects (immutable)</h2>' +
+        groupedBlocks(valueEdges) + "</div>";
+    }
+
+    var references = referencesOf(node.id);
+
+    if (references.length > 0) {
+      body += '<div class="section"><h2 class="section__head">References</h2>' +
+        '<p class="subtitle">Named by id, not held — following one leaves this aggregate.</p>' +
+        '<div class="cards">' + references.map(function (edge) {
+          var to = byId[edge.to];
+          if (!to) return "";
+          return cardHtml({
+            kind: kindAttr(to),
+            name: to.name,
+            mono: true,
+            badge: badgeOf(to),
+            desc: "Referenced by id via " + edge.via + ".",
+            href: hrefOf(to)
+          });
+        }).join("") + "</div></div>";
+    }
+
+    var persisted = edgesTo(node.id, "persists");
+
+    if (persisted.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Persisted by</h2>' +
+        "<p>" + linkList(persisted.map(function (e) { return e.from; })) + "</p></div>";
+    }
+
+    body += findingsFor(node.id);
+
+    var fields = node.stateFields || [];
+    if (fields.length === 0) return body;
+
+    // The state type name rides in the inspector label, so the detail page's
+    // "State — <Type>" heading survives without a second table of the same rows.
+    return '<div class="main--split"><div class="main__body">' + body + "</div>" +
+      inspectorHtml({
+        name: node.name,
+        kind: kindAttr(node),
+        badge: badgeOf(node),
+        desc: node.description || "",
+        label: "State &mdash; <span class=\"mono\">" + esc(node.stateTypeName) + "</span>",
+        fields: fields.map(function (f) {
+          return {
+            name: f.name,
+            type: f.type,
+            note: f.optional ? "Optional" : ""
+          };
+        })
+      }) + "</div>";
+  }
+
+  function inspectorHtml(o) {
+    var html = '<aside class="inspector" data-kind="' + esc(o.kind) + '">' +
+      '<div class="inspector__top">' +
+      '<span class="inspector__name">' + esc(o.name) + "</span>" +
+      (o.badge ? '<span class="badge badge--soft">' + esc(o.badge) + "</span>" : "") +
+      "</div>";
+
+    if (o.desc) html += '<p class="card__desc">' + esc(o.desc) + "</p>";
+
+    html += '<div class="inspector__label">' + o.label + "</div>";
+
+    html += o.fields.length
+      ? o.fields.map(function (f) {
+          return '<div class="field"><div class="field__top">' +
+            '<span class="field__name">' + esc(f.name) + "</span>" +
+            '<span class="field__type">' + esc(f.type) + "</span></div>" +
+            (f.note ? '<p class="field__note">' + esc(f.note) + "</p>" : "") +
+            "</div>";
+        }).join("")
+      : '<div class="empty">None declared.</div>';
+
+    return html + "</aside>";
+  }
+
+  /** Screen 4 — the events and errors one behaviour produces. */
+  function viewBehaviour(owner, method) {
+    var segments = pathTo(owner).map(function (n) {
+      return { label: n.name, href: hrefOf(n) };
+    });
+    segments = trailHead(owner).concat(segments);
+    segments.push({ label: method.name + "()", href: "#" });
+
+    var body = trailHtml(segments) +
+      '<h1 class="title title--mono">' + esc(method.name) + "() \u2014 Events &amp; Errors</h1>" +
+      '<p class="subtitle">' + esc(method.description ||
+        "Domain events published and errors raised by this behaviour.") + "</p>" +
+      legendHtml([["event", "Domain event"], ["error", "Error"]]);
+
+    body += '<div class="section"><h2 class="section__head">Events emitted</h2>';
+    body += method.emits.length
+      ? '<div class="cards cards--one">' + method.emits.map(function (id) {
+          var n = byId[id];
+          return n ? detailCard(n) : "";
+        }).join("") + "</div>"
+      : '<div class="empty">No event is named in the signature. Some methods return a ' +
+        "wrapper carrying the aggregate's event union rather than a specific event, in " +
+        "which case what they emit is not determinable from the type alone.</div>";
+    body += "</div>";
+
+    if (method.canFail.length > 0) {
+      body += '<div class="section"><h2 class="section__head">Errors raised</h2>' +
+        '<div class="cards cards--one">' + method.canFail.map(function (id) {
+          var n = byId[id];
+          return n ? detailCard(n) : "";
+        }).join("") + "</div></div>";
+    }
+
+    body += '<div class="section"><h2 class="section__head">Behaviour signature</h2>' +
+      "<pre>" + signatureHtml(method) + "</pre></div>";
+
+    return '<div class="main--split"><div class="main__body">' + body + "</div>" +
+      inspectorHtml({
+        name: method.name + "()",
+        kind: "behaviour",
+        badge: "FN",
+        desc: method.description || "",
+        label: "Parameters",
+        fields: method.parameters.map(function (param) {
+          return { name: param.name, type: param.type, note: "" };
+        }).concat([{ name: "returns", type: method.returnType, note: "Return type" }])
+      }) + "</div>";
+  }
+
+  /** A card for an event or error, where the payload matters more than a count. */
+  function detailCard(node) {
+    return cardHtml({
+      kind: kindAttr(node),
+      name: node.name,
+      mono: true,
+      badge: badgeOf(node),
+      desc: node.description || "",
+      tinted: true,
+      href: hrefOf(node)
+    });
+  }
+
+  /** name(param: Type, ...): Return, lightly coloured. */
+  function signatureHtml(method) {
+    var params = method.parameters.map(function (param) {
+      return '<span class="p">' + esc(param.name) + '</span>: <span class="t">' +
+        esc(param.type) + "</span>";
+    }).join(", ");
+
+    return '<span class="k">' + esc(method.name) + "</span>(" + params +
+      '): <span class="t">' + esc(method.returnType) + "</span>";
+  }
+
+  /** The legend bar under every object header. */
+  var DOMAIN_LEGEND = [
+    ["entity", "Aggregate"],
+    ["subEntity", "Entity"],
+    ["valueObject", "Value object"],
+    ["behaviour", "Behaviour"],
+    ["event", "Event"],
+    ["error", "Error"],
+    ["invariant", "Invariant"],
+    ["repository", "Repository"],
+    ["readModel", "Read model"]
+  ];
+
+  /** Screen 1 — every aggregate in the model. */
+  function viewDomainRoots() {
+    var roots = aggregateNodes();
+
+    var html = trailHtml([
+        { label: "Overview", href: "#/" },
+        { label: "Aggregates" }
+      ]) +
+      '<h1 class="title">Aggregates \u2014 ' + roots.length + "</h1>" +
+      '<p class="subtitle">Top-level objects that hold others \u2014 nothing holds these, ' +
+      "and each is one atomic write. Open one to see what it contains and what it can do.</p>" +
+      legendHtml(DOMAIN_LEGEND);
+
+    html += '<div class="section">' +
+      (roots.length
+        ? '<div class="cards">' + roots.map(function (n) { return blockHtml(n); }).join("") + "</div>"
+        : '<div class="empty">Nothing here aggregates anything \u2014 every entity in ' +
+          'this model stands alone. See <a href="#/entity">Entities</a>.</div>') +
+      "</div>";
+
+    var orphans = nodesOfKind("valueObject").filter(function (vo) {
+      return MODEL.edges.filter(function (e) {
+        return e.kind === "contains" && e.to === vo.id;
+      }).length === 0;
+    });
+
+    if (orphans.length > 0) {
+      html += '<div class="section"><h2 class="section__head">Unattached value objects</h2>' +
+        '<p class="subtitle">Nothing was found holding these. They may be built and used ' +
+        "transiently, or held in a way that cannot be seen statically.</p>" +
+        '<div class="cards">' + orphans.map(function (n) { return blockHtml(n); }).join("") +
+        "</div></div>";
+    }
+
+    return html;
+  }
+
+  function legendHtml(entries) {
+    return '<div class="legend">' + entries.map(function (entry) {
+      return '<span class="legend__item" data-kind="' + esc(entry[0]) + '">' +
+        '<span class="legend__swatch"></span>' + esc(entry[1]) + "</span>";
+    }).join("") + "</div>";
+  }
+
+  // ---------- theme ----------
+
+  var THEME_KEY = "ontologic-theme";
+
+  /**
+   * Three states, matching the three the stylesheet defines: no attribute means
+   * follow the system, and an explicit value overrides it in either direction.
+   */
+  function currentTheme() {
+    var set = document.documentElement.getAttribute("data-theme");
+    return set === "light" || set === "dark" ? set : "system";
+  }
+
+  function applyTheme(choice) {
+    if (choice === "system") {
+      document.documentElement.removeAttribute("data-theme");
+    } else {
+      document.documentElement.setAttribute("data-theme", choice);
+    }
+
+    try {
+      if (choice === "system") localStorage.removeItem(THEME_KEY);
+      else localStorage.setItem(THEME_KEY, choice);
+    } catch (e) {
+      // Storage can be blocked on file:// — the choice still applies, it just
+      // does not survive a reload.
+    }
+
+    markTheme();
+  }
+
+  function markTheme() {
+    var now = currentTheme();
+    var buttons = document.querySelectorAll("[data-theme-set]");
+
+    for (var i = 0; i < buttons.length; i++) {
+      buttons[i].setAttribute(
+        "aria-pressed",
+        buttons[i].getAttribute("data-theme-set") === now ? "true" : "false",
+      );
+    }
+  }
+
+  function wireTheme() {
+    var group = document.getElementById("theme");
+    if (!group) return;
+
+    group.addEventListener("click", function (event) {
+      var button = event.target.closest("[data-theme-set]");
+      if (button) applyTheme(button.getAttribute("data-theme-set"));
+    });
+
+    markTheme();
+  }
+
+  // ---------- graph ----------
+
+  // Geometry, mirroring GRAPH_GEOMETRY in render/graph.ts so unfolding a family
+  // can re-place the tree with the same rule the generator used. A test asserts
+  // the two agree.
+  var BOX_W = 172, BOX_H = 24, COLUMN = 208, ROW = 30, PAD = 16;
+
+  /** Family boxes the reader has opened, keyed by "<rootId>#<index>". */
+  var unfolded = {};
+
+  // The same concept colours as the cards. Kept as a second mapping because SVG
+  // attributes cannot read the [data-kind] custom properties.
+  var GRAPH_FILL = {
+    entity: "var(--c-aggregate-soft)",
+    subEntity: "var(--c-entity-soft)",
+    valueObject: "var(--c-value-soft)",
+    event: "var(--c-event-soft)",
+    family: "var(--surface-sunken)"
+  };
+
+  var GRAPH_STROKE = {
+    entity: "var(--c-aggregate)",
+    subEntity: "var(--c-entity)",
+    valueObject: "var(--c-value)",
+    event: "var(--c-event)",
+    family: "var(--line-strong)"
+  };
+
+  function truncate(text, max) {
+    return text.length > max ? text.slice(0, max - 1) + "…" : text;
+  }
+
+  /**
+   * The diagram for whichever aggregate a node belongs to. Layouts are keyed by
+   * root, so a contained entity borrows the one for the root above it.
+   */
+  function graphFor(node) {
+    var graphs = MODEL.graphs || [];
+    var trail = pathTo(node);
+    var rootId = trail.length > 0 ? trail[0].id : node.id;
+
+    for (var i = 0; i < graphs.length; i++) {
+      if (graphs[i].rootId === rootId) return graphs[i];
+    }
+
+    return null;
+  }
+
+  /** A family member reads the way it would have if it were never collapsed. */
+  function memberKind(node) {
+    if (!node) return "valueObject";
+    return node.kind === "valueObject" || node.kind === "event"
+      ? node.kind
+      : "subEntity";
+  }
+
+  /**
+   * The layout with every opened family unfolded back into its members.
+   *
+   * The generator decided the tree (render/graph.ts) and this only re-runs its
+   * placement rule over a bigger one: depth sets x, leaves stack down a running
+   * cursor, and a parent centres between its first and last child. That works
+   * because a collapsed family is only ever collapsed when none of its members
+   * has children — so unfolding adds leaves and never a new decision.
+   */
+  function placedGraph(layout) {
+    var nodes = layout.nodes.map(function (n) {
+      return {
+        id: n.id, label: n.label, kind: n.kind, count: n.count,
+        memberIds: n.memberIds, open: false, x: 0, y: 0
+      };
+    });
+
+    var kids = nodes.map(function () { return []; });
+    layout.edges.forEach(function (edge) { kids[edge.from].push(edge.to); });
+
+    nodes.slice().forEach(function (node, index) {
+      if (!node.memberIds || !unfolded[layout.rootId + "#" + index]) return;
+      node.open = true;
+
+      node.memberIds.forEach(function (id) {
+        var member = byId[id];
+
+        kids[index].push(nodes.length);
+        kids.push([]);
+        nodes.push({
+          id: id,
+          label: member ? member.name : id,
+          kind: memberKind(member),
+          open: false,
+          x: 0, y: 0
+        });
+      });
+    });
+
+    var cursor = 0;
+
+    var place = function (index, depth) {
+      var node = nodes[index];
+      node.x = PAD + depth * COLUMN;
+
+      if (kids[index].length === 0) {
+        node.y = cursor;
+        cursor += ROW;
+        return;
+      }
+
+      kids[index].forEach(function (child) { place(child, depth + 1); });
+
+      var first = nodes[kids[index][0]];
+      var last = nodes[kids[index][kids[index].length - 1]];
+      node.y = (first.y + last.y) / 2;
+    };
+
+    place(0, 0);
+
+    var edges = [];
+    kids.forEach(function (list, from) {
+      list.forEach(function (to) { edges.push({ from: from, to: to }); });
+    });
+
+    var maxX = nodes.reduce(function (max, n) { return Math.max(max, n.x); }, 0);
+
+    return {
+      rootId: layout.rootId,
+      title: layout.title,
+      nodes: nodes,
+      edges: edges,
+      width: maxX + BOX_W + PAD,
+      height: Math.max(cursor + PAD * 2, BOX_H + PAD * 2)
+    };
+  }
+
+  function graphSvg(source, currentId) {
+    var layout = placedGraph(source);
+    var edges = "";
+    var boxes = "";
+
+    layout.edges.forEach(function (edge) {
+      var a = layout.nodes[edge.from];
+      var b = layout.nodes[edge.to];
+      if (!a || !b) return;
+
+      var x1 = a.x + BOX_W, y1 = a.y + BOX_H / 2;
+      var x2 = b.x, y2 = b.y + BOX_H / 2;
+      var mid = (x1 + x2) / 2;
+
+      edges += '<path d="M ' + x1 + " " + y1 + " C " + mid + " " + y1 + ", " +
+        mid + " " + y2 + ", " + x2 + " " + y2 +
+        '" fill="none" stroke="var(--line-strong)" stroke-width="1"/>';
+    });
+
+    layout.nodes.forEach(function (node, index) {
+      var family = node.kind === "family";
+
+      var label = family
+        ? truncate(node.label, 16) + " ×" + node.count
+        : truncate(node.label, 22);
+
+      // The box for the node whose page this is, so a contained entity can see
+      // where it sits rather than having to find its own name.
+      var here = !!currentId && node.id === currentId;
+
+      var box =
+        '<rect x="' + node.x + '" y="' + node.y + '" width="' + BOX_W +
+        '" height="' + BOX_H + '" rx="4" fill="' +
+        (GRAPH_FILL[node.kind] || "var(--surface)") + '" stroke="' +
+        (GRAPH_STROKE[node.kind] || "var(--line-strong)") + '" stroke-width="' +
+        (here ? "2.5" : "1") + '"' +
+        (family ? ' stroke-dasharray="3 2"' : "") + "/>" +
+        '<text x="' + (node.x + 9) + '" y="' + (node.y + 16) +
+        '" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="' +
+        (node.kind === "event" ? "10.5" : "11.5") + '" font-weight="' +
+        (here ? "700" : "400") + '" fill="var(--ink)">' +
+        esc(label) + "</text>";
+
+      if (family) {
+        // A caret rather than a link: the box stands for several nodes, so there
+        // is nowhere for it to navigate to. Opening it is the only thing it does.
+        box += '<text x="' + (node.x + BOX_W - 9) + '" y="' + (node.y + 16) +
+          '" text-anchor="end" font-size="11" fill="var(--ink)">' +
+          (node.open ? "\u25be" : "\u25b8") + "</text>";
+
+        boxes += '<g class="gfold" role="button" tabindex="0" data-unfold="' +
+          esc(layout.rootId + "#" + index) + '" aria-expanded="' + node.open +
+          '" aria-label="' + esc(node.label) + ", " + node.count + ' of them">' +
+          box + "</g>";
+        return;
+      }
+
+      boxes += node.id
+        ? '<a href="' + (byId[node.id] ? hrefOf(byId[node.id]) : "#") + '">' +
+          box + "</a>"
+        : box;
+    });
+
+    return '<svg viewBox="0 0 ' + layout.width + " " + layout.height +
+      '" width="' + layout.width + '" height="' + layout.height +
+      '" role="img" aria-label="Structure of ' + esc(layout.title) + '">' +
+      edges + boxes + "</svg>";
+  }
+
+  /**
+   * The diagram in its scroll container. Unfolding redraws only what is inside
+   * it, so the reader keeps their scroll position and the rest of the page.
+   */
+  function graphBlockHtml(layout, currentId) {
+    return '<div class="scroll" style="padding:6px" data-graph="' +
+      esc(layout.rootId) + '" data-current="' + esc(currentId || "") + '">' +
+      graphSvg(layout, currentId) + "</div>";
+  }
+
+  function redrawGraph(container) {
+    var rootId = container.getAttribute("data-graph");
+    var graphs = MODEL.graphs || [];
+
+    for (var i = 0; i < graphs.length; i++) {
+      if (graphs[i].rootId !== rootId) continue;
+      container.innerHTML = graphSvg(graphs[i], container.getAttribute("data-current"));
+      return;
+    }
+  }
+
+  /** Show or hide the read models on every board at once. */
+  function toggleConsumers(target) {
+    var hit = target && target.closest
+      ? target.closest("[data-consumers-toggle]")
+      : null;
+    if (!hit) return false;
+
+    showConsumers = !showConsumers;
+    hit.setAttribute("aria-pressed", String(showConsumers));
+
+    var boards = document.querySelectorAll("[data-consumers]");
+    for (var i = 0; i < boards.length; i++) {
+      boards[i].setAttribute("data-consumers", showConsumers ? "on" : "off");
+    }
+
+    return true;
+  }
+
+  /** Open or close the family box the event landed on. */
+  function toggleUnfold(target) {
+    var hit = target && target.closest ? target.closest("[data-unfold]") : null;
+    if (!hit) return false;
+
+    var key = hit.getAttribute("data-unfold");
+    if (unfolded[key]) delete unfolded[key];
+    else unfolded[key] = true;
+
+    var container = hit.closest("[data-graph]");
+    if (!container) return true;
+
+    redrawGraph(container);
+
+    // The members appear one column to the right of the box, usually past the
+    // edge of the scroll box. Without this the reader clicks and sees a gap open
+    // where the box was, with what they asked for off-screen.
+    var opened = container.querySelector(
+      '[data-unfold="' + key + '"][aria-expanded="true"]'
+    );
+    var box = opened && opened.querySelector("rect");
+
+    if (box) {
+      var right = Number(box.getAttribute("x")) + COLUMN + BOX_W + PAD;
+      if (right > container.clientWidth) {
+        container.scrollLeft = right - container.clientWidth;
+      }
+    }
+
+    return true;
+  }
+
+  /** Reads the diagram, not the page — the concept legend above covers the rest. */
+  var GRAPH_LEGEND = [
+    ["entity", "aggregate root"],
+    ["subEntity", "entity it holds"],
+    ["valueObject", "value object"],
+    ["event", "event"],
+    ["family", "family — any one of N, click to open"]
+  ];
+
+  // ---------- routing ----------
+
+  /**
+   * The one view per kind. The router consults this and nothing else once it has
+   * a node, so an object cannot render differently depending on how it was
+   * reached.
+   */
+  var VIEWS = {
+    entity: viewObject,
+    subEntity: viewObject,
+    valueObject: viewObject,
+    event: viewEvent,
+    error: viewError,
+    invariant: viewInvariant,
+    repository: viewRepository,
+    readModel: viewReadModel,
+    useCase: viewUseCase
+  };
+
+  function render() {
+    var parts = location.hash.replace(/^#\/?/, "").split("/");
+    var route = parts[0] || "";
+    var target = decodeURIComponent(parts.slice(1).join("/") || "");
+
+    // The standalone graph screen is gone — the diagram belongs to the aggregate
+    // it describes. Rewrite the address rather than render something else at it,
+    // and replace rather than push, so Back does not bounce off the redirect.
+    if (route === "graph") {
+      location.replace(
+        "#/domain" + (target ? "/" + encodeURIComponent(target) : "")
+      );
+      return;
+    }
+
+    var main = document.getElementById("main");
+
+    main.innerHTML = viewFor(route, target);
+    main.scrollTop = 0;
+    window.scrollTo(0, 0);
+    markCurrent();
+  }
+
+  /**
+   * What to draw.
+   *
+   * The object decides, never the address: an id is resolved and dispatched on
+   * its kind before the route is looked at, so every address that names the same
+   * node renders the same page. The route only picks a screen when there is no
+   * node to pick one — a list, or the overview.
+   */
+  function viewFor(route, target) {
+    // A behaviour is not a node; it is addressed as owner::method.
+    if (target.indexOf("::") !== -1) {
+      var found = behaviourOf(target);
+      if (found) return viewBehaviour(found.owner, found.method);
+    }
+
+    var node = byId[target];
+    if (node && VIEWS[node.kind]) return VIEWS[node.kind](node);
+
+    if (!route) return viewOverview();
+
+    // "explore" is the pre-redesign address, kept so saved links still work.
+    if (route === "domain" || route === "explore") return viewDomainRoots();
+    if (route === "use-cases" || route === "use-case") return viewUseCases();
+
+    var list = viewKindList(route);
+    if (list) return list;
+
+    return '<h1 class="title">Not found</h1>' +
+      '<p class="subtitle">No ' + esc(routeToKind[route] || route) +
+      ' matches this address. <a href="#/">Back to the overview</a>.</p>';
+  }
+
+  var searchBox = document.getElementById("search");
+
+  searchBox.addEventListener("input", function (event) {
+    renderRail(event.target.value);
+  });
+
+  document.getElementById("filters").addEventListener("click", function (event) {
+    var button = event.target.closest("[data-filter]");
+    if (!button) return;
+
+    var kind = button.getAttribute("data-filter");
+    activeKinds[kind] = !activeKinds[kind];
+
+    renderFilters();
+    renderRail(searchBox.value);
+  });
+
+  document.addEventListener("click", function (event) {
+    if (toggleUnfold(event.target)) event.preventDefault();
+    else if (toggleConsumers(event.target)) event.preventDefault();
+  });
+
+  document.addEventListener("keydown", function (event) {
+    // A focused family box opens on Enter or Space, before Enter is read as
+    // "open whatever the rail cursor is on".
+    if (event.key === "Enter" || event.key === " ") {
+      if (toggleUnfold(event.target)) {
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // "/" focuses the filter box from anywhere, the way search boxes usually do.
+    if (event.key === "/" && event.target !== searchBox) {
+      event.preventDefault();
+      searchBox.focus();
+      searchBox.select();
+      return;
+    }
+
+    if (event.key === "Escape") {
+      searchBox.value = "";
+      activeKinds = {};
+      renderFilters();
+      renderRail("");
+      searchBox.blur();
+      return;
+    }
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+      event.preventDefault();
+      moveCursor(event.key === "ArrowDown" ? 1 : -1);
+      return;
+    }
+
+    if (event.key === "Enter" && cursor >= 0 && railItems[cursor]) {
+      event.preventDefault();
+      location.hash = hrefOf(railItems[cursor]);
+    }
+  });
+
+  window.addEventListener("hashchange", render);
+
+  wireTheme();
+  renderFilters();
+  renderRail("");
+  render();
+})();
+</script>
+</body>
+</html>
