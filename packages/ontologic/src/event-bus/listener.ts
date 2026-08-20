@@ -56,27 +56,36 @@ export class DomainEventBusListener<
         this.#eventHandlersMap.get("*");
 
       if (!eventHandler) {
-        this.#eventEmitter.emit(
-          "error",
-          new Error("[DomainEventBusListener]: No event handler found"),
-        );
-        await message.nack();
+        // Nothing here subscribed to this event, which is the ordinary result of
+        // `listenTo` being per event name — a consumer takes what it needs, and
+        // `listenTo("*")` is there for the ones that want everything.
+        //
+        // So this is not a failure, and nacking would be wrong twice over: a
+        // nack asks the broker to deliver again, and the second attempt would
+        // meet the same missing handler, forever. Redelivery loops and
+        // dead-letter queues full of other people's events both come from that.
+        this.#eventEmitter.emit("unhandled", message.name);
+        await message.ack();
         return;
       }
 
-      const parsedMessage = JSON.parse(message.content);
-      const { event, metadata } = parsedMessage;
-
-      let eventToHandle = event;
-
-      eventToHandle = this.#validator(event);
-
-      const validatedMetadata = validateMetadata(metadata);
-
       try {
+        const { event, metadata } = JSON.parse(message.content);
+
+        const eventToHandle = this.#validator(event);
+        const validatedMetadata = validateMetadata(metadata);
+
         await eventHandler(eventToHandle, validatedMetadata);
         await message.ack();
-      } catch {
+      } catch (error) {
+        // Deserialisation, validation and handler failures are all genuine
+        // failures, so they nack — and say why. Contrast the branch above: an
+        // event nobody subscribed to is acked and reported through
+        // `onUnhandled`, because that is not a failure at all.
+        //
+        // Reported before the nack, so the reason survives even if the nack
+        // itself fails.
+        this.#eventEmitter.emit("failure", error);
         await message.nack();
       }
     });
@@ -94,6 +103,22 @@ export class DomainEventBusListener<
 
   onError(handler: (error: unknown) => void): void {
     this.#listenerConnector.onError(handler);
-    this.#eventEmitter.on("error", handler);
+    // Deliberately not the "error" channel: Node throws an 'error' event that
+    // has no listener, so emitting on it would turn "we nacked, here is why"
+    // into an unhandled exception for anyone who never called this.
+    this.#eventEmitter.on("failure", handler);
+  }
+
+  /**
+   * Called with the name of an event that reached this listener with no handler
+   * registered for it.
+   *
+   * Separate from `onError` on purpose: an unsubscribed event is a normal
+   * outcome, not a failure, and a consumer with selective subscriptions would
+   * otherwise see a constant stream of non-errors. Register this when you want
+   * to notice a handler you forgot to wire.
+   */
+  onUnhandled(handler: (eventName: string) => void): void {
+    this.#eventEmitter.on("unhandled", handler);
   }
 }

@@ -10,6 +10,7 @@ import {
   parseTestEvent,
   type TestEvent,
 } from "./helpers/testEventValidator";
+import { RecordingListenerConnector } from "./helpers/recordingConnector";
 
 function makeMetadata(overrides?: Partial<EventMetadata>): EventMetadata {
   return {
@@ -176,28 +177,195 @@ describe("DomainEventBusListener", () => {
     expect(handler).toHaveBeenCalledTimes(1);
   });
 
-  it("notifies onError when no handler matches the message name", async () => {
-    const onError = vi.fn<(error: unknown) => void>();
+  it("acks an event it has no handler for, rather than nacking it", async () => {
+    // A consumer subscribes to what it needs. An event it did not ask for is
+    // not a failure, and nacking would ask the broker to redeliver something
+    // that can never be handled — a loop, or a dead-letter queue full of other
+    // people's events.
+    const recording = new RecordingListenerConnector();
     const listener = new DomainEventBusListener<TestEvent>({
-      listenerConnector: connectors.listener,
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {});
+    await listener.start();
+
+    await recording.deliver("OtherEvent", "{}");
+
+    expect(recording.acked).toEqual(["OtherEvent"]);
+    expect(recording.nacked).toEqual([]);
+  });
+
+  it("does not report an unhandled event as an error", async () => {
+    const onError = vi.fn<(error: unknown) => void>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
       options: { validator: parseTestEvent },
     });
 
     listener.listenTo("TestEvent", async () => {});
     listener.onError(onError);
-
     await listener.start();
 
-    await connectors.publisher.publish("OtherEvent", "{}");
+    await recording.deliver("OtherEvent", "{}");
 
-    expect(onError).toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+  });
 
-    expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
-    expect(String((onError.mock.calls[0]?.[0] as Error).message)).toContain(
-      "No event handler found",
+  it("reports an unhandled event through onUnhandled", async () => {
+    const onUnhandled = vi.fn<(eventName: string) => void>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {});
+    listener.onUnhandled(onUnhandled);
+    await listener.start();
+
+    await recording.deliver("OtherEvent", "{}");
+
+    expect(onUnhandled).toHaveBeenCalledWith("OtherEvent");
+  });
+
+  it("survives an unhandled event with nothing observing it", async () => {
+    // The regression this replaces: the old code emitted "error" on a bare
+    // EventEmitter, and Node throws an "error" event that has no listener. A
+    // consumer that never registered onError therefore threw on every event it
+    // did not subscribe to — which is the shipped example's exact shape.
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {});
+    await listener.start();
+
+    await expect(recording.deliver("OtherEvent", "{}")).resolves.toBeUndefined();
+    expect(recording.acked).toEqual(["OtherEvent"]);
+  });
+
+  it("still nacks when a handler throws", async () => {
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {
+      throw new Error("handler blew up");
+    });
+    await listener.start();
+
+    await recording.deliver(
+      "TestEvent",
+      JSON.stringify({ event: makeEvent(), metadata: makeMetadata() }),
+    );
+
+    expect(recording.nacked).toEqual(["TestEvent"]);
+    expect(recording.acked).toEqual([]);
+  });
+
+  it("reports the reason it nacked a handler failure", async () => {
+    const onError = vi.fn<(error: unknown) => void>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {
+      throw new Error("handler blew up");
+    });
+    listener.onError(onError);
+    await listener.start();
+
+    await recording.deliver(
+      "TestEvent",
+      JSON.stringify({ event: makeEvent(), metadata: makeMetadata() }),
+    );
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect((onError.mock.calls[0]?.[0] as Error).message).toBe(
+      "handler blew up",
     );
   });
+
+  it("nacks a message whose content is not JSON", async () => {
+    const onError = vi.fn<(error: unknown) => void>();
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", handler);
+    listener.onError(onError);
+    await listener.start();
+
+    await recording.deliver("TestEvent", "not json at all");
+
+    expect(recording.nacked).toEqual(["TestEvent"]);
+    expect(recording.acked).toEqual([]);
+    expect(handler).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("nacks a message whose metadata is invalid", async () => {
+    const onError = vi.fn<(error: unknown) => void>();
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", handler);
+    listener.onError(onError);
+    await listener.start();
+
+    await recording.deliver(
+      "TestEvent",
+      JSON.stringify({ event: makeEvent(), metadata: { id: "" } }),
+    );
+
+    expect(recording.nacked).toEqual(["TestEvent"]);
+    expect(handler).not.toHaveBeenCalled();
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("nacks an invalid message without throwing when nothing observes errors", async () => {
+    // The trap this fix has to avoid: `emit("error")` on a bare EventEmitter
+    // throws when no listener is registered, which is what made the old
+    // no-handler branch skip its own nack. The internal channel must not be the
+    // reserved one.
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", handlerThatNeverRuns);
+    await listener.start();
+
+    await expect(
+      recording.deliver("TestEvent", "not json at all"),
+    ).resolves.toBeUndefined();
+
+    expect(recording.nacked).toEqual(["TestEvent"]);
+  });
 });
+
+async function handlerThatNeverRuns() {
+  throw new Error("the message never gets this far");
+}
 
 describe("event validator option", () => {
   let connectors: InMemoryConnectors;
@@ -254,8 +422,13 @@ describe("event validator option", () => {
       vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
     const onError = vi.fn<(error: unknown) => void>();
 
+    // Delivered through the recording connector rather than the in-memory one:
+    // this used to pass only because a rejected callback happened to resurface
+    // as an "error" on that connector's shared emitter, which also meant the
+    // message was neither acked nor nacked.
+    const recording = new RecordingListenerConnector();
     const listener = new DomainEventBusListener<TestEvent>({
-      listenerConnector: connectors.listener,
+      listenerConnector: recording,
       options: { validator },
     });
 
@@ -264,16 +437,16 @@ describe("event validator option", () => {
 
     await listener.start();
 
-    connectors.publisher.publish(
+    await recording.deliver(
       "TestEvent",
       JSON.stringify({ event: null, metadata: makeMetadata() }),
     );
 
-    await vi.waitFor(() => expect(onError).toHaveBeenCalled());
-
     expect(validator).toHaveBeenCalledTimes(1);
     expect(validator).toHaveBeenCalledWith(null);
     expect(handler).not.toHaveBeenCalled();
+    expect(recording.nacked).toEqual(["TestEvent"]);
+    expect(recording.acked).toEqual([]);
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
     expect((onError.mock.calls[0]?.[0] as Error).message).toBe(
       "TestEvent: expected an object",

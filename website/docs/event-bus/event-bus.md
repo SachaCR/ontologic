@@ -18,7 +18,14 @@ The publisher publish events to a message broker. It accepts any event that matc
 
 ### Listener
 
-The listener subscribes to incoming messages from the broker and dispatches them to your handlers. You register a handler per event name — or a wildcard handler for everything — before starting the listener. On success the message is acknowledged; on error it is nack'd.
+The listener subscribes to incoming messages from the broker and dispatches them to your handlers. You register a handler per event name — or a wildcard handler for everything — before starting the listener. Every delivery ends in exactly one of four ways, decided by the listener rather than by the connector:
+
+| Outcome | Message | Reported through |
+| --- | --- | --- |
+| Your handler resolves | `ack()` | — |
+| No handler registered for the event | `ack()` | `onUnhandled(name)` |
+| Content is not JSON, or fails the validator | `nack()` | `onError(error)` |
+| Your handler throws | `nack()` | `onError(error)` |
 
 ### Connector
 
@@ -128,7 +135,19 @@ listener.listenTo("*", async (event, metadata) => {
 });
 ```
 
-The wildcard handler is used as a fallback: if an incoming event has no specific handler registered, it falls through to `"*"`. If there is no specific handler and no wildcard, the message is nack'd.
+The wildcard handler is used as a fallback: if an incoming event has no specific handler registered, it falls through to `"*"`. If there is no specific handler and no wildcard, the message is **acknowledged** and the name is reported through `onUnhandled`.
+
+Acknowledged, not nack'd: `listenTo` is per event name precisely so a consumer can take only what concerns it, and a nack asks the broker to deliver the message again. Nothing about the second attempt would differ — the handler is still not registered — so a nack here buys a redelivery loop, or a dead-letter queue filling with events that were never this consumer's business.
+
+If you want to notice a handler you forgot to wire, register `onUnhandled`:
+
+```ts
+listener.onUnhandled((eventName) => {
+  logger.debug(`no handler for ${eventName}`);
+});
+```
+
+It is deliberately not `onError`. An unsubscribed event is a routine outcome, and a consumer with selective subscriptions would otherwise see a constant stream of non-errors on its error channel.
 
 ---
 
@@ -295,7 +314,7 @@ const listener = new DomainEventBusListener<OrderEvents>({
 });
 ```
 
-The validator runs after deserialization and before your handler is called. If it throws, the message is nack'd and your handler is never invoked.
+The validator runs after deserialization and before your handler is called. If it throws, the message is nack'd, the error is reported through `onError`, and your handler is never invoked.
 
 ---
 
@@ -313,7 +332,7 @@ listener.onError((error) => {
 });
 ```
 
-Handler-level errors (thrown inside a `listenTo` callback) result in an automatic `nack()` and do not propagate to `onError`.
+Handler-level errors (thrown inside a `listenTo` callback) result in an automatic `nack()` and are reported through `onError`. Events with no matching handler do not reach `onError` — they are acknowledged and reported through `onUnhandled` instead, because an event you did not subscribe to is not a failure.
 
 ---
 
