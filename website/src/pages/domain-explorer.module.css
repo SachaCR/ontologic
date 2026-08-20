@@ -56,6 +56,13 @@
   color: #4338ca !important;
 }
 
+/* Infima's .button is nowrap, and this label no longer fits one line on a phone
+   — without this the button runs edge to edge while everything beside it keeps
+   its margin. Two selectors deep so it outranks .button without !important. */
+.heroButtons .btnPrimary {
+  white-space: normal;
+}
+
 .btnSecondary {
   background: rgba(255, 255, 255, 0.12);
   color: white !important;
