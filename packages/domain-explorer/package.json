@@ -1,6 +1,6 @@
 {
   "name": "@ontologics/domain-explorer",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Generate an interactive HTML domain model from an Ontologic codebase: aggregates, value objects, events, typed errors, invariants, repositories and use cases.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
