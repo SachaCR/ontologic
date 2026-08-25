@@ -30,7 +30,7 @@ const OUT = join(WEBSITE_DIR, "static", "demo", "library-domain.html");
 if (!existsSync(CLI)) {
   console.error(
     `generate-demo: ${CLI} is missing.\n` +
-      "Build the explorer first: pnpm --filter @ontologic/domain-explorer build",
+      "Build the explorer first: pnpm --filter @ontologics/domain-explorer build",
   );
   process.exit(1);
 }

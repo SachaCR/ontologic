@@ -1,10 +1,14 @@
-# @ontologic/domain-explorer
+# @ontologics/domain-explorer
+
+[![npm](https://img.shields.io/npm/v/@ontologics/domain-explorer)](https://www.npmjs.com/package/@ontologics/domain-explorer)
+[![node](https://img.shields.io/node/v/@ontologics/domain-explorer)](https://nodejs.org)
+[![license](https://img.shields.io/npm/l/@ontologics/domain-explorer)](https://github.com/SachaCR/ontologic/blob/main/packages/domain-explorer/LICENSE)
 
 Reads a codebase built on [Ontologic](https://ontologic.site) and generates a single
 self-contained HTML page documenting its domain model.
 
 ```bash
-npx @ontologic/domain-explorer ./src/domain
+npx @ontologics/domain-explorer ./src/domain
 ```
 
 One file, named after your codebase. Stylesheet, script and data are all inlined, so it opens from disk, survives
@@ -107,7 +111,7 @@ to email or put behind a URL.
 ## Programmatic use
 
 ```ts
-import { extractModel, renderHtml } from "@ontologic/domain-explorer";
+import { extractModel, renderHtml } from "@ontologics/domain-explorer";
 
 const model = extractModel({ paths: ["./src/domain"] });
 console.log(model.findings);

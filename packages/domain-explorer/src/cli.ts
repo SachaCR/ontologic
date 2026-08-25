@@ -6,8 +6,8 @@
  * library, `main()` returns an exit code, and nothing calls `process.exit()`.
  */
 
-import { writeFileSync } from "node:fs";
-import { relative, resolve } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join, relative, resolve } from "node:path";
 
 import { extractModel, renderHtml } from "./index";
 import { domainName } from "./render/html";
@@ -72,9 +72,28 @@ function parseArgs(argv: string[]): Options {
   return options;
 }
 
+/**
+ * The published version, read from the manifest rather than duplicated here.
+ *
+ * `dist/cli.js` sits one level under `package.json`, and although `files` ships
+ * only `/dist`, npm always includes the manifest — so this resolves in the
+ * workspace and from inside someone else's `node_modules` alike. Importing the
+ * JSON instead would reach outside `rootDir` and change the shape of `dist`.
+ */
+function version(): string {
+  try {
+    const manifest = readFileSync(join(__dirname, "..", "package.json"), "utf8");
+
+    return (JSON.parse(manifest) as { version?: string }).version ?? "unknown";
+  } catch {
+    // A version is never worth failing a run over.
+    return "unknown";
+  }
+}
+
 function printUsage(): void {
   console.log(`
-domain-explorer — document an Ontologic domain model
+domain-explorer ${version()} — document an Ontologic domain model
 
 Usage:
   domain-explorer <path...> [options]
@@ -86,6 +105,7 @@ Options:
       --json <file>      Write the extracted model as JSON
       --label <text>     Name the analysed codebase, instead of its path on disk
       --include-tests    Include __tests__ directories (excluded by default)
+  -V, --version          Print the version
   -h, --help             Show this message
 
 Examples:
@@ -226,6 +246,13 @@ function displayPath(target: string): string {
 
 function main(): number {
   const argv = process.argv.slice(2);
+
+  // Before --help, and before anything reads a path: `--version` is the first
+  // thing anyone runs against a tool they just installed.
+  if (argv.includes("--version") || argv.includes("-V")) {
+    console.log(version());
+    return 0;
+  }
 
   if (argv.includes("--help") || argv.includes("-h") || argv.length === 0) {
     printUsage();

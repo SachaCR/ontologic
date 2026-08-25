@@ -1,3 +1,13 @@
+// Release build. Two deliberate differences from tsconfig.json:
+//
+//   inlineSources    embeds the TypeScript of every shipped module into the
+//                    .js.map files. That is over half the unpacked tarball, and
+//                    it is the point: `sources` points at "../src/*.ts", which
+//                    does not exist in the tarball, so without the inlined text
+//                    the maps are useless and a stack trace from someone else's
+//                    CI is unreadable. The source is MIT and on GitHub anyway.
+//   declarationMap   off: a .d.ts.map only helps go-to-definition into .ts files
+//                    that are not shipped.
 {
   "extends": "./tsconfig.json",
   "exclude": [

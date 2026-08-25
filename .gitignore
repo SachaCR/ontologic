@@ -17,3 +17,9 @@ packages/*/scripts/
 # turbo local cache and per-package test output
 .turbo/
 reports/
+
+# domain-explorer writes <codebase>.html into the cwd when --out is omitted, so
+# running it from the repo root drops reports here. Two of them were committed
+# once, and one rendered a private codebase's whole domain model into a public
+# repository. Root-level only: the committed demo lives under website/static.
+/*.html
