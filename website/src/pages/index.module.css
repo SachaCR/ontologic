@@ -189,61 +189,16 @@
   color: white !important;
 }
 
+/* Placement only. The pill's own look lives with the component, in
+   src/components/InstallCommand/styles.module.css. */
 .install {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
   margin-top: 2rem;
-  padding: 0.35rem 0.35rem 0.35rem 0.85rem;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 8px;
 }
 
-.install code {
-  background: none;
-  color: rgba(255, 255, 255, 0.85);
-  font-size: 0.875rem;
-  padding: 0;
-}
 
-.npmLink {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.3rem;
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  color: rgba(255, 255, 255, 0.7);
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
 
-.npmLink:hover {
-  color: white;
-}
 
-.copyButton {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.3rem;
-  width: 28px;
-  height: 28px;
-  border-radius: 5px;
-  border: none;
-  background: rgba(255, 255, 255, 0.12);
-  color: rgba(255, 255, 255, 0.7);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  flex-shrink: 0;
-}
 
-.copyButton:hover {
-  background: rgba(255, 255, 255, 0.22);
-  color: white;
-}
 
 /* ── Section divider ──────────────────────────────────────────────────────── */
 

@@ -1,0 +1,68 @@
+/* Moved verbatim from index.module.css, minus the page's own margin. Colours are
+   translucent white on purpose: the pill is designed to sit on a dark hero, and
+   both heroes that use it are dark. */
+
+.install {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  max-width: 100%;
+  padding: 0.35rem 0.35rem 0.35rem 0.85rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+}
+
+/* A command can be wider than a phone — `npx`, a scoped package and a path add
+   up. Scroll it inside the pill instead of letting it shove the copy and npm
+   buttons off the screen, which is what a full-width code block used to do for
+   free. `min-width: 0` is the load-bearing part: a flex item defaults to
+   `min-width: auto` and so refuses to shrink below its own content. */
+.install code {
+  min-width: 0;
+  overflow-x: auto;
+  white-space: pre;
+  background: none;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 0.875rem;
+  padding: 0;
+  scrollbar-width: thin;
+}
+
+.copyButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  border: none;
+  background: rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+
+.copyButton:hover {
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+}
+
+.npmLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  width: 28px;
+  height: 28px;
+  border-radius: 5px;
+  color: rgba(255, 255, 255, 0.7);
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+
+.npmLink:hover {
+  color: white;
+}

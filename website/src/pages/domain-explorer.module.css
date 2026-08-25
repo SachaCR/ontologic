@@ -75,13 +75,17 @@
   color: white !important;
 }
 
+/* The hero centres its content; the pill is inline-flex, so it needs the
+   centring rather than the left-alignment the full-width code block wanted. */
 .heroCommand {
   max-width: 620px;
   margin: 1.25rem auto 0;
-  text-align: left;
+  text-align: center;
 }
 
-.heroCommand :global(.theme-code-block) {
+/* Placement only — the pill's look comes from the shared component. Replaces
+   the gap the code block used to contribute with its own margin. */
+.heroPill {
   margin-bottom: 0.6rem;
 }
 

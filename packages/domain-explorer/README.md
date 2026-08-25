@@ -14,6 +14,13 @@ npx @ontologics/domain-explorer ./src/domain
 One file, named after your codebase. Stylesheet, script and data are all inlined, so it opens from disk, survives
 being emailed, and works in a sandbox that blocks every external host.
 
+![The DeclareBookLostUseCase board: one happy path ending in a BookLostEvent, above two failure paths.](https://raw.githubusercontent.com/SachaCR/ontologic/main/website/static/img/domain-explorer/use-case-board.png)
+
+Each row is one complete scenario, read left to right: the command that started it, every aggregate
+it read or wrote, and where it ended. Failure paths repeat the prefix, so a refusal reads on its own
+instead of as a branch you trace back. [Open the full report for a real
+codebase](https://ontologic.site/demo/library-domain.html).
+
 ## What it finds
 
 Detection keys on base classes and type arguments, never on filenames — so it works

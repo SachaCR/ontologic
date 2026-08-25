@@ -3,12 +3,14 @@ import Link from "@docusaurus/Link";
 import Head from "@docusaurus/Head";
 import Layout from "@theme/Layout";
 import Heading from "@theme/Heading";
-import CodeBlock from "@theme/CodeBlock";
+
+import InstallCommand from "@site/src/components/InstallCommand";
 
 import styles from "./domain-explorer.module.css";
 
 const DEMO = "/demo/library-domain.html";
 const COMMAND = "npx @ontologics/domain-explorer ./src/domain";
+const NPM_URL = "https://www.npmjs.com/package/@ontologics/domain-explorer";
 
 type Card = {
   id: string;
@@ -189,7 +191,11 @@ function Hero(): ReactNode {
         </div>
 
         <div className={styles.heroCommand}>
-          <CodeBlock language="bash">{COMMAND}</CodeBlock>
+          <InstallCommand
+            command={COMMAND}
+            npmUrl={NPM_URL}
+            className={styles.heroPill}
+          />
           <p className={styles.heroNote}>
             One HTML file out, named after your codebase. Stylesheet, script and
             data all inlined, so it opens from disk and survives being emailed.
