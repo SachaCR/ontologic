@@ -10,10 +10,10 @@ on:
         default: "ontologic"
         options:
           - "ontologic"
-          - "@ontologic/domain-explorer"
+          - "@ontologics/domain-explorer"
 
       release_type:
-        description: Release type
+        description: Release type ("none" publishes the version already on main)
         type: choice
         required: true
         default: "patch"
@@ -21,6 +21,7 @@ on:
           - "patch"
           - "minor"
           - "major"
+          - "none"
 
 permissions:
   id-token: write
@@ -63,7 +64,12 @@ jobs:
       # Bump the selected package, not the workspace root. Running `pnpm version`
       # at the root bumps the private root manifest and leaves the package being
       # published on its old version.
+      #
+      # Skipped for "none", which exists for two cases: a first release of a
+      # version already written into the manifest, and a re-run after a publish
+      # that failed with the bump commit already pushed.
       - name: Bump version
+        if: github.event.inputs.release_type != 'none'
         run: pnpm --filter "${{ github.event.inputs.package }}" exec npm version ${{ github.event.inputs.release_type }}
 
       - name: Build
@@ -71,9 +77,37 @@ jobs:
 
       - name: Commit and tag
         run: |
+          version=$(pnpm --filter "${{ github.event.inputs.package }}" exec node -p "require('./package.json').version" | tail -n 1 | tr -d '[:space:]')
+          tag="${{ github.event.inputs.package }}@$version"
+          echo "Releasing $tag"
+
           git add -A
-          git commit -m "release ${{ github.event.inputs.package }} (${{ github.event.inputs.release_type }})"
+
+          # Nothing to commit when the bump was skipped. That is not a failure —
+          # the publish below is still the point of the run.
+          if git diff --cached --quiet; then
+            echo "No manifest change to commit."
+          else
+            git commit -m "release ${{ github.event.inputs.package }} ($version)"
+          fi
+
+          # `npm version` is not producing tags in this workspace: the last one is
+          # v1.7.1, and 1.8.0, 1.9.0 and 1.9.1 all shipped untagged. So tag here,
+          # and name the tag after the package as well as the version — one tag
+          # namespace, two packages, and "v0.1.0" beside "v1.9.1" would say
+          # nothing about which is which.
+          #
+          # Annotated, because `--follow-tags` ignores lightweight tags.
+          created=""
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "Tag $tag already exists, leaving it alone."
+          else
+            git tag -a "$tag" -m "release ${{ github.event.inputs.package }} $version"
+            created="$tag"
+          fi
+
           git push
+          if [ -n "$created" ]; then git push origin "$created"; fi
 
       - name: Publish to NPM
         run: pnpm publish --no-git-checks --filter "${{ github.event.inputs.package }}"

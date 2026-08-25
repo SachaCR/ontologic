@@ -8,7 +8,7 @@ software that speaks your domain's language, and the tools built around it.
 | Package | Published as | What it is |
 | --- | --- | --- |
 | [`packages/ontologic`](packages/ontologic) | [`ontologic`](https://www.npmjs.com/package/ontologic) | The library. Domain entities, invariants, domain events, the Result pattern, repositories, the event bus and outbox relay, and typed resumable workflows. Zero runtime dependencies. |
-| [`packages/domain-explorer`](packages/domain-explorer) | `@ontologic/domain-explorer` | Reads an Ontologic codebase and generates a single self-contained HTML page documenting its domain model — aggregates, value objects, events, typed errors, invariants, repositories and use cases. |
+| [`packages/domain-explorer`](packages/domain-explorer) | [`@ontologics/domain-explorer`](https://www.npmjs.com/package/@ontologics/domain-explorer) | Reads an Ontologic codebase and generates a single self-contained HTML page documenting its domain model — aggregates, value objects, events, typed errors, invariants, repositories and use cases. |
 | [`packages/library-example`](packages/library-example) | not published | A NestJS library-management app demonstrating the library on a real domain, and the source for the articles under its `docs/`. |
 | [`website`](website) | ontologic.site | The documentation site (Docusaurus), including the `llms.txt` generated from it. |
 
@@ -30,7 +30,7 @@ Scope a command to one package with `--filter`:
 
 ```bash
 pnpm --filter ontologic test
-pnpm --filter @ontologic/domain-explorer build
+pnpm --filter @ontologics/domain-explorer build
 pnpm --filter website build
 ```
 
@@ -55,7 +55,7 @@ Two things differ between packages and are deliberate:
 
 The **Release package** workflow (`workflow_dispatch`) bumps and publishes a single
 package. It takes the package name and a release type, so `ontologic` and
-`@ontologic/domain-explorer` release independently.
+`@ontologics/domain-explorer` release independently.
 
 ## License
 

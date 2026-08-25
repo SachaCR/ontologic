@@ -15,7 +15,7 @@ Ontologic now lives in a pnpm workspace with turbo on top:
 
 - **`ontologic`** — the library, still 1.7.1, still published under the same unscoped name.
 - **`library-example`** — the lending-library application, private, not published.
-- **`@ontologic/domain-explorer`** — new, and not on npm yet. More on it below.
+- **`@ontologics/domain-explorer`** — new, and not on npm yet. More on it below.
 
 The line that matters is in the example's manifest:
 
@@ -53,9 +53,18 @@ The fix is not discipline. It is putting the example in the build, where being o
 
 The other reason for the migration is that I want to build tools for Ontologic, and tools need a real codebase to be developed against.
 
-The first one is `@ontologic/domain-explorer`. It reads an Ontologic codebase with the TypeScript compiler API and produces a single self-contained HTML page: your aggregates, the entities and value objects they contain, the events they emit, the use cases that drive them — navigable, with a graph view. It also reports where the model looks inconsistent: an invariant that is declared but never attached, a use case whose error union has been widened to `Error`.
+The first one is `@ontologics/domain-explorer`. It reads an Ontologic codebase with the TypeScript compiler API and produces a single self-contained HTML page: your aggregates, the entities and value objects they contain, the events they emit, the use cases that drive them — navigable, with a graph view. It also reports where the model looks inconsistent: an invariant that is declared but never attached, a use case whose error union has been widened to `Error`.
 
 It is not released. It is in the repository, at version 0.1.0, and I want to run it against real domains before putting it on npm. But it exists at all because there is now a non-trivial Ontologic application in the same workspace to point it at — one that is guaranteed to be current, because the build says so.
+
+:::note[Update]
+
+It is released now — `npx @ontologics/domain-explorer ./src/domain`. The scope reads
+`@ontologics` and not `@ontologic` as originally written here: that namespace turned out to be
+unavailable on npm, so the package names above were corrected. The [Domain Explorer
+page](/domain-explorer) has the current version of everything above.
+
+:::
 
 That is the general shape of it: the monorepo is not the interesting part, it is the thing that makes the interesting parts checkable.
 

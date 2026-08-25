@@ -8,14 +8,7 @@ import CodeBlock from "@theme/CodeBlock";
 import styles from "./domain-explorer.module.css";
 
 const DEMO = "/demo/library-domain.html";
-const COMMAND = "npx @ontologic/domain-explorer ./src/domain";
-
-const CLONE = [
-  "git clone https://github.com/SachaCR/ontologic",
-  "cd ontologic && pnpm install && pnpm build",
-  // Run from inside the clone, so the target has to be somewhere else.
-  "node packages/domain-explorer/dist/cli.js ~/my-app/src/domain",
-].join("\n");
+const COMMAND = "npx @ontologics/domain-explorer ./src/domain";
 
 type Card = {
   id: string;
@@ -194,17 +187,6 @@ function Hero(): ReactNode {
             Explore the library domain example →
           </Link>
         </div>
-
-        {/* A native <details>: one line until asked, no state to manage, and it
-            opens without JavaScript. */}
-        <details className={styles.callout}>
-          <summary className={styles.calloutSummary}>
-            <span className={styles.calloutBadge}>Not yet on npm</span>
-            <span className={styles.calloutLead}>Will be released soon.</span>
-            <span className={styles.calloutMore}>Beta test it</span>
-          </summary>
-          <pre className={styles.calloutCode}>{CLONE}</pre>
-        </details>
 
         <div className={styles.heroCommand}>
           <CodeBlock language="bash">{COMMAND}</CodeBlock>
