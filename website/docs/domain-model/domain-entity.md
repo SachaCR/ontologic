@@ -361,7 +361,7 @@ Domain events are useful for:
 
 - **Reacting** to changes in other parts of the system (e.g. send an email when an account is opened)
 - **Auditing** what happened over time
-- **Event sourcing** — rebuilding state by replaying events
+- **[Event sourcing](../event-sourcing/index.mdx)** — rebuilding state by replaying events
 
 In `ontologic`, you define events by extending `DomainEvent`:
 

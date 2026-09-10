@@ -1,0 +1,377 @@
+/* Every colour here comes from an Infima theme variable rather than a literal.
+   Light mode on this site is a blue-gray (#d8dced), not white, so a panel
+   painted with a hardcoded #fff would float off the page — and the same panel
+   has to stay legible against the dark theme's surface. */
+
+.demo {
+  margin: 2rem 0;
+}
+
+/* ── Layout ─────────────────────────────────────────────────────────────── */
+
+/* The docs article column is only ~750px wide, so the log gets the smaller
+   share: a cart line is four columns (name, stepper, price, remove) and needs
+   the room more than a list of event names does. `minmax(0, …)` on both tracks
+   is load-bearing — without it a long payload string blows the grid out and
+   the page scrolls sideways. */
+.panels {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 17rem);
+  gap: 1rem;
+  align-items: start;
+}
+
+@media (max-width: 996px) {
+  .panels {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.cart,
+.log {
+  min-width: 0;
+  background: var(--ifm-background-surface-color);
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 10px;
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.panelTitle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ifm-color-content-secondary);
+}
+
+/* The version badge, and the event count on the log. */
+.version {
+  padding: 0.1rem 0.45rem;
+  border-radius: 999px;
+  background: var(--ifm-color-primary);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: none;
+}
+
+/* ── Cart panel ─────────────────────────────────────────────────────────── */
+
+.cartHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-bottom: 1px solid var(--ifm-toc-border-color);
+  padding-bottom: 0.75rem;
+}
+
+.derived {
+  margin: 0 0 0.6rem;
+  font-size: 0.95rem;
+}
+
+/* Calls out the teaching point: the count and total are not in the state. */
+.derivedNote {
+  display: block;
+  font-size: 0.7rem;
+  font-style: italic;
+  color: var(--ifm-color-content-secondary);
+}
+
+.empty {
+  margin: 1rem 0;
+  color: var(--ifm-color-content-secondary);
+  font-size: 0.9rem;
+}
+
+.lines {
+  list-style: none;
+  margin: 0.85rem 0;
+  padding: 0;
+}
+
+.line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0;
+  border-bottom: 1px dashed var(--ifm-toc-border-color);
+}
+
+.line:last-child {
+  border-bottom: none;
+}
+
+.lineName {
+  min-width: 0;
+  font-size: 0.92rem;
+}
+
+.lineQty {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.qtyValue {
+  min-width: 1.5rem;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+}
+
+.linePrice {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9rem;
+  color: var(--ifm-color-content-secondary);
+}
+
+.stepper,
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.stepper:hover:not(:disabled),
+.remove:hover:not(:disabled) {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+.catalog {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.add {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--ifm-color-primary);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ifm-color-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add:hover:not(:disabled) {
+  background: var(--ifm-color-primary);
+  color: white;
+}
+
+.add:hover:not(:disabled) .addPrice {
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.addPrice {
+  font-size: 0.75rem;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: var(--ifm-color-content-secondary);
+}
+
+.hint {
+  margin: 0.9rem 0 0;
+  padding: 0.6rem 0.75rem;
+  border-left: 3px solid var(--ifm-color-primary);
+  border-radius: 0 6px 6px 0;
+  background: var(--ifm-background-color);
+  font-size: 0.85rem;
+  color: var(--ifm-color-content-secondary);
+}
+
+.inlineLink {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--ifm-color-primary);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+/* ── Event log ──────────────────────────────────────────────────────────── */
+
+/* A long history scrolls inside the panel instead of stretching the page and
+   dragging the cart panel's top edge out of view. */
+.events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 20rem;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.event {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.4rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-family: var(--ifm-font-family-monospace);
+  font-size: 0.78rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.event:hover,
+.event:focus-visible {
+  border-color: var(--ifm-color-primary);
+  background: var(--ifm-background-color);
+}
+
+.eventPinned {
+  border-color: var(--ifm-color-primary);
+  background: var(--ifm-background-color);
+}
+
+/* Events past the version being viewed: still in the stream, not yet folded
+   into the state on screen. Dimmed, never hidden — that they survive is the
+   point of a non-destructive rewind. */
+.eventFuture {
+  opacity: 0.45;
+}
+
+.eventVersion {
+  flex-shrink: 0;
+  min-width: 2.1rem;
+  color: var(--ifm-color-content-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.eventName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-weight: 600;
+}
+
+.payload {
+  margin: 0.15rem 0 0.4rem 2.6rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 6px;
+  background: var(--ifm-background-color);
+  font-size: 0.72rem;
+  line-height: 1.45;
+}
+
+/* ── Controls ───────────────────────────────────────────────────────────── */
+
+.controls {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--ifm-toc-border-color);
+}
+
+.scrubber input {
+  width: 100%;
+  accent-color: var(--ifm-color-primary);
+}
+
+.readout {
+  margin: 0.35rem 0 0.6rem;
+  font-size: 0.8rem;
+  color: var(--ifm-color-content-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.control {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--ifm-toc-border-color);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.control:hover:not(:disabled) {
+  border-color: var(--ifm-color-primary);
+  color: var(--ifm-color-primary);
+}
+
+/* ── Shared ─────────────────────────────────────────────────────────────── */
+
+.demo button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Visible to screen readers only — used to tell them what the dimming says
+   visually, and to label the range input. */
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Pre-hydration placeholder — see the BrowserOnly wrapper in index.tsx. */
+.fallback {
+  margin: 0;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--ifm-toc-border-color);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+  color: var(--ifm-color-content-secondary);
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Shown only if `apply` throws — see the catch in index.tsx. */
+.error {
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--ifm-color-danger);
+  border-radius: 10px;
+  background: var(--ifm-background-surface-color);
+  font-size: 0.9rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo * {
+    transition: none;
+  }
+}
