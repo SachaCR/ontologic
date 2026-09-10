@@ -361,7 +361,7 @@ Domain events are useful for:
 
 - **Reacting** to changes in other parts of the system (e.g. send an email when an account is opened)
 - **Auditing** what happened over time
-- **[Event sourcing](../event-sourcing/index.mdx)** — rebuilding state by replaying events
+- **Building Read Model**: Use [Event Sourcing](../event-sourcing/index.mdx) to project event into rich data model
 
 In `ontologic`, you define events by extending `DomainEvent`:
 
@@ -425,9 +425,11 @@ An operation often produces more than one event. Creating an account and crediti
 The use case collects them and saves them together — `saveWithEvents` takes one event or an array, and writes them with the state atomically:
 
 ```typescript
-class OpenAccountWithDepositUseCase
-  implements UseCase<OpenAccountWithDepositCommand, AccountState, never>
-{
+class OpenAccountWithDepositUseCase implements UseCase<
+  OpenAccountWithDepositCommand,
+  AccountState,
+  never
+> {
   constructor(private readonly accounts: BankAccountRepository) {}
 
   async execute(command: OpenAccountWithDepositCommand) {
@@ -567,13 +569,13 @@ if (result.isErr()) {
 
 ## Summary
 
-| Concept                 | What it means                              | How `ontologic` helps                           |
-| ----------------------- | ------------------------------------------ | ----------------------------------------------- |
-| **State Encapsulation** | The entity controls its own data           | `protected state`, safe-copy `readState()`      |
-| **Custom serialization**| Keep sub-entities alive inside an aggregate| `serialize` option, `DomainEntity<State, Serialized>` |
-| **Invariants**          | Rules that must always hold                | `BaseDomainInvariant`, checked on read          |
-| **Domain Logic**        | Behavior lives in the entity               | Methods return `Result<Event, Error>`           |
-| **Domain Events**       | Records of meaningful things that happened | Typed `DomainEvent` with name, version, payload |
+| Concept                  | What it means                               | How `ontologic` helps                                 |
+| ------------------------ | ------------------------------------------- | ----------------------------------------------------- |
+| **State Encapsulation**  | The entity controls its own data            | `protected state`, safe-copy `readState()`            |
+| **Custom serialization** | Keep sub-entities alive inside an aggregate | `serialize` option, `DomainEntity<State, Serialized>` |
+| **Invariants**           | Rules that must always hold                 | `BaseDomainInvariant`, checked on read                |
+| **Domain Logic**         | Behavior lives in the entity                | Methods return `Result<Event, Error>`                 |
+| **Domain Events**        | Records of meaningful things that happened  | Typed `DomainEvent` with name, version, payload       |
 
 DDD is ultimately about making your code reflect reality. When your `BankAccount` class knows what it means to be a bank account — what it can do, what it can't, what happens when it changes — you stop fighting the code and start thinking in your domain.
 
