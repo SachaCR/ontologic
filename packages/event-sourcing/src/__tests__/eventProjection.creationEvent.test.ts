@@ -1,6 +1,11 @@
 import { describe, test, expect } from "vitest";
 
-import { EventProjection } from "../index";
+import {
+  CreationEventNotFoundError,
+  EventProjection,
+  NoCreationEventApplierError,
+  UnknownEventApplierError,
+} from "../index";
 
 import {
   applyCreationEvent,
@@ -8,6 +13,7 @@ import {
   applyTestEventB,
   applyTestEventC,
   buildTestEvent,
+  thrownBy,
   type TestEvent,
   type TestState,
 } from "./testEvents";
@@ -29,12 +35,18 @@ describe("Component EventProjection", () => {
     ];
 
     describe("When I apply events without initial state", () => {
-      test("Then it throws an error 'No creation event applier configured'", () => {
-        expect(() => {
+      test("Then it throws NO_CREATION_EVENT_APPLIER", () => {
+        const error = thrownBy(() =>
           testProjection.apply({
             events: eventList,
-          });
-        }).toThrow(new Error("No creation event applier configured"));
+          }),
+        );
+
+        expect(error).toBeInstanceOf(NoCreationEventApplierError);
+        expect(error).toMatchObject({
+          name: "NO_CREATION_EVENT_APPLIER",
+          projectionName: "TestEntity",
+        });
       });
     });
   });
@@ -86,26 +98,20 @@ describe("Component EventProjection", () => {
           buildTestEvent("EventC"),
         ];
 
-        test("Then it throws an error 'Initial event not found'", () => {
-          let error: Error | undefined;
-
-          try {
+        test("Then it throws CREATION_EVENT_NOT_FOUND naming both events", () => {
+          const error = thrownBy(() =>
             testProjection.apply({
               events: eventList,
-            });
-          } catch (err) {
-            if (err instanceof Error) {
-              error = err;
-            }
-          }
+            }),
+          );
 
-          if (!error) {
-            throw new Error("Expected an error to be thrown");
-          }
-
-          expect(error).toBeDefined();
-          expect(error).toBeInstanceOf(Error);
-          expect(error.message).toStrictEqual("Initial event not found");
+          expect(error).toBeInstanceOf(CreationEventNotFoundError);
+          expect(error).toMatchObject({
+            name: "CREATION_EVENT_NOT_FOUND",
+            projectionName: "TestEntity",
+            expected: "CreationEvent",
+            received: "EventA",
+          });
         });
       });
     });
@@ -153,16 +159,24 @@ describe("Component EventProjection", () => {
           buildTestEvent("EventC"),
         ];
 
-        test("Then it throws an error 'Unknown event applier'", () => {
-          expect(() => {
+        test("Then it throws UNKNOWN_EVENT_APPLIER for the creation event", () => {
+          const error = thrownBy(() =>
             testProjection.apply({
               snapshot: {
                 state: initialState,
                 version: 587,
               },
               events: eventList,
-            });
-          }).toThrow(new Error("Unknown event applier: CreationEvent"));
+            }),
+          );
+
+          expect(error).toBeInstanceOf(UnknownEventApplierError);
+          expect(error).toMatchObject({
+            name: "UNKNOWN_EVENT_APPLIER",
+            eventName: "CreationEvent",
+            eventIndex: 0,
+            streamLength: 4,
+          });
         });
       });
     });

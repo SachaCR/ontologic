@@ -1,8 +1,8 @@
 import { describe, test, expect } from "vitest";
 
-import { EventProjection } from "../index";
+import { EventProjection, InvalidProjectedStateError } from "../index";
 
-import { buildTestEvent, type TestEvent } from "./testEvents";
+import { buildTestEvent, thrownBy, type TestEvent } from "./testEvents";
 
 interface StateWithDate {
   at: Date;
@@ -22,13 +22,23 @@ describe("Component EventProjection", () => {
       // No applier is mounted for EventA on purpose: the state check has to
       // win over the applier lookup, or the caller gets a misleading error
       // about a missing applier when the real problem is the snapshot.
-      test("Then it throws a 'The initial state is not JSON compatible' error", () => {
-        expect(() => {
+      test("Then it throws INVALID_PROJECTED_STATE locating the Date", () => {
+        const error = thrownBy(() =>
           projection.apply({
             snapshot: { state: { at: new Date(0) }, version: 1 },
             events: [buildTestEvent("EventA")],
-          });
-        }).toThrow(new Error("The initial state is not JSON compatible"));
+          }),
+        );
+
+        expect(error).toBeInstanceOf(InvalidProjectedStateError);
+        expect(error).toMatchObject({
+          name: "INVALID_PROJECTED_STATE",
+          projectionName: "TestEntity",
+          stage: "initial",
+          code: "non-plain-object",
+          path: "$.at",
+          reason: "Date instance instead of a plain object",
+        });
       });
     });
   });
@@ -43,12 +53,19 @@ describe("Component EventProjection", () => {
     }));
 
     describe("When I apply the creation event without a snapshot", () => {
-      test("Then it throws a 'The initial state is not JSON compatible' error", () => {
-        expect(() => {
+      test("Then it throws INVALID_PROJECTED_STATE at the initial stage", () => {
+        const error = thrownBy(() =>
           projection.apply({
             events: [buildTestEvent("CreationEvent")],
-          });
-        }).toThrow(new Error("The initial state is not JSON compatible"));
+          }),
+        );
+
+        expect(error).toBeInstanceOf(InvalidProjectedStateError);
+        expect(error).toMatchObject({
+          stage: "initial",
+          code: "non-plain-object",
+          path: "$.at",
+        });
       });
     });
   });
@@ -59,13 +76,24 @@ describe("Component EventProjection", () => {
     projection.mountEventApplier("EventA", () => ({ value: new Map() }));
 
     describe("When I apply that event", () => {
-      test("Then it throws a 'The new state is not JSON compatible' error", () => {
-        expect(() => {
+      test("Then it throws INVALID_PROJECTED_STATE at the projected stage", () => {
+        const error = thrownBy(() =>
           projection.apply({
             snapshot: { state: { value: 1 }, version: 4 },
             events: [buildTestEvent("EventA")],
-          });
-        }).toThrow(new Error("The new state is not JSON compatible"));
+          }),
+        );
+
+        expect(error).toBeInstanceOf(InvalidProjectedStateError);
+        expect(error).toMatchObject({
+          stage: "projected",
+          code: "non-plain-object",
+          path: "$.value",
+          reason: "Map instance instead of a plain object",
+        });
+        expect((error as Error).message).toContain(
+          "The projected state is not JSON compatible",
+        );
       });
     });
   });

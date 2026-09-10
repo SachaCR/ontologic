@@ -1,12 +1,13 @@
 import { describe, test, expect } from "vitest";
 
-import { EventProjection } from "../index";
+import { EventProjection, UnknownEventApplierError } from "../index";
 
 import {
   applyTestEventA,
   applyTestEventB,
   applyTestEventC,
   buildTestEvent,
+  thrownBy,
   type TestEvent,
   type TestState,
 } from "./testEvents";
@@ -17,9 +18,9 @@ describe("Component EventProjection", () => {
       "TestEntity",
     );
 
-    describe("When I read entityName", () => {
-      test("Then it returns expected entity name", () => {
-        expect(testProjection.entityName).toStrictEqual("TestEntity");
+    describe("When I read its name", () => {
+      test("Then it returns the name it was constructed with", () => {
+        expect(testProjection.name()).toStrictEqual("TestEntity");
       });
     });
   });
@@ -32,16 +33,28 @@ describe("Component EventProjection", () => {
     const eventList = [buildTestEvent("EventA")];
 
     describe("When I apply an event", () => {
-      test("Then it throws an UNKNOWN_APPLIER error", () => {
-        expect(() => {
+      test("Then it throws UNKNOWN_EVENT_APPLIER naming the event", () => {
+        const error = thrownBy(() =>
           testProjection.apply({
             events: eventList,
             snapshot: {
               state: { result: [] },
               version: 0,
             },
-          });
-        }).toThrow(new Error("Unknown event applier: EventA"));
+          }),
+        );
+
+        expect(error).toBeInstanceOf(UnknownEventApplierError);
+        expect(error).toMatchObject({
+          name: "UNKNOWN_EVENT_APPLIER",
+          projectionName: "TestEntity",
+          eventName: "EventA",
+          eventIndex: 0,
+          streamLength: 1,
+        });
+        expect((error as Error).message).toContain(
+          "[TestEntity] Unknown event applier: EventA",
+        );
       });
     });
   });

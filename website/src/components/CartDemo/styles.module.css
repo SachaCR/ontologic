@@ -402,18 +402,6 @@
   border: 0;
 }
 
-/* Pre-hydration placeholder — see the BrowserOnly wrapper in index.tsx. */
-.fallback {
-  margin: 0;
-  padding: 2rem 1rem;
-  border: 1px dashed var(--ifm-toc-border-color);
-  border-radius: 10px;
-  background: var(--ifm-background-surface-color);
-  color: var(--ifm-color-content-secondary);
-  font-size: 0.9rem;
-  text-align: center;
-}
-
 /* Shown only if `apply` throws — see the catch in index.tsx. */
 .error {
   margin: 0;

@@ -1,5 +1,3 @@
-import { EventProjection } from "../eventProjection";
-
 import type { SourceEvent } from "../interfaces";
 
 export interface CreationEvent extends SourceEvent {
@@ -76,17 +74,6 @@ export function applyTestEventC(params: {
   };
 }
 
-export function buildTestProjection(): EventProjection<TestState, TestEvent> {
-  const testProjection = new EventProjection<TestState, TestEvent>(
-    "TestEntity",
-  );
-
-  testProjection.mountEventApplier("EventA", applyTestEventA);
-  testProjection.mountEventApplier("EventB", applyTestEventB);
-  testProjection.mountEventApplier("EventC", applyTestEventC);
-
-  return testProjection;
-}
 export function buildTestEvent(name: TestEvent["name"]): TestEvent {
   const event: TestEvent = {
     name,
@@ -97,4 +84,19 @@ export function buildTestEvent(name: TestEvent["name"]): TestEvent {
   };
 
   return event;
+}
+
+/**
+ * Runs `fn` and returns whatever it threw, so a test can assert on a typed
+ * error's fields and not only on its message. Fails loudly if nothing throws —
+ * a silent pass is the failure mode of hand-rolled try/catch assertions.
+ */
+export function thrownBy(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+
+  throw new Error("Expected the call to throw, but it returned normally");
 }

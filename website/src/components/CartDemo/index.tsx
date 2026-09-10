@@ -14,21 +14,23 @@
  *
  * Payloads unfold on click, never on hover — see the note on `openVersion`.
  *
- * Client-only, via `BrowserOnly`, and not merely because a widget nobody can
- * click is of little use pre-hydration. `apply` deep-clones the state with
- * `structuredClone` and then checks the clone is JSON-compatible, and that
- * check compares the prototype against *this* realm's `Object.prototype`.
- * Docusaurus evaluates its server bundle inside a `vm` context, so the host's
- * `structuredClone` returns an object carrying the *outer* realm's prototype —
- * a perfectly plain object that the check nonetheless rejects, failing the
- * whole site build with "The new state is not JSON compatible". Rendering only
- * in the browser keeps every object in one realm.
+ * Server-rendered like the rest of the page, so the cart and its first event
+ * are in the HTML before any JavaScript runs. Nothing in render is
+ * non-deterministic — no clock, no randomness, no `Intl` — so the server's
+ * markup matches the first client render and hydration is quiet.
+ *
+ * It was briefly wrapped in `BrowserOnly` out of necessity: `apply` deep-clones
+ * the state and checked the clone against *this* realm's `Object.prototype` by
+ * identity, and Docusaurus evaluates its server bundle in a `vm` context, so
+ * the host's `structuredClone` handed back an object carrying the outer realm's
+ * prototype — a perfectly plain object the check rejected, failing the whole
+ * site build. The package now accepts any realm's plain object, so the wrapper
+ * is gone.
  */
 
 import type { CSSProperties, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import BrowserOnly from "@docusaurus/BrowserOnly";
 
 import { EventProjection } from "@ontologics/event-sourcing";
 
@@ -193,7 +195,7 @@ type Props = {
   className?: string;
 };
 
-function CartDemoClient({ className }: Props): ReactNode {
+export default function CartDemo({ className }: Props): ReactNode {
   const [events, setEvents] = useState<CartEvent[]>(() => [cartCreated()]);
 
   /** `null` means "follow the head of the stream". */
@@ -217,11 +219,11 @@ function CartDemoClient({ className }: Props): ReactNode {
   // The fold. `shown` is never below 1, so the slice always starts with
   // CART_CREATED and `apply` always has its creation event.
   //
-  // Every one of `apply`'s five error paths is excluded by construction, so the
-  // catch should never fire. It is here because a throw in render unmounts the
-  // whole React tree for the page: if an applier above is ever edited into
-  // returning something the JSON check rejects, the reader should see which
-  // error it was, not a blank article.
+  // Every one of `apply`'s error paths is excluded by construction, so the
+  // catch should never fire. It is here because this component renders during
+  // `docusaurus build`: a throw would fail the whole site build, not merely
+  // blank this panel. If an applier above is ever edited into returning
+  // something the JSON check rejects, the page should say which error it was.
   const view = useMemo<
     { ok: true; state: CartState } | { ok: false; error: string }
   >(() => {
@@ -560,19 +562,5 @@ function CartDemoClient({ className }: Props): ReactNode {
         </section>
       </div>
     </div>
-  );
-}
-
-export default function CartDemo({ className }: Props): ReactNode {
-  return (
-    <BrowserOnly
-      fallback={
-        <div className={clsx(styles.demo, className)}>
-          <p className={styles.fallback}>Loading the interactive cart…</p>
-        </div>
-      }
-    >
-      {() => <CartDemoClient className={className} />}
-    </BrowserOnly>
   );
 }

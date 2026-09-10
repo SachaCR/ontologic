@@ -147,10 +147,11 @@ describe("Component validateJsonValue", () => {
     });
 
     describe("When I validate an object whose constructor cannot be named", () => {
-      // Its prototype is a null-prototype object: neither Object.prototype nor
-      // null, so it is rejected, but there is no constructor to name it after.
+      // Three prototypes deep: the chain reaches a null-prototype object only
+      // at the third hop, so this is not a plain object in any realm — and
+      // there is no constructor anywhere on the chain to name it after.
       const unnameable = Object.create(
-        Object.create(null) as object,
+        Object.create(Object.create(null) as object) as object,
       ) as unknown;
 
       test("Then it is rejected with a placeholder name", () => {
