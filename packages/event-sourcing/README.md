@@ -4,15 +4,12 @@
 [![node](https://img.shields.io/node/v/@ontologics/event-sourcing)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/@ontologics/event-sourcing)](https://github.com/SachaCR/ontologic/blob/main/packages/event-sourcing/LICENSE)
 
-Event sourcing for entities modelled with [Ontologic](https://ontologic.site). Declare one applier
-per event, and rebuild an entity's state by folding its stream — from the beginning, or onto a
+Event sourcing to help you build read model that project events into rich data model. Declare one applier
+per event, and rebuild a model's state by folding its event stream from the beginning, or onto a
 snapshot you already hold.
 
-A companion package, so that [`ontologic`](https://www.npmjs.com/package/ontologic) itself stays
-free of runtime dependencies:
-
 ```bash
-pnpm add @ontologics/event-sourcing ontologic
+pnpm add @ontologics/event-sourcing
 ```
 
 ## Quick start
@@ -70,14 +67,18 @@ export class BookProjection extends EventProjection<BookState, BookEvent> {
 `event` is narrowed to the event you mounted the applier for, so `event.payload` is typed per event
 rather than as the union.
 
-Fold a whole stream:
+Project a whole stream:
 
 ```ts
 const books = new BookProjection();
 
 const { state, version } = books.apply({
   events: [
-    { name: "BOOK_ADDED", version: 1, payload: { bookId: "b-1", title: "Dune" } },
+    {
+      name: "BOOK_ADDED",
+      version: 1,
+      payload: { bookId: "b-1", title: "Dune" },
+    },
     { name: "BOOK_BORROWED", version: 1, payload: { memberId: "m-7" } },
   ],
 });
@@ -92,7 +93,11 @@ Or catch a snapshot up with the events recorded since:
 const next = books.apply({
   snapshot: { state, version },
   events: [
-    { name: "BOOK_RETURNED", version: 1, payload: { returnedAt: "2026-09-10" } },
+    {
+      name: "BOOK_RETURNED",
+      version: 1,
+      payload: { returnedAt: "2026-09-10" },
+    },
   ],
 });
 
@@ -101,7 +106,7 @@ const next = books.apply({
 ```
 
 A projection holds no state of its own. `apply` takes a snapshot and returns a new one, so one
-instance can rebuild any number of entities of that type, concurrently and in any order — and a
+instance can rebuild any number of entities of that type, concurrently and in any order. A
 test can replay the same stream from any starting point.
 
 ## Snapshots and versions
@@ -113,7 +118,7 @@ Omit `snapshot` and the fold starts from nothing: the first event must be the cr
 the returned version counts from zero. Pass one and every event in `events` is applied on top of
 it, with `version` counting on from `snapshot.version`.
 
-The creation event is deliberately *not* mountable as an ordinary applier — it takes no incoming
+The creation event is deliberately _not_ mountable as an ordinary applier. It takes no incoming
 state, so its applier receives only `{ event }`. As a result, replaying a stream that still
 contains its creation event on top of an existing snapshot is an error rather than a silent
 re-initialization; see the table below.
@@ -122,18 +127,18 @@ re-initialization; see the table below.
 
 `apply` throws a plain `Error` in these cases:
 
-| Message | Cause |
-| --- | --- |
-| `No creation event applier configured` | No `snapshot`, and no creation event applier was mounted. |
-| `Initial event not found` | No `snapshot`, and `events` is empty or does not start with the creation event. |
-| `Unknown event applier: <name>` | An event has no applier mounted for its name. Also what you get for the creation event when a `snapshot` *was* passed. |
-| `The initial state is not JSON compatible` | The state in the snapshot, or the state the creation applier returned, is not JSON-compatible. |
-| `The new state is not JSON compatible` | An applier returned a state that is not JSON-compatible. |
+| Message                                    | Cause                                                                                                                  |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
+| `No creation event applier configured`     | No `snapshot`, and no creation event applier was mounted.                                                              |
+| `Initial event not found`                  | No `snapshot`, and `events` is empty or does not start with the creation event.                                        |
+| `Unknown event applier: <name>`            | An event has no applier mounted for its name. Also what you get for the creation event when a `snapshot` _was_ passed. |
+| `The initial state is not JSON compatible` | The state in the snapshot, or the state the creation applier returned, is not JSON-compatible.                         |
+| `The new state is not JSON compatible`     | An applier returned a state that is not JSON-compatible.                                                               |
 
 ## State must be JSON-compatible
 
 State is checked before and after the fold, and deep-cloned in between, so an applier cannot leak a
-mutation back into the caller's snapshot. That constrains what a state may hold — it must survive a
+mutation back into the caller's snapshot. That constrains what a state may hold. It must survive a
 round trip through `JSON.parse(JSON.stringify(x))` unchanged.
 
 Rejected: `undefined`, functions, symbols, `bigint`, `NaN` and the infinities, symbol keys,
@@ -146,13 +151,13 @@ Accepted, by design: sparse arrays (holes come back as `null`) and null-prototyp
 
 ### `class EventProjection<State, Event extends SourceEvent>`
 
-| Member | Description |
-| --- | --- |
-| `constructor(entityName: string)` | Names the entity this projection rebuilds. |
-| `mountEventApplier(eventName, applier)` | Registers `({ event, state }) => State` for one event name. Mounting twice for the same name replaces the first. |
-| `mountCreationEventApplier(eventName, applier)` | Registers `({ event }) => State` for the event that creates the entity. |
-| `apply({ snapshot?, events })` | Folds `events` and returns `{ state, version }`. |
-| `entityName` | The name given to the constructor. |
+| Member                                          | Description                                                                                                      |
+| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `constructor(entityName: string)`               | Names the entity this projection rebuilds.                                                                       |
+| `mountEventApplier(eventName, applier)`         | Registers `({ event, state }) => State` for one event name. Mounting twice for the same name replaces the first. |
+| `mountCreationEventApplier(eventName, applier)` | Registers `({ event }) => State` for the event that creates the entity.                                          |
+| `apply({ snapshot?, events })`                  | Folds `events` and returns `{ state, version }`.                                                                 |
+| `entityName`                                    | The name given to the constructor.                                                                               |
 
 ### `interface SourceEvent`
 
@@ -165,10 +170,9 @@ without translation.
 
 ### `interface Snapshot<State>`
 
-`{ state, version }` — what `apply` accepts as a starting point and what it returns.
+`{ state, version }` what `apply` accepts as a starting point and what it returns.
 
 ## Status
 
-Early. `EventProjection` is the whole public API today; the event store and stream-append side of
-the package is not written yet, so persistence is still yours to provide. Expect additions rather
+Early. `EventProjection` is the whole public API today; the event store is still yours to provide. Expect additions rather
 than changes to what is here, but the package is pre-1.0 and the surface is not frozen.
