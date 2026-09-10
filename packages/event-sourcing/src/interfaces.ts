@@ -1,20 +1,37 @@
+/**
+ * The contract a projection satisfies. Implement it to write your own;
+ * {@link EventProjection} is simply the implementation this package ships.
+ *
+ * It is not something a *consumer* needs — folding events through
+ * `EventProjection` requires none of this. Its whole audience is someone
+ * writing an alternative: one that reads its appliers from a config object,
+ * caches snapshots, records timings, or decorates the shipped class.
+ *
+ * Every member is declared as a function-typed property rather than a method,
+ * and that is load-bearing. TypeScript compares *method* parameters
+ * bivariantly, so an implementation that demanded more than the contract
+ * promises — an `apply` requiring the snapshot this declares optional, say —
+ * would satisfy a method-declared interface while breaking every caller that
+ * went through it. Properties fall under `strictFunctionTypes`, which is
+ * contravariant, so that no longer type-checks.
+ */
 export interface EventProjectionInterface<State, Event extends SourceEvent> {
-  name(): string;
+  name: () => string;
 
-  mountEventApplier<EventName extends Event["name"]>(
+  mountEventApplier: <EventName extends Event["name"]>(
     eventName: EventName,
     eventApplier: EventApplier<Extract<Event, { name: EventName }>, State>,
-  ): void;
+  ) => void;
 
-  mountCreationEventApplier<EventName extends Event["name"]>(
+  mountCreationEventApplier: <EventName extends Event["name"]>(
     eventName: EventName,
     eventApplier: CreationEventApplier<
       Extract<Event, { name: EventName }>,
       State
     >,
-  ): void;
+  ) => void;
 
-  apply(params: { snapshot?: Snapshot<State>; events: Event[] }): {
+  apply: (params: { snapshot?: Snapshot<State>; events: Event[] }) => {
     state: State;
     version: number;
   };
