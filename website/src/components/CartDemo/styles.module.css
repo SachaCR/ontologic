@@ -30,29 +30,39 @@
 .cart,
 .log {
   min-width: 0;
+  overflow: hidden;
   background: var(--ifm-background-surface-color);
   border: 1px solid var(--ifm-toc-border-color);
   border-radius: 10px;
   padding: 1rem 1.1rem 1.1rem;
 }
 
+/* The panels read flat because everything in them sat within a few percent
+   lightness of everything else. Each one now gets a header bar borrowed from
+   the site's hero gradient — the same recipe as `.heroBanner` — which does the
+   figure/ground work no amount of border tweaking could. Negative margins
+   bleed it to the panel edges through the panel's own padding. */
 .panelTitle {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  margin: 0 0 0.6rem;
+  margin: -1rem -1.1rem 0.85rem;
+  padding: 0.55rem 1.1rem;
+  border-radius: 9px 9px 0 0;
+  background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);
+  color: white;
   font-size: 0.8rem;
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  color: var(--ifm-color-content-secondary);
 }
 
-/* The version badge, and the event count on the log. */
+/* The version badge, and the event count on the log. Translucent white rather
+   than primary indigo — it sits on the dark strip now. */
 .version {
-  padding: 0.1rem 0.45rem;
+  padding: 0.1rem 0.5rem;
   border-radius: 999px;
-  background: var(--ifm-color-primary);
+  background: rgba(255, 255, 255, 0.2);
   color: white;
   font-size: 0.7rem;
   font-weight: 700;
@@ -62,19 +72,23 @@
 
 /* ── Cart panel ─────────────────────────────────────────────────────────── */
 
-.cartHeader {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.5rem;
-  border-bottom: 1px solid var(--ifm-toc-border-color);
-  padding-bottom: 0.75rem;
+/* The summary sits below the line items and hard right, where an invoice puts
+   its total — with a rule above it, so the items read as the document and this
+   reads as what they add up to. */
+.derived {
+  margin: 0;
+  padding-top: 0.75rem;
+  padding-bottom: 0.85rem;
+  border-top: 1px solid var(--ifm-toc-border-color);
+  font-size: 0.95rem;
+  text-align: right;
 }
 
-.derived {
-  margin: 0 0 0.6rem;
-  font-size: 0.95rem;
+/* The total is what the fold is for — the one number worth emphasising. */
+.total {
+  color: var(--ifm-color-primary);
+  font-size: 1.15rem;
+  font-weight: 700;
 }
 
 /* Calls out the teaching point: the count and total are not in the state. */
@@ -188,6 +202,16 @@
   color: rgba(255, 255, 255, 0.75);
 }
 
+/* A fruit's colour, with no contrast obligation because it carries no text. */
+.dot {
+  width: 9px;
+  height: 9px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  align-self: center;
+}
+
 .addPrice {
   font-size: 0.75rem;
   font-weight: 400;
@@ -225,6 +249,8 @@
   padding: 0;
   max-height: 20rem;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
   scrollbar-width: thin;
 }
 
@@ -239,6 +265,7 @@
   width: 100%;
   padding: 0.4rem 0.5rem;
   border: 1px solid var(--ifm-toc-border-color);
+  border-left: 3px solid var(--accent);
   border-radius: 6px;
   background: var(--ifm-background-color);
   color: inherit;
@@ -254,20 +281,24 @@
 
 .event:hover,
 .event:focus-visible {
-  border-color: var(--ifm-color-primary);
-  color: var(--ifm-color-primary);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--ifm-background-color));
 }
 
 .eventOpen {
-  border-color: var(--ifm-color-primary);
-  box-shadow: inset 2px 0 0 var(--ifm-color-primary);
+  border-top-color: var(--accent);
+  border-right-color: var(--accent);
+  border-bottom-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, var(--ifm-background-color));
 }
 
 /* Points right when closed, down when open — the one cue that says "there is
    more inside this". */
 .caret {
   flex-shrink: 0;
-  color: var(--ifm-color-primary);
+  color: var(--accent);
   font-size: 0.9rem;
   line-height: 1;
   transition: transform 0.12s ease;
@@ -301,6 +332,7 @@
   margin: 0.25rem 0 0.45rem 1.6rem;
   padding: 0.5rem 0.6rem;
   border: 1px solid var(--ifm-toc-border-color);
+  border-left: 3px solid color-mix(in srgb, var(--accent) 55%, transparent);
   border-radius: 6px;
   background: var(--ifm-background-color);
   font-size: 0.72rem;
@@ -395,5 +427,10 @@
 @media (prefers-reduced-motion: reduce) {
   .demo * {
     transition: none;
+  }
+
+  /* The log jumps to the newest event rather than animating there. */
+  .events {
+    scroll-behavior: auto;
   }
 }
