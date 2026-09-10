@@ -11,6 +11,7 @@ on:
         options:
           - "ontologic"
           - "@ontologics/domain-explorer"
+          - "@ontologics/event-sourcing"
 
       release_type:
         description: Release type ("none" publishes the version already on main)
