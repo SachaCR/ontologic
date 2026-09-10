@@ -1,6 +1,6 @@
 {
   "name": "@ontologics/event-sourcing",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Event sourcing for Ontologic domain entities: rebuild entity state by folding its event stream.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
