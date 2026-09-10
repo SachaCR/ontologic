@@ -4,9 +4,14 @@
 [![node](https://img.shields.io/node/v/@ontologics/event-sourcing)](https://nodejs.org)
 [![license](https://img.shields.io/npm/l/@ontologics/event-sourcing)](https://github.com/SachaCR/ontologic/blob/main/packages/event-sourcing/LICENSE)
 
-Event sourcing to help you build read model that project events into rich data model. Declare one applier
-per event, and rebuild a model's state by folding its event stream from the beginning, or onto a
-snapshot you already hold.
+Event sourcing for any state that is a function of the facts that produced it. Declare one applier
+per event, and rebuild the state by folding its event stream from the beginning, or onto a snapshot
+you already hold.
+
+It has no opinion about what the state is: an aggregate rebuilt from its own events, a read model
+that projects a stream into the shape a query wants, a running total. The package is standalone and
+depends on nothing. It pairs well with [`ontologic`](https://www.npmjs.com/package/ontologic) but knows
+nothing about it, so it works just as well on events from anywhere else.
 
 ```bash
 pnpm add @ontologics/event-sourcing
@@ -106,7 +111,7 @@ const next = books.apply({
 ```
 
 A projection holds no state of its own. `apply` takes a snapshot and returns a new one, so one
-instance can rebuild any number of entities of that type, concurrently and in any order. A
+instance can rebuild any number of streams, concurrently and in any order. A
 test can replay the same stream from any starting point.
 
 ## Snapshots and versions
@@ -123,17 +128,87 @@ state, so its applier receives only `{ event }`. As a result, replaying a stream
 contains its creation event on top of an existing snapshot is an error rather than a silent
 re-initialization; see the table below.
 
+## Folding into a read model
+
+Nothing in a projection assumes the state is an aggregate. A read model is the same fold with a
+different shape on the other side. The only difference is that no event _creates_ it, so there is
+no creation applier to mount.
+
+Declare the events the model is interested in:
+
+```ts
+/** memberId → how many books they have borrowed. */
+type BorrowCounts = Record<string, number>;
+
+const borrowCounts = new EventProjection<BorrowCounts, BookBorrowed>(
+  "BorrowCounts",
+);
+
+borrowCounts.mountEventApplier("BOOK_BORROWED", ({ event, state }) => ({
+  ...state,
+  [event.payload.memberId]: (state[event.payload.memberId] ?? 0) + 1,
+}));
+
+// Whatever your store handed you since the last run.
+declare const eventsSinceLastRun: BookEvent[];
+
+// `apply` accepts `BookBorrowed[]` here, so the compiler will not let you pass
+// the raw stream. Narrowing the generic turns filtering into an obligation
+// instead of something to remember.
+const borrows = eventsSinceLastRun.filter(
+  (event): event is BookBorrowed => event.name === "BOOK_BORROWED",
+);
+
+// Version 0 with an empty shape is the read model's starting point.
+const { state: counts, version: folded } = borrowCounts.apply({
+  snapshot: { state: {}, version: 0 },
+  events: borrows,
+});
+```
+
+Where the selection happens is a choice worth making deliberately. Narrow the generic as above and
+the type checker forces the caller to filter, which is also the only arrangement that makes
+`apply`'s refusal of an unmounted event unreachable rather than a runtime risk. Widen it to the full
+union instead and you have to mount `({ state }) => state` for every event you mean to ignore: more
+code, and a list that grows with the stream rather than with the model, in exchange for every event
+the model sees being visible in one place.
+
+One thing not to assume: `version` counts the events this projection folded, so on a filtered stream
+it is not a position in that stream. Fold two of five events and it returns 2. If you need to resume
+where you left off, persist the stream offset yourself alongside the state.
+
 ## Errors
 
-`apply` throws a plain `Error` in these cases:
+Every one of these is a programmer error: an applier that was never mounted, a stream that does not
+begin where it claims to, a state that could not survive being stored. So `apply` throws rather
+than returning them. Each is a class carrying the context needed to fix the bug, and each sets
+`name` to a stable discriminant you can branch on without parsing a message.
 
-| Message                                    | Cause                                                                                                                  |
-| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| `No creation event applier configured`     | No `snapshot`, and no creation event applier was mounted.                                                              |
-| `Initial event not found`                  | No `snapshot`, and `events` is empty or does not start with the creation event.                                        |
-| `Unknown event applier: <name>`            | An event has no applier mounted for its name. Also what you get for the creation event when a `snapshot` _was_ passed. |
-| `The initial state is not JSON compatible` | The state in the snapshot, or the state the creation applier returned, is not JSON-compatible.                         |
-| `The new state is not JSON compatible`     | An applier returned a state that is not JSON-compatible.                                                               |
+| Class                         | `name`                      | Extra fields                              | Cause                                                                                                                  |
+| ----------------------------- | --------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `NoCreationEventApplierError` | `NO_CREATION_EVENT_APPLIER` | —                                         | No `snapshot`, and no creation event applier was mounted.                                                              |
+| `CreationEventNotFoundError`  | `CREATION_EVENT_NOT_FOUND`  | `expected`, `received`                    | No `snapshot`, and `events` is empty or does not start with the creation event.                                        |
+| `UnknownEventApplierError`    | `UNKNOWN_EVENT_APPLIER`     | `eventName`, `eventIndex`, `streamLength` | An event has no applier mounted for its name. Also what you get for the creation event when a `snapshot` _was_ passed. |
+| `InvalidProjectedStateError`  | `INVALID_PROJECTED_STATE`   | `stage`, `code`, `path`, `reason`         | A state is not JSON-compatible. `stage` is `"initial"` or `"projected"`.                                               |
+
+All four extend `EventSourcingError`, which carries `projectionName` and prefixes the message with it.
+
+`InvalidProjectedStateError` carries the validator's full diagnosis, so you get the offending
+location rather than only the fact of failure:
+
+```ts
+import { InvalidProjectedStateError } from "@ontologics/event-sourcing";
+
+try {
+  books.apply({ snapshot: { state, version }, events: [] });
+} catch (error) {
+  if (error instanceof InvalidProjectedStateError) {
+    console.error(error.code); // e.g. "non-plain-object"
+    console.error(error.path); // e.g. "$.borrowedAt"
+    console.error(error.stage); // "initial" or "projected"
+  }
+}
+```
 
 ## State must be JSON-compatible
 
@@ -153,11 +228,11 @@ Accepted, by design: sparse arrays (holes come back as `null`) and null-prototyp
 
 | Member                                          | Description                                                                                                      |
 | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `constructor(entityName: string)`               | Names the entity this projection rebuilds.                                                                       |
+| `constructor(projectionName: string)`           | Names this projection, so its errors can say which one complained.                                               |
 | `mountEventApplier(eventName, applier)`         | Registers `({ event, state }) => State` for one event name. Mounting twice for the same name replaces the first. |
 | `mountCreationEventApplier(eventName, applier)` | Registers `({ event }) => State` for the event that creates the entity.                                          |
 | `apply({ snapshot?, events })`                  | Folds `events` and returns `{ state, version }`.                                                                 |
-| `entityName`                                    | The name given to the constructor.                                                                               |
+| `name()`                                        | The name given to the constructor.                                                                               |
 
 ### `interface SourceEvent`
 
@@ -165,12 +240,35 @@ The minimum an event must provide: `name`, `version` and `payload`. Appliers are
 alone; `version` describes the event's own shape, and the entity version in the result is derived
 by counting the events applied.
 
-Core's `DomainEvent` satisfies this structurally, so events from an Ontologic domain can be folded
-without translation.
+Any object of that shape will do, wherever it came from. `ontologic`'s `DomainEvent` happens to
+satisfy it structurally. It exposes `name`, `version` and `payload` as getters. Though nothing in
+this package depends on that, and if you are reading events back through `ontologic`'s repository
+you will be unwrapping `EventWithMetadata` first:
+
+```ts
+// `ontologic`'s repository hands back each event wrapped with its metadata,
+// so unwrap before folding.
+declare const stored: { event: BookEvent; metadata: { offset: number } }[];
+
+const { state: rebuilt } = books.apply({
+  events: stored.map((wrapped) => wrapped.event),
+});
+```
 
 ### `interface Snapshot<State>`
 
 `{ state, version }` what `apply` accepts as a starting point and what it returns.
+
+### Errors
+
+`EventSourcingError` and its four subclasses. See [Errors](#errors) above.
+
+### The JSON validator
+
+`validateJsonValue(value)` returns `{ isValid: true }` or `{ isValid: false, code, reason, path }`;
+`isJsonValue(value)` is the boolean form. `JsonValue`, `JsonValidation` and `JsonInvalidCode` are
+exported alongside them. This is the same check `apply` runs, exposed so you can validate a state
+before handing it over rather than after.
 
 ## Status
 

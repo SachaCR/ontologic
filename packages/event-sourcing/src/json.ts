@@ -172,7 +172,19 @@ function check(value: unknown, ctx: Context): Failure | null {
   } else {
     const proto = Object.getPrototypeOf(obj);
 
-    if (proto !== Object.prototype && proto !== null) {
+    // A plain object is one whose prototype has no prototype of its own —
+    // every realm's `Object.prototype` satisfies that, and so does `null`.
+    //
+    // Comparing against *this* realm's `Object.prototype` by identity instead
+    // would reject a perfectly plain object that was built somewhere else: a
+    // `vm` context, a `worker_threads` message, an iframe. `structuredClone`
+    // returns exactly such an object when the host provides it from outside
+    // the running realm, so the stricter test made `EventProjection.apply`
+    // reject the clone it had just made of a valid state.
+    //
+    // `Date`, `Map`, `Set`, `RegExp` and class instances are still rejected:
+    // their prototype's prototype is `Object.prototype`, which is not null.
+    if (proto !== null && Object.getPrototypeOf(proto) !== null) {
       const name = obj.constructor?.name ?? "?";
 
       failure = fail(
@@ -232,7 +244,11 @@ export function validateJsonValue(value: unknown): JsonValidation {
   };
 }
 
-/** Predicate variant, for TypeScript narrowing. */
+/**
+ * Boolean form of {@link validateJsonValue}, for when the verdict is all you
+ * need. It is not a type predicate and narrows nothing — use
+ * `validateJsonValue` when you want to know *what* is wrong and where.
+ */
 export function isJsonValue(value: unknown): boolean {
   return validateJsonValue(value).isValid;
 }

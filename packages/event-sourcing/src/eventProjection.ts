@@ -1,14 +1,20 @@
 import {
+  CreationEventNotFoundError,
+  InvalidProjectedStateError,
+  NoCreationEventApplierError,
+  UnknownEventApplierError,
+} from "./errors";
+import {
   type CreationEventApplier,
   type EventApplier,
   type EventProjectionInterface,
   type Snapshot,
   type SourceEvent,
 } from "./interfaces";
-import { isJsonValue } from "./json";
+import { validateJsonValue } from "./json";
 
 /**
- * Rebuilds an entity's state by folding its own events onto a snapshot.
+ * Rebuilds a state by folding a stream of events onto a snapshot.
  *
  * Mount one applier per event name, then call {@link EventProjection.apply}.
  * The projection is pure and holds no state of its own: a snapshot and a list
@@ -16,32 +22,44 @@ import { isJsonValue } from "./json";
  * can therefore rebuild the same stream from any starting point, which is what
  * makes it cheap to test.
  *
- * This is not `ontologic`'s `ReadModel`. A read model subscribes to the event
- * bus and folds events into whatever shape answers a query — the read side.
- * A projection here folds one entity's events back into the write-side state
- * its invariants are checked against.
+ * It has no opinion about what the state *is*. Fold an aggregate's own events
+ * back into the write-side state its invariants are checked against; fold a
+ * stream into a read model that answers a query; fold anything whose current
+ * value is a function of the facts that produced it. Nothing here knows about
+ * `ontologic`, and the package depends on it in neither direction.
  *
- * Extend this class to create projections for your entities.
+ * A read model usually has no creation event, since nothing "creates" a view.
+ * Start it from a snapshot of its empty shape instead:
  *
- * @typeParam State - The state of the entity.
- * @typeParam Event - The events that the entity can handle.
+ * ```ts
+ * const { state, version } = projection.apply({
+ *   snapshot: { state: { booksPerAuthor: {} }, version: 0 },
+ *   events: newEvents,
+ * });
+ * ```
+ *
+ * Extend this class to create your own projections.
+ *
+ * @typeParam State - The shape being rebuilt. Must be JSON-compatible.
+ * @typeParam Event - The events this projection can fold.
  */
 export class EventProjection<
   State,
   Event extends SourceEvent,
 > implements EventProjectionInterface<State, Event> {
   #appliers: Map<Event["name"], EventApplier<Event, State>>;
-  #entityName: string;
+  #projectionName: string;
   #creationEventApplier: CreationEventApplier<Event, State> | undefined;
   #creationEventName: Event["name"] | undefined;
 
   constructor(
     /**
-     * The name of the entity.
+     * A name for this projection, used to say which one complained when it
+     * throws. Whatever you are rebuilding: `"Cart"`, `"BorrowCounts"`.
      */
-    entityName: string,
+    projectionName: string,
   ) {
-    this.#entityName = entityName;
+    this.#projectionName = projectionName;
     this.#appliers = new Map<Event["name"], EventApplier<Event, State>>();
   }
 
@@ -108,37 +126,54 @@ export class EventProjection<
   } {
     const { snapshot, events } = params;
 
-    let initialState = snapshot?.state;
-
-    let newVersion = snapshot?.version ?? 0;
-
+    let initialState: State;
+    let newVersion: number;
     let initialEventApplied = false;
 
-    if (!initialState) {
+    // Presence, not truthiness. A snapshot whose state is `0`, `""`, `false`
+    // or `null` is a legitimate snapshot — `State` is unconstrained and all of
+    // those are JSON values — and testing it for falsiness silently discarded
+    // it, sending a counter at zero down the creation path to either throw
+    // "Initial event not found" or re-initialise and return a fabricated
+    // state and version.
+    if (snapshot === undefined) {
       if (!this.#creationEventApplier) {
-        throw new Error("No creation event applier configured");
+        throw new NoCreationEventApplierError(this.#projectionName);
       }
 
-      if (
-        events.length === 0 ||
-        events[0] === undefined ||
-        events[0]?.name !== this.#creationEventName
-      ) {
-        throw new Error("Initial event not found");
+      const first = events[0];
+
+      if (first === undefined || first.name !== this.#creationEventName) {
+        throw new CreationEventNotFoundError({
+          projectionName: this.#projectionName,
+          expected: String(this.#creationEventName),
+          received: first?.name,
+        });
       }
 
-      initialState = this.#creationEventApplier({
-        event: events[0],
-      });
+      initialState = this.#creationEventApplier({ event: first });
 
-      newVersion = newVersion + 1;
+      newVersion = 1;
       initialEventApplied = true;
+    } else {
+      initialState = snapshot.state;
+      newVersion = snapshot.version;
     }
 
-    if (!isJsonValue(initialState)) {
-      throw new Error("The initial state is not JSON compatible");
+    const incoming = validateJsonValue(initialState);
+
+    if (!incoming.isValid) {
+      throw new InvalidProjectedStateError({
+        projectionName: this.#projectionName,
+        stage: "initial",
+        code: incoming.code,
+        path: incoming.path,
+        reason: incoming.reason,
+      });
     }
 
+    // Safe to clone unchecked: the check above already rejects everything
+    // `structuredClone` would refuse.
     let newState = structuredClone(initialState);
 
     for (const [index, event] of events.entries()) {
@@ -150,7 +185,12 @@ export class EventProjection<
           continue;
         }
 
-        throw new Error(`Unknown event applier: ${event.name}`);
+        throw new UnknownEventApplierError({
+          projectionName: this.#projectionName,
+          eventName: event.name,
+          eventIndex: index,
+          streamLength: events.length,
+        });
       }
 
       newState = applier({
@@ -161,8 +201,16 @@ export class EventProjection<
       newVersion = newVersion + 1;
     }
 
-    if (!isJsonValue(newState)) {
-      throw new Error("The new state is not JSON compatible");
+    const projected = validateJsonValue(newState);
+
+    if (!projected.isValid) {
+      throw new InvalidProjectedStateError({
+        projectionName: this.#projectionName,
+        stage: "projected",
+        code: projected.code,
+        path: projected.path,
+        reason: projected.reason,
+      });
     }
 
     return {
@@ -172,9 +220,10 @@ export class EventProjection<
   }
 
   /**
-   * The name of the entity.
+   * The name this projection was constructed with, as it appears in the
+   * messages and on the `projectionName` field of anything it throws.
    */
-  get entityName() {
-    return this.#entityName;
+  name(): string {
+    return this.#projectionName;
   }
 }

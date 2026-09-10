@@ -1,5 +1,5 @@
 export interface EventProjectionInterface<State, Event extends SourceEvent> {
-  entityName: string;
+  name(): string;
 
   mountEventApplier<EventName extends Event["name"]>(
     eventName: EventName,
