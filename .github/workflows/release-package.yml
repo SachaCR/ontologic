@@ -110,5 +110,19 @@ jobs:
           git push
           if [ -n "$created" ]; then git push origin "$created"; fi
 
+      # `--provenance` attaches a signed attestation linking the tarball to this
+      # workflow run and the commit it was built from, which npm shows as a
+      # "Built and signed on GitHub Actions" badge on the package page.
+      #
+      # It needs four things, all of which already hold: the `id-token: write`
+      # permission above, a public repository, a public package
+      # (`publishConfig.access` in each manifest), and a `repository` field in
+      # the manifest to link back to. It is also why a release cannot be run
+      # from a fork or a private mirror.
+      #
+      # npm's own CLI generates provenance automatically when publishing via a
+      # trusted publisher, but pnpm has its own publish implementation and does
+      # not document that behaviour, so ask for it explicitly rather than
+      # assume. Requesting what you would have got anyway costs nothing.
       - name: Publish to NPM
-        run: pnpm publish --no-git-checks --filter "${{ github.event.inputs.package }}"
+        run: pnpm publish --provenance --no-git-checks --filter "${{ github.event.inputs.package }}"
