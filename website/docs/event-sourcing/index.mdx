@@ -1,0 +1,167 @@
+---
+sidebar_position: 1
+---
+
+import CartDemo from "@site/src/components/CartDemo";
+
+# Event Sourcing
+
+Most applications store the **current state** of things. A row in a `carts` table says the cart holds two mugs. Ask it how it got there was one mug added twice, or two at once, and did the customer briefly add a tee and remove it? And the row has nothing to say. That history was overwritten the moment the state changed.
+
+**Event sourcing** inverts the storage. You persist the events (the facts) in order and you never persist the state at all. The state is what you get by replaying those facts from the beginning.
+
+That is the whole idea, and it has one consequence worth sitting with: the state is not data you keep.
+
+```bash
+pnpm add @ontologics/event-sourcing
+```
+
+---
+
+## The state is a projection of events
+
+If the events are the truth, then any state is derived and deriving it is a projection. Start from nothing, apply the first event to get the first state, apply the second event to that, and so on until the stream runs out. Whatever falls out the end is the current state.
+
+`@ontologics/event-sourcing` gives that projection a name: an **`EventProjection`**. You declare one **applier** per event name, each a small pure function from `(state, event)` to the next state, and the projection runs them in order.
+
+An applier is not a handler. It must not send a mail, write a row, or read the clock. A projection replays the whole stream on every rebuild, so anything an applier touches gets touched again every time.
+
+---
+
+## Try it
+
+The cart below is event-sourced. It starts with a single event making it existing. Then every button pushed appends one event to the stream on the right. The cart you see is not stored anywhere: it is `apply()` projecting that stream, from scratch, on every render.
+
+Hover or tab to an event to see its payload. Click one to rewind the cart to that version.
+
+<CartDemo />
+
+Three things to notice.
+
+The count and the total are **not in the state**. They are computed from the lines when the cart renders. Storing them would mean two facts that can disagree.
+
+Rewinding **destroys nothing**. Viewing v3 of 7 replays the first three events; the other four are still in the stream, dimmed, and jumping back to the head brings them right back.
+
+And while you are looking at history, the cart buttons are **disabled**. A stream is append-only: you can add a fact to the end, but you cannot go back and change one. That restriction is not the demo being careful, it is the model being honest.
+
+---
+
+## Declaring a projection
+
+Here is the projection the demo above actually runs — the same code, not an illustration of it.
+
+```typescript
+type CartLine = {
+  sku: string;
+  name: string;
+  unitPrice: number; // in cents
+  quantity: number;
+};
+
+type CartState = {
+  cartId: string;
+  currency: string;
+  lines: CartLine[];
+};
+
+const cartProjection = new EventProjection<CartState, CartEvent>("Cart");
+
+// The event that brings a cart into existence. It receives no prior state,
+// because there is none yet — which is why it is mounted separately.
+cartProjection.mountCreationEventApplier("CART_CREATED", ({ event }) => ({
+  cartId: event.payload.cartId,
+  currency: event.payload.currency,
+  lines: [],
+}));
+
+cartProjection.mountEventApplier("ITEM_ADDED", ({ event, state }) => {
+  const existing = state.lines.find((line) => line.sku === event.payload.sku);
+
+  // Adding a sku already in the cart bumps its quantity rather than opening a
+  // second line for the same product.
+  if (existing) {
+    return {
+      ...state,
+      lines: state.lines.map((line) =>
+        line.sku === event.payload.sku
+          ? { ...line, quantity: line.quantity + event.payload.quantity }
+          : line,
+      ),
+    };
+  }
+
+  return { ...state, lines: [...state.lines, { ...event.payload }] };
+});
+
+cartProjection.mountEventApplier("ITEM_REMOVED", ({ event, state }) => ({
+  ...state,
+  lines: state.lines.filter((line) => line.sku !== event.payload.sku),
+}));
+```
+
+Projecting a stream is then one call:
+
+```typescript
+const { state, version } = cartProjection.apply({
+  events: [cartCreated, mugAdded, teeAdded],
+});
+
+// state   → { cartId: "cart-7f3a", currency: "EUR", lines: [ … ] }
+// version → 3
+```
+
+The projection holds no state of its own. A snapshot goes in, a new one comes out, and nothing is kept between calls. A single instance can rebuild any number of carts, and a test can replay the same stream from any starting point.
+
+---
+
+## Snapshots keep replay cheap
+
+Replaying from the first event is correct, and for a cart with seven events it is free. For an entity with fifty thousand it is not.
+
+A **snapshot** is a state plus the version it was projected to. Hand one to `apply()` and it starts there instead of from nothing, applying only the events recorded since:
+
+```typescript
+// Fold everything once
+const first = cartProjection.apply({ events: allEvents });
+
+// Later: start from what you already have, apply only what is new
+const next = cartProjection.apply({
+  snapshot: first,
+  events: eventsRecordedSince,
+});
+```
+
+The result of `apply()` is itself a valid snapshot, so there is no separate type to build. A snapshot is a cache, never a source of truth: delete every one of them and the stream still rebuilds the same state.
+
+Note that the creation event is not replayable on top of a snapshot. A cart that already exists cannot be created again, so passing a stream that still starts with `CART_CREATED` alongside a snapshot is an error rather than a silent re-initialization.
+
+---
+
+## State must be JSON-compatible
+
+A projection deep-clones the state as it folds, and checks it before and after, so an applier cannot leak a mutation back into the snapshot you passed in. That check constrains what a state may hold: it has to survive a round trip through `JSON.parse(JSON.stringify(state))` unchanged.
+
+Rejected: `undefined`, functions, symbols, `bigint`, `NaN` and the infinities, symbol keys, circular references, and class instances or built-ins such as `Map`, `Set`, `RegExp` and `Date`.
+
+In practice that means storing a `Date` as an ISO string and a `Map` as a plain object. Which is the right shape for persisted state anyway. A projected state is a record, not a live object graph, and giving it behaviour is how it stops being either.
+
+:::warning
+`@ontologics/event-sourcing` is early. The projection side described here is what exists today; the event store and the stream-append side of the package are not written yet, so persisting and reading back a stream is still yours to provide.
+:::
+
+---
+
+## Summary
+
+| Concept                   | What it means                                                               |
+| ------------------------- | --------------------------------------------------------------------------- |
+| **Events are the truth**  | The stream is persisted; the state is derived and disposable                |
+| **`EventProjection`**     | One applier per event name, folded in order by `apply()`                    |
+| **Appliers are pure**     | `(state, event) => state` replayed on every rebuild, so no side effects     |
+| **Creation event**        | Mounted separately, takes no prior state, not replayable onto a snapshot    |
+| **Entity `version`**      | Count of events folded in. It is the optimistic-locking token               |
+| **Event `version`**       | The payload's own contract version, for evolving the event shape            |
+| **Snapshot**              | A `{ state, version }` point in time to start from; never a source of truth |
+| **JSON-compatible state** | No `Date`, `Map`, class instances or `undefined` in a projected state       |
+
+Storing facts instead of state costs you a fold and buys you the entire history.
