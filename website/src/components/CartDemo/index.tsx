@@ -25,8 +25,8 @@
  * in the browser keeps every object in one realm.
  */
 
-import type { ReactNode } from "react";
-import { useMemo, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import BrowserOnly from "@docusaurus/BrowserOnly";
 
@@ -143,6 +143,30 @@ const CATALOG: CatalogItem[] = [
 ];
 
 /**
+ * One hue per kind of fact, so the log can be read by colour before it is read
+ * by word: something began, something arrived, something left, something was
+ * adjusted. Every hex here is already in use elsewhere on the site.
+ *
+ * These are fixed colours, not theme variables, so they are only ever used for
+ * a border, a caret or a tint — never as a text colour. Amber text on the
+ * light theme's #d8dced would fail contrast, and the same value has to work on
+ * the dark theme too.
+ */
+const EVENT_ACCENTS: Record<CartEvent["name"], string> = {
+  CART_CREATED: "#6366f1",
+  ITEM_ADDED: "#10b981",
+  ITEM_REMOVED: "#ef4444",
+  ITEM_QUANTITY_CHANGED: "#f59e0b",
+};
+
+/** Matches each fruit to its own dot in the catalog row. */
+const CATALOG_ACCENTS: Record<string, string> = {
+  APPLE: "#22c55e",
+  ORANGE: "#f97316",
+  BANANA: "#eab308",
+};
+
+/**
  * The cart id is a constant, not a `randomUUID()`. The page is
  * server-rendered, so anything random here would differ between the HTML and
  * the first client render and trip a hydration mismatch.
@@ -184,6 +208,8 @@ function CartDemoClient({ className }: Props): ReactNode {
    */
   const [openVersion, setOpenVersion] = useState<number | null>(null);
 
+  const logRef = useRef<HTMLOListElement>(null);
+
   const latestVersion = events.length;
   const shown = viewedVersion ?? latestVersion;
   const isScrubbed = shown < latestVersion;
@@ -211,6 +237,60 @@ function CartDemoClient({ className }: Props): ReactNode {
       };
     }
   }, [events, shown]);
+
+  /**
+   * Keep the newest event in view: once the log overflows its panel, an
+   * appended event lands below the fold and the reader has to go looking for
+   * the thing they just caused.
+   *
+   * Keyed on the event count alone, deliberately. Depending on `shown` or
+   * `openVersion` too would mean clicking an early row to inspect it scrolled
+   * the list away from that very row.
+   */
+  useEffect(() => {
+    const log = logRef.current;
+
+    if (log) {
+      log.scrollTop = log.scrollHeight;
+    }
+  }, [events.length]);
+
+  /**
+   * Bring a freshly unfolded payload into view. Unfolding the last event was
+   * the worst case: the log is already scrolled to the bottom, so the payload
+   * opens entirely below the fold and the reader has to scroll to see the
+   * thing they just asked for.
+   *
+   * Measured with rects rather than `offsetTop`, which is relative to the
+   * nearest positioned ancestor and not to the scrollport. Only the log's own
+   * `scrollTop` is touched, never `scrollIntoView`, so the article behind the
+   * demo never moves under the reader.
+   */
+  useEffect(() => {
+    const log = logRef.current;
+
+    if (!log || openVersion === null) {
+      return;
+    }
+
+    const row = log.querySelector<HTMLElement>(
+      `[data-version="${openVersion}"]`,
+    );
+
+    if (!row) {
+      return;
+    }
+
+    const logBox = log.getBoundingClientRect();
+    const rowBox = row.getBoundingClientRect();
+
+    if (rowBox.height >= logBox.height || rowBox.top < logBox.top) {
+      // Taller than the scrollport, or hanging off the top: align its top.
+      log.scrollTop += rowBox.top - logBox.top;
+    } else if (rowBox.bottom > logBox.bottom) {
+      log.scrollTop += rowBox.bottom - logBox.bottom;
+    }
+  }, [openVersion]);
 
   if (!view.ok) {
     return (
@@ -259,20 +339,12 @@ function CartDemoClient({ className }: Props): ReactNode {
       <div className={styles.panels}>
         {/* ── Cart state ── */}
         <section className={styles.cart} aria-label="Cart state">
-          <header className={styles.cartHeader}>
-            <h4 className={styles.panelTitle}>
-              Cart state{" "}
-              <span className={styles.version}>
-                {isScrubbed ? `at v${shown}` : `v${shown}`}
-              </span>
-            </h4>
-            <p className={styles.derived}>
-              <strong>{itemCount}</strong> {itemCount === 1 ? "item" : "items"} ·{" "}
-              <strong>{formatCents(total)}</strong>
-              <span className={styles.derivedNote}>derived, not stored</span>
-            </p>
-          </header>
-
+          <h4 className={styles.panelTitle}>
+            Cart state{" "}
+            <span className={styles.version}>
+              {isScrubbed ? `at v${shown}` : `v${shown}`}
+            </span>
+          </h4>
           {state.lines.length === 0 ? (
             <p className={styles.empty}>
               The cart is empty. It has one event so far — the fact that it
@@ -345,6 +417,12 @@ function CartDemoClient({ className }: Props): ReactNode {
             </ul>
           )}
 
+          <p className={styles.derived}>
+            <strong>{itemCount}</strong> {itemCount === 1 ? "item" : "items"} ·{" "}
+            <span className={styles.total}>{formatCents(total)}</span>
+            <span className={styles.derivedNote}>derived, not stored</span>
+          </p>
+
           <div className={styles.catalog}>
             {CATALOG.map((item) => (
               <button
@@ -360,7 +438,14 @@ function CartDemoClient({ className }: Props): ReactNode {
                   })
                 }
               >
-                + {item.name}
+                <span
+                  className={styles.dot}
+                  style={
+                    { "--accent": CATALOG_ACCENTS[item.sku] } as CSSProperties
+                  }
+                  aria-hidden="true"
+                />
+                {item.name}
                 <span className={styles.addPrice}>
                   {formatCents(item.unitPrice)}
                 </span>
@@ -390,14 +475,20 @@ function CartDemoClient({ className }: Props): ReactNode {
             Event stream <span className={styles.version}>{latestVersion}</span>
           </h4>
 
-          <ol className={styles.events}>
+          <ol className={styles.events} ref={logRef}>
             {events.map((event, index) => {
               const version = index + 1;
               const isFuture = version > shown;
               const isOpen = openVersion === version;
 
               return (
-                <li key={version}>
+                <li
+                  key={version}
+                  data-version={version}
+                  style={
+                    { "--accent": EVENT_ACCENTS[event.name] } as CSSProperties
+                  }
+                >
                   <button
                     type="button"
                     className={clsx(
