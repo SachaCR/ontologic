@@ -12,6 +12,8 @@
  * buttons go disabled while scrubbed rather than rewriting history from the
  * middle, which is the whole point — an event stream is append-only.
  *
+ * Payloads unfold on click, never on hover — see the note on `openVersion`.
+ *
  * Client-only, via `BrowserOnly`, and not merely because a widget nobody can
  * click is of little use pre-hydration. `apply` deep-clones the state with
  * `structuredClone` and then checks the clone is JSON-compatible, and that
@@ -135,9 +137,9 @@ cartProjection.mountEventApplier(
 type CatalogItem = { sku: string; name: string; unitPrice: number };
 
 const CATALOG: CatalogItem[] = [
-  { sku: "MUG", name: "Ontologic Mug", unitPrice: 1200 },
-  { sku: "TEE", name: "Model What Matters Tee", unitPrice: 3600 },
-  { sku: "NOTES", name: "Domain Field Notes", unitPrice: 2400 },
+  { sku: "APPLE", name: "Apple", unitPrice: 60 },
+  { sku: "ORANGE", name: "Orange", unitPrice: 90 },
+  { sku: "BANANA", name: "Banana", unitPrice: 40 },
 ];
 
 /**
@@ -173,9 +175,14 @@ function CartDemoClient({ className }: Props): ReactNode {
   /** `null` means "follow the head of the stream". */
   const [viewedVersion, setViewedVersion] = useState<number | null>(null);
 
-  /** Payload revealed by hover or focus; falls back to the pinned row. */
+  /**
+   * Which row has its payload open. Click-only, deliberately: revealing on
+   * hover meant every mouse move re-rendered the list, and once a payload
+   * expanded it pushed the rows below it out from under the cursor — which
+   * fired mouseleave, collapsed the payload, moved the row back, and flickered
+   * for as long as the pointer sat there. With ~15 events it was unusable.
+   */
   const [openVersion, setOpenVersion] = useState<number | null>(null);
-  const [pinnedVersion, setPinnedVersion] = useState<number | null>(null);
 
   const latestVersion = events.length;
   const shown = viewedVersion ?? latestVersion;
@@ -229,7 +236,6 @@ function CartDemoClient({ className }: Props): ReactNode {
     setEvents([cartCreated()]);
     setViewedVersion(null);
     setOpenVersion(null);
-    setPinnedVersion(null);
   }
 
   /** Move the viewed version without touching which payload is revealed. */
@@ -239,16 +245,13 @@ function CartDemoClient({ className }: Props): ReactNode {
 
   function jumpToLatest() {
     setViewedVersion(null);
-    setPinnedVersion(null);
     setOpenVersion(null);
   }
 
-  /** A row click does both jobs: scrub there, and pin its payload open. */
+  /** A row click does both jobs: scrub there, and toggle its payload open. */
   function selectEvent(version: number) {
     scrubTo(version);
-    const nextPin = pinnedVersion === version ? null : version;
-    setPinnedVersion(nextPin);
-    setOpenVersion(nextPin);
+    setOpenVersion(openVersion === version ? null : version);
   }
 
   return (
@@ -400,16 +403,15 @@ function CartDemoClient({ className }: Props): ReactNode {
                     className={clsx(
                       styles.event,
                       isFuture && styles.eventFuture,
-                      pinnedVersion === version && styles.eventPinned,
+                      isOpen && styles.eventOpen,
                     )}
                     aria-expanded={isOpen}
                     aria-controls={`cart-demo-payload-${version}`}
-                    onMouseEnter={() => setOpenVersion(version)}
-                    onMouseLeave={() => setOpenVersion(pinnedVersion)}
-                    onFocus={() => setOpenVersion(version)}
-                    onBlur={() => setOpenVersion(pinnedVersion)}
                     onClick={() => selectEvent(version)}
                   >
+                    <span className={styles.caret} aria-hidden="true">
+                      ›
+                    </span>
                     <span className={styles.eventVersion}>v{version}</span>
                     <span className={styles.eventName}>{event.name}</span>
                     {isFuture && (

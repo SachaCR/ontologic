@@ -32,7 +32,7 @@ An applier is not a handler. It must not send a mail, write a row, or read the c
 
 The cart below is event-sourced. It starts with a single event making it existing. Then every button pushed appends one event to the stream on the right. The cart you see is not stored anywhere: it is `apply()` projecting that stream, from scratch, on every render.
 
-Hover or tab to an event to see its payload. Click one to rewind the cart to that version.
+Click an event to unfold its payload and rewind the cart to that version.
 
 <CartDemo />
 
@@ -103,7 +103,7 @@ Projecting a stream is then one call:
 
 ```typescript
 const { state, version } = cartProjection.apply({
-  events: [cartCreated, mugAdded, teeAdded],
+  events: [cartCreated, appleAdded, orangeAdded],
 });
 
 // state   → { cartId: "cart-7f3a", currency: "EUR", lines: [ … ] }
