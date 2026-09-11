@@ -24,13 +24,12 @@ type CounterEvent =
   | { name: "STARTED"; version: 1; payload: Record<string, never> }
   | { name: "INCREMENTED"; version: 1; payload: Record<string, never> };
 
-function buildCounter(): EventProjection<number, CounterEvent> {
-  const counter = new EventProjection<number, CounterEvent>("Counter");
-
-  counter.mountCreationEventApplier("STARTED", () => 0);
-  counter.mountEventApplier("INCREMENTED", ({ state }) => state + 1);
-
-  return counter;
+function buildCounter(): EventProjection<number, CounterEvent, "STARTED"> {
+  return new EventProjection<number, CounterEvent, "STARTED">({
+    name: "Counter",
+    creation: { event: "STARTED", applier: () => 0 },
+    appliers: { INCREMENTED: ({ state }) => state + 1 },
+  });
 }
 
 const started: CounterEvent = {
@@ -77,10 +76,11 @@ describe("Component EventProjection", () => {
     const text = new EventProjection<
       string,
       { name: "APPENDED"; version: 1; payload: { char: string } }
-    >("Text");
-
-    text.mountEventApplier("APPENDED", ({ event, state }) => {
-      return state + event.payload.char;
+    >({
+      name: "Text",
+      appliers: {
+        APPENDED: ({ event, state }) => state + event.payload.char,
+      },
     });
 
     describe("When I apply an event on top of it", () => {
@@ -100,9 +100,15 @@ describe("Component EventProjection", () => {
       // A fold over nothing returns what it started from. Notably this needs
       // no creation applier — there is nothing to create.
       test("Then it returns the snapshot unchanged", () => {
-        const projection = new EventProjection<TestState, TestEvent>(
-          "TestEntity",
-        );
+        const projection = new EventProjection<TestState, TestEvent>({
+          name: "TestEntity",
+          appliers: {
+            CreationEvent: ({ state }) => state,
+            EventA: applyTestEventA,
+            EventB: ({ state }) => state,
+            EventC: ({ state }) => state,
+          },
+        });
 
         expect(
           projection.apply({
@@ -115,11 +121,19 @@ describe("Component EventProjection", () => {
   });
 
   describe("Given no snapshot and no events", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
-    projection.mountCreationEventApplier("CreationEvent", () => ({
-      result: [],
-    }));
+    const projection = new EventProjection<
+      TestState,
+      TestEvent,
+      "CreationEvent"
+    >({
+      name: "TestEntity",
+      creation: { event: "CreationEvent", applier: () => ({ result: [] }) },
+      appliers: {
+        EventA: applyTestEventA,
+        EventB: ({ state }) => state,
+        EventC: ({ state }) => state,
+      },
+    });
 
     describe("When I apply", () => {
       test("Then it throws CREATION_EVENT_NOT_FOUND saying it was empty", () => {
@@ -136,13 +150,19 @@ describe("Component EventProjection", () => {
   });
 
   describe("Given an applier that mutates the state it is handed", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
-    projection.mountEventApplier("EventA", ({ event, state }) => {
-      // Deliberately the wrong way to write an applier. The point is that
-      // writing it this way cannot corrupt the caller's own object.
-      state.result.push("mutated by " + event.name);
-      return state;
+    const projection = new EventProjection<TestState, TestEvent>({
+      name: "TestEntity",
+      appliers: {
+        CreationEvent: ({ state }) => state,
+        // Deliberately the wrong way to write an applier. The point is that
+        // writing it this way cannot corrupt the caller's own object.
+        EventA: ({ event, state }) => {
+          state.result.push("mutated by " + event.name);
+          return state;
+        },
+        EventB: ({ state }) => state,
+        EventC: ({ state }) => state,
+      },
     });
 
     describe("When I apply it over a state object I still hold", () => {
@@ -173,9 +193,15 @@ describe("Component EventProjection", () => {
   });
 
   describe("Given a projection that has already folded a stream", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
-    projection.mountEventApplier("EventA", applyTestEventA);
+    const projection = new EventProjection<TestState, TestEvent>({
+      name: "TestEntity",
+      appliers: {
+        CreationEvent: ({ state }) => state,
+        EventA: applyTestEventA,
+        EventB: ({ state }) => state,
+        EventC: ({ state }) => state,
+      },
+    });
 
     const snapshot = { state: { result: [] as string[] }, version: 0 };
     const events = [buildTestEvent("EventA")];
@@ -215,9 +241,15 @@ describe("Component EventProjection", () => {
   });
 
   describe("Given a snapshot that came out of a previous apply", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
-    projection.mountEventApplier("EventA", applyTestEventA);
+    const projection = new EventProjection<TestState, TestEvent>({
+      name: "TestEntity",
+      appliers: {
+        CreationEvent: ({ state }) => state,
+        EventA: applyTestEventA,
+        EventB: ({ state }) => state,
+        EventC: ({ state }) => state,
+      },
+    });
 
     describe("When I feed it straight back in", () => {
       // Such a state skips the incoming JSON check — it was validated on the
@@ -291,21 +323,7 @@ describe("Component EventProjection", () => {
     });
   });
 
-  describe("Given an event name mounted twice", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
-    projection.mountEventApplier("EventA", () => ({ result: ["first"] }));
-    projection.mountEventApplier("EventA", () => ({ result: ["second"] }));
-
-    describe("When I apply that event", () => {
-      test("Then the applier mounted last wins", () => {
-        expect(
-          projection.apply({
-            snapshot: { state: { result: [] }, version: 0 },
-            events: [buildTestEvent("EventA")],
-          }).state,
-        ).toStrictEqual({ result: ["second"] });
-      });
-    });
-  });
+  // There was a test here for an event mounted twice, asserting the last
+  // applier won. It is gone because the situation is: appliers arrive as one
+  // object literal, and an object cannot carry the same key twice.
 });
