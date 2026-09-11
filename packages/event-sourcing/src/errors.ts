@@ -1,11 +1,11 @@
 /**
  * Everything `EventProjection.apply` throws.
  *
- * All four signal a programmer error — an applier that was never mounted, a
- * stream that does not begin where it claims to, a state that cannot survive
- * being persisted. None of them is a domain failure, so none is returned in a
- * result type: there is no business decision to make about them, only a bug to
- * fix.
+ * All five signal a programmer error — an applier that was never declared, a
+ * stream that does not begin where it claims to, one that replays a creation
+ * event onto state that already exists, a state that cannot survive being
+ * persisted. None of them is a domain failure, so none is returned in a result
+ * type: there is no business decision to make about them, only a bug to fix.
  *
  * They are classes rather than bare `Error`s so that a caller can branch on
  * `name` without parsing a message, and so that the context needed to fix the
@@ -16,13 +16,14 @@
 import type { JsonInvalidCode } from "./json";
 
 export type EventSourcingErrorName =
-  | "NO_CREATION_EVENT_APPLIER"
+  | "NO_CREATION_EVENT"
   | "CREATION_EVENT_NOT_FOUND"
+  | "CREATION_EVENT_REPLAYED"
   | "UNKNOWN_EVENT_APPLIER"
   | "INVALID_PROJECTED_STATE";
 
 /**
- * Base for the four. Prefixes every message with the projection's name,
+ * Base for all of them. Prefixes every message with the projection's name,
  * because a service folding a dozen projections needs to know which one
  * complained before it needs anything else.
  */
@@ -40,16 +41,20 @@ export abstract class EventSourcingError extends Error {
 
 /**
  * `apply` was called without a snapshot, so the state had to be built from a
- * creation event — and no creation event applier was ever mounted.
+ * creation event — and the config never named one.
+ *
+ * A projection with no `creationEvent` can only ever be folded onto a snapshot,
+ * which is the normal shape for a read model: nothing creates a view, so you
+ * start it from its empty shape.
  */
-export class NoCreationEventApplierError extends EventSourcingError {
-  override readonly name = "NO_CREATION_EVENT_APPLIER" as const;
+export class NoCreationEventError extends EventSourcingError {
+  override readonly name = "NO_CREATION_EVENT" as const;
 
   constructor(projectionName: string) {
     super(
       projectionName,
-      "No creation event applier configured. Give the config a " +
-        "`creation` entry, or pass a snapshot to apply from.",
+      "No creation event declared. Name one with `creationEvent` in the " +
+        "config, or pass a snapshot to fold onto.",
     );
   }
 }
@@ -88,12 +93,49 @@ export class CreationEventNotFoundError extends EventSourcingError {
 }
 
 /**
- * An event in the stream has no applier mounted for its name.
+ * The creation event turned up where a state already exists: on top of a
+ * snapshot, or partway through a stream.
  *
- * Worth reading twice when it names your creation event: replaying a stream
- * that still contains the creation event on top of a snapshot lands here,
- * because a creation applier is mounted separately and is not in the ordinary
- * applier table.
+ * Almost always a caller folding a whole stream onto a snapshot it had already
+ * folded. Left unchecked that re-runs the creation applier and hands back a
+ * freshly created state carrying a plausible version, which is far worse than
+ * an error — it is a wrong answer that looks right.
+ */
+export class CreationEventReplayedError extends EventSourcingError {
+  override readonly name = "CREATION_EVENT_REPLAYED" as const;
+
+  /** The creation event's name. */
+  readonly eventName: string;
+
+  /** Its zero-based position in the `events` array that was passed in. */
+  readonly eventIndex: number;
+
+  constructor(params: {
+    projectionName: string;
+    eventName: string;
+    eventIndex: number;
+  }) {
+    const { projectionName, eventName, eventIndex } = params;
+
+    super(
+      projectionName,
+      `Creation event ${eventName} replayed at position ${eventIndex + 1} of ` +
+        "a stream folded onto an existing state. A creation event can only be " +
+        "the first event of a fold that starts from nothing.",
+    );
+
+    this.eventName = eventName;
+    this.eventIndex = eventIndex;
+  }
+}
+
+/**
+ * An event in the stream has no applier declared for its name.
+ *
+ * The applier map is exhaustive over the event union, so this is unreachable
+ * for well-typed code. It still fires for the case that matters in production:
+ * a stream written before a new event type existed, replayed through a
+ * projection that predates it.
  */
 export class UnknownEventApplierError extends EventSourcingError {
   override readonly name = "UNKNOWN_EVENT_APPLIER" as const;

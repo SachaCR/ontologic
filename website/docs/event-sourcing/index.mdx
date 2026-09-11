@@ -71,20 +71,22 @@ const cartProjection = new EventProjection<
 >({
   name: "Cart",
 
-  // The event that brings a cart into existence. It receives no prior state,
-  // because there is none yet — which is why it is declared separately.
-  creation: {
-    event: "CART_CREATED",
-    applier: ({ event }) => ({
+  // Which event brings a cart into existence. Naming it lets a fold start from
+  // nothing, and stops a stream replaying it onto a cart that already exists.
+  creationEvent: "CART_CREATED",
+
+  // One applier per event. The map is exhaustive over `CartEvent`: leave one
+  // out and this does not compile.
+  appliers: {
+    // Declared like any other applier. The only difference is that it receives
+    // no `state` — at the first event there is none, and asking for it would
+    // not compile.
+    CART_CREATED: ({ event }) => ({
       cartId: event.payload.cartId,
       currency: event.payload.currency,
       lines: [],
     }),
-  },
 
-  // One applier per remaining event. The map is exhaustive over `CartEvent`:
-  // leave one out and this does not compile.
-  appliers: {
     ITEM_ADDED: ({ event, state }) => {
       const existing = state.lines.find(
         (line) => line.sku === event.payload.sku,
@@ -121,7 +123,6 @@ const cartProjection = new EventProjection<
     }),
   },
 });
-
 ```
 
 Projecting a stream is then one call:
@@ -158,7 +159,7 @@ const next = cartProjection.apply({
 
 The result of `apply()` is itself a valid snapshot, so there is no separate type to build. A snapshot is a cache, never a source of truth: delete every one of them and the stream still rebuilds the same state.
 
-Note that the creation event is not replayable on top of a snapshot. A cart that already exists cannot be created again, so passing a stream that still starts with `CART_CREATED` alongside a snapshot is an error rather than a silent re-initialization.
+Note that the creation event is not replayable on top of a snapshot. A cart that already exists cannot be created again, so passing a stream that still starts with `CART_CREATED` alongside a snapshot throws `CreationEventReplayedError` rather than silently re-creating the cart. That matters more than it sounds: a silent re-creation returns a brand new state carrying a version that counts on from the snapshot, which is a wrong answer that looks entirely plausible.
 
 ---
 
@@ -184,7 +185,7 @@ In practice that means storing a `Date` as an ISO string and a `Map` as a plain 
 | **`EventProjection`**     | One applier per event name, folded in order by `apply()`                    |
 | **Exhaustive appliers**   | One applier per event, checked at compile time rather than at fold time     |
 | **Appliers are pure**     | `(state, event) => state` replayed on every rebuild, so no side effects     |
-| **Creation event**        | Declared separately, takes no prior state, not replayable onto a snapshot   |
+| **Creation event**        | Declared in the same map, but receives no prior state and cannot be replayed |
 | **Entity `version`**      | Count of events folded in. It is the optimistic-locking token               |
 | **Event `version`**       | The payload's own contract version, for evolving the event shape            |
 | **Snapshot**              | A `{ state, version }` point in time to start from; never a source of truth |

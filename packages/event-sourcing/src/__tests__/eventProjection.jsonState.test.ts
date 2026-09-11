@@ -56,11 +56,9 @@ describe("Component EventProjection", () => {
       "CreationEvent"
     >({
       name: "TestEntity",
-      creation: {
-        event: "CreationEvent",
-        applier: () => ({ at: new Date(0) }),
-      },
+      creationEvent: "CreationEvent",
       appliers: {
+        CreationEvent: () => ({ at: new Date(0) }),
         EventA: ({ state }) => state,
         EventB: ({ state }) => state,
         EventC: ({ state }) => state,
@@ -68,7 +66,11 @@ describe("Component EventProjection", () => {
     });
 
     describe("When I apply the creation event without a snapshot", () => {
-      test("Then it throws INVALID_PROJECTED_STATE at the initial stage", () => {
+      // `stage` is "projected", not "initial": the creation applier is an
+      // applier like any other now, so what it returns is a projected state.
+      // "initial" has narrowed to mean one thing — the snapshot you passed in
+      // was invalid.
+      test("Then it throws INVALID_PROJECTED_STATE at the projected stage", () => {
         const error = thrownBy(() =>
           projection.apply({
             events: [buildTestEvent("CreationEvent")],
@@ -77,7 +79,7 @@ describe("Component EventProjection", () => {
 
         expect(error).toBeInstanceOf(InvalidProjectedStateError);
         expect(error).toMatchObject({
-          stage: "initial",
+          stage: "projected",
           code: "non-plain-object",
           path: "$.at",
         });

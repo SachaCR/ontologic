@@ -2,6 +2,7 @@ import { describe, test, expect } from "vitest";
 
 import {
   CreationEventNotFoundError,
+  CreationEventReplayedError,
   EventProjection,
   InvalidProjectedStateError,
 } from "../index";
@@ -27,8 +28,11 @@ type CounterEvent =
 function buildCounter(): EventProjection<number, CounterEvent, "STARTED"> {
   return new EventProjection<number, CounterEvent, "STARTED">({
     name: "Counter",
-    creation: { event: "STARTED", applier: () => 0 },
-    appliers: { INCREMENTED: ({ state }) => state + 1 },
+    creationEvent: "STARTED",
+    appliers: {
+      STARTED: () => 0,
+      INCREMENTED: ({ state }) => state + 1,
+    },
   });
 }
 
@@ -67,7 +71,7 @@ describe("Component EventProjection", () => {
             snapshot: { state: 0, version: 500 },
             events: [started, incremented],
           });
-        }).toThrow("Unknown event applier: STARTED");
+        }).toThrow(CreationEventReplayedError);
       });
     });
   });
@@ -127,8 +131,9 @@ describe("Component EventProjection", () => {
       "CreationEvent"
     >({
       name: "TestEntity",
-      creation: { event: "CreationEvent", applier: () => ({ result: [] }) },
+      creationEvent: "CreationEvent",
       appliers: {
+        CreationEvent: () => ({ result: [] }),
         EventA: applyTestEventA,
         EventB: ({ state }) => state,
         EventC: ({ state }) => state,

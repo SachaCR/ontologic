@@ -1,7 +1,8 @@
 import {
   CreationEventNotFoundError,
+  CreationEventReplayedError,
   InvalidProjectedStateError,
-  NoCreationEventApplierError,
+  NoCreationEventError,
   UnknownEventApplierError,
 } from "./errors";
 import {
@@ -26,13 +27,19 @@ import { validateJsonValue } from "./json";
  * ```ts
  * const cart = new EventProjection<CartState, CartEvent, "CART_CREATED">({
  *   name: "Cart",
- *   creation: { event: "CART_CREATED", applier: ({ event }) => … },
- *   appliers: { ITEM_ADDED: ({ event, state }) => … },
+ *   creationEvent: "CART_CREATED",
+ *   appliers: {
+ *     CART_CREATED: ({ event }) => …,          // no state yet to receive
+ *     ITEM_ADDED: ({ event, state }) => …,
+ *   },
  * });
  * ```
  *
- * Because `appliers` is a mapped type over the event union, a forgotten
- * applier is a compile error rather than a surprise at fold time.
+ * Every applier is declared the same way. The creation event's is the one that
+ * receives no `state`, because at the first event there is none — asking for it
+ * does not compile. Because `appliers` is a mapped type over the whole event
+ * union, a forgotten applier is a compile error rather than a surprise at fold
+ * time.
  *
  * It has no opinion about what the state *is*. Fold an aggregate's own events
  * back into the write-side state its invariants are checked against; fold a
@@ -41,7 +48,8 @@ import { validateJsonValue } from "./json";
  * `ontologic`, and the package depends on it in neither direction.
  *
  * A read model usually has no creation event, since nothing "creates" a view.
- * Start it from a snapshot of its empty shape instead:
+ * Leave `creationEvent` off, and every applier becomes an ordinary one; start
+ * the fold from a snapshot of the model's empty shape:
  *
  * ```ts
  * const { state, version } = projection.apply({
@@ -63,9 +71,15 @@ export class EventProjection<
   Event extends SourceEvent,
   CreationName extends Event["name"] = never,
 > implements EventProjectionInterface<State, Event> {
+  /**
+   * Every applier, the creation one included. It is stored under the ordinary
+   * `EventApplier` type because the two differ only in whether they read
+   * `state`, and a function that ignores an argument is compatible with one
+   * that takes it. The config type is what keeps the distinction honest at the
+   * declaration site.
+   */
   #appliers: Map<Event["name"], EventApplier<Event, State>>;
   #projectionName: string;
-  #creationEventApplier: CreationEventApplier<Event, State> | undefined;
   #creationEventName: Event["name"] | undefined;
 
   constructor(config: EventProjectionConfig<State, Event, CreationName>) {
@@ -81,10 +95,7 @@ export class EventProjection<
       );
     }
 
-    this.#creationEventName = config.creation?.event;
-    this.#creationEventApplier = config.creation?.applier as
-      | CreationEventApplier<Event, State>
-      | undefined;
+    this.#creationEventName = config.creationEvent;
   }
 
   /**
@@ -93,12 +104,12 @@ export class EventProjection<
    */
   apply(params: {
     /**
-     * The starting point to apply events on top of. If not provided, the initial
-     * state will be created using the creation event applier on the first event
-     * of the array.
+     * The starting point to fold events onto. Omit it and the state is built
+     * from the creation event, which must then be the first event in the array.
      *
-     * Throws if it is omitted and the first event is not the creation event, or
-     * if it is omitted and no creation event applier has been mounted.
+     * Throws if omitted and the config named no `creationEvent`, or if omitted
+     * and the stream does not start with it. Pass one and the stream must *not*
+     * contain the creation event at all.
      */
     snapshot?: Snapshot<State>;
 
@@ -119,9 +130,8 @@ export class EventProjection<
   } {
     const { snapshot, events } = params;
 
-    let initialState: State;
+    let newState: State;
     let newVersion: number;
-    let initialEventApplied = false;
 
     // Presence, not truthiness. A snapshot whose state is `0`, `""`, `false`
     // or `null` is a legitimate snapshot — `State` is unconstrained and all of
@@ -129,9 +139,11 @@ export class EventProjection<
     // it, sending a counter at zero down the creation path to either throw
     // "Initial event not found" or re-initialise and return a fabricated
     // state and version.
+    const startsFromNothing = snapshot === undefined;
+
     if (snapshot === undefined) {
-      if (!this.#creationEventApplier) {
-        throw new NoCreationEventApplierError(this.#projectionName);
+      if (this.#creationEventName === undefined) {
+        throw new NoCreationEventError(this.#projectionName);
       }
 
       const first = events[0];
@@ -144,40 +156,64 @@ export class EventProjection<
         });
       }
 
-      initialState = this.#creationEventApplier({ event: first });
+      // The creation applier lives in the same map as the others; only its
+      // signature differs, and the config type is what enforced that. Here it
+      // is called with no state, because there is none yet.
+      const creationApplier = this.#appliers.get(first.name) as unknown as
+        | CreationEventApplier<Event, State>
+        | undefined;
 
+      if (creationApplier === undefined) {
+        throw new UnknownEventApplierError({
+          projectionName: this.#projectionName,
+          eventName: first.name,
+          eventIndex: 0,
+          streamLength: events.length,
+        });
+      }
+
+      // Nothing to validate on the way in and nothing to clone: this state is
+      // built here and nobody else holds a reference to it. The check after
+      // the fold covers what the applier returned.
+      newState = creationApplier({ event: first });
       newVersion = 1;
-      initialEventApplied = true;
     } else {
-      initialState = snapshot.state;
+      const incoming = validateJsonValue(snapshot.state);
+
+      if (!incoming.isValid) {
+        throw new InvalidProjectedStateError({
+          projectionName: this.#projectionName,
+          stage: "initial",
+          code: incoming.code,
+          path: incoming.path,
+          reason: incoming.reason,
+        });
+      }
+
+      // Safe to clone unchecked: the check above already rejects everything
+      // `structuredClone` would refuse. The clone is what stops an applier
+      // mutating the caller's own snapshot object.
+      newState = structuredClone(snapshot.state);
       newVersion = snapshot.version;
     }
 
-    const incoming = validateJsonValue(initialState);
-
-    if (!incoming.isValid) {
-      throw new InvalidProjectedStateError({
-        projectionName: this.#projectionName,
-        stage: "initial",
-        code: incoming.code,
-        path: incoming.path,
-        reason: incoming.reason,
-      });
-    }
-
-    // Safe to clone unchecked: the check above already rejects everything
-    // `structuredClone` would refuse.
-    let newState = structuredClone(initialState);
-
     for (const [index, event] of events.entries()) {
+      if (index === 0 && startsFromNothing) {
+        // Already folded above, as the creation event.
+        continue;
+      }
+
+      if (event.name === this.#creationEventName) {
+        throw new CreationEventReplayedError({
+          projectionName: this.#projectionName,
+          eventName: event.name,
+          eventIndex: index,
+        });
+      }
+
       const applier = this.#appliers.get(event.name);
 
       if (!applier) {
-        if (index === 0 && initialEventApplied) {
-          // Skip the creation event, as it has already been applied
-          continue;
-        }
-
         throw new UnknownEventApplierError({
           projectionName: this.#projectionName,
           eventName: event.name,

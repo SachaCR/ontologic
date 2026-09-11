@@ -3,8 +3,8 @@ import { describe, test, expect } from "vitest";
 import {
   CreationEventNotFoundError,
   EventProjection,
-  NoCreationEventApplierError,
-  UnknownEventApplierError,
+  NoCreationEventError,
+  CreationEventReplayedError,
 } from "../index";
 
 import {
@@ -38,16 +38,16 @@ describe("Component EventProjection", () => {
     ];
 
     describe("When I apply events without initial state", () => {
-      test("Then it throws NO_CREATION_EVENT_APPLIER", () => {
+      test("Then it throws NO_CREATION_EVENT", () => {
         const error = thrownBy(() =>
           testProjection.apply({
             events: eventList,
           }),
         );
 
-        expect(error).toBeInstanceOf(NoCreationEventApplierError);
+        expect(error).toBeInstanceOf(NoCreationEventError);
         expect(error).toMatchObject({
-          name: "NO_CREATION_EVENT_APPLIER",
+          name: "NO_CREATION_EVENT",
           projectionName: "TestEntity",
         });
       });
@@ -61,8 +61,9 @@ describe("Component EventProjection", () => {
       "CreationEvent"
     >({
       name: "TestEntity",
-      creation: { event: "CreationEvent", applier: applyCreationEvent },
+      creationEvent: "CreationEvent",
       appliers: {
+        CreationEvent: applyCreationEvent,
         EventA: applyTestEventA,
         EventB: applyTestEventB,
         EventC: applyTestEventC,
@@ -163,7 +164,7 @@ describe("Component EventProjection", () => {
           buildTestEvent("EventC"),
         ];
 
-        test("Then it throws UNKNOWN_EVENT_APPLIER for the creation event", () => {
+        test("Then it throws CREATION_EVENT_REPLAYED", () => {
           const error = thrownBy(() =>
             testProjection.apply({
               snapshot: {
@@ -174,12 +175,12 @@ describe("Component EventProjection", () => {
             }),
           );
 
-          expect(error).toBeInstanceOf(UnknownEventApplierError);
+          expect(error).toBeInstanceOf(CreationEventReplayedError);
           expect(error).toMatchObject({
-            name: "UNKNOWN_EVENT_APPLIER",
+            name: "CREATION_EVENT_REPLAYED",
+            projectionName: "TestEntity",
             eventName: "CreationEvent",
             eventIndex: 0,
-            streamLength: 4,
           });
         });
       });
