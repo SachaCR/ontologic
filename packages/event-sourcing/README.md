@@ -45,26 +45,39 @@ interface BookState {
   borrowedBy: string | null;
 }
 
-export class BookProjection extends EventProjection<BookState, BookEvent> {
+export class BookProjection extends EventProjection<
+  BookState,
+  BookEvent,
+  "BOOK_ADDED"
+> {
   constructor() {
-    super("Book");
+    super({
+      name: "Book",
 
-    // The one event that brings a book into existence: no prior state to fold onto.
-    this.mountCreationEventApplier("BOOK_ADDED", ({ event }) => ({
-      bookId: event.payload.bookId,
-      title: event.payload.title,
-      borrowedBy: null,
-    }));
+      // The one event that brings a book into existence: no prior state to
+      // fold onto, so its applier receives only the event.
+      creation: {
+        event: "BOOK_ADDED",
+        applier: ({ event }) => ({
+          bookId: event.payload.bookId,
+          title: event.payload.title,
+          borrowedBy: null,
+        }),
+      },
 
-    this.mountEventApplier("BOOK_BORROWED", ({ event, state }) => ({
-      ...state,
-      borrowedBy: event.payload.memberId,
-    }));
+      // One entry per remaining event. Leave one out and this will not compile.
+      appliers: {
+        BOOK_BORROWED: ({ event, state }) => ({
+          ...state,
+          borrowedBy: event.payload.memberId,
+        }),
 
-    this.mountEventApplier("BOOK_RETURNED", ({ state }) => ({
-      ...state,
-      borrowedBy: null,
-    }));
+        BOOK_RETURNED: ({ state }) => ({
+          ...state,
+          borrowedBy: null,
+        }),
+      },
+    });
   }
 }
 ```
@@ -140,14 +153,17 @@ Declare the events the model is interested in:
 /** memberId → how many books they have borrowed. */
 type BorrowCounts = Record<string, number>;
 
-const borrowCounts = new EventProjection<BorrowCounts, BookBorrowed>(
-  "BorrowCounts",
-);
-
-borrowCounts.mountEventApplier("BOOK_BORROWED", ({ event, state }) => ({
-  ...state,
-  [event.payload.memberId]: (state[event.payload.memberId] ?? 0) + 1,
-}));
+// No `creation`: nothing brings a read model into existence, so every event
+// in the declared union needs an applier and `apply` needs a snapshot.
+const borrowCounts = new EventProjection<BorrowCounts, BookBorrowed>({
+  name: "BorrowCounts",
+  appliers: {
+    BOOK_BORROWED: ({ event, state }) => ({
+      ...state,
+      [event.payload.memberId]: (state[event.payload.memberId] ?? 0) + 1,
+    }),
+  },
+});
 
 // Whatever your store handed you since the last run.
 declare const eventsSinceLastRun: BookEvent[];
@@ -226,19 +242,63 @@ Accepted, by design: sparse arrays (holes come back as `null`) and null-prototyp
 
 ### `class EventProjection<State, Event extends SourceEvent>`
 
-| Member                                          | Description                                                                                                      |
-| ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| `constructor(projectionName: string)`           | Names this projection, so its errors can say which one complained.                                               |
-| `mountEventApplier(eventName, applier)`         | Registers `({ event, state }) => State` for one event name. Mounting twice for the same name replaces the first. |
-| `mountCreationEventApplier(eventName, applier)` | Registers `({ event }) => State` for the event that creates the entity.                                          |
-| `apply({ snapshot?, events })`                  | Folds `events` and returns `{ state, version }`.                                                                 |
-| `name()`                                        | The name given to the constructor.                                                                               |
+| Member                         | Description                                                                                                                                              |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constructor(config)`          | Takes `{ name, creation?, appliers }`. Everything is fixed at construction; there is no mounting afterwards.                                             |
+| `config.name`                  | Names this projection, so its errors can say which one complained.                                                                                       |
+| `config.appliers`              | One `({ event, state }) => State` per event name. Exhaustive: a missing entry is a compile error.                                                        |
+| `config.creation`              | `{ event, applier }` for the event that creates the state, where the applier receives only `{ event }`. Omit it for a projection with no creation event. |
+| `apply({ snapshot?, events })` | Folds `events` and returns `{ state, version }`.                                                                                                         |
+| `name()`                       | The name given to the constructor.                                                                                                                       |
 
 ### `interface SourceEvent`
 
-The minimum an event must provide: `name`, `version` and `payload`. Appliers are matched on `name`
-alone; `version` describes the event's own shape, and the entity version in the result is derived
-by counting the events applied.
+The minimum an event must provide: `name`, `version` and `payload`.
+
+Appliers are keyed on `name` alone, so `version` is never read by the projection. It is there for
+_your_ appliers: when a union carries two versions of the same event, `Extract` on the name hands
+the applier both, and `version` is the discriminant that narrows the payload.
+
+```ts
+type BookAddedV1 = {
+  name: "BOOK_ADDED";
+  version: 1;
+  payload: { title: string };
+};
+
+type BookAddedV2 = {
+  name: "BOOK_ADDED";
+  version: 2;
+  payload: { title: string; isbn: string };
+};
+
+type CatalogEvent = BookAddedV1 | BookAddedV2;
+type CatalogState = { title: string; isbn: string | null };
+
+const catalog = new EventProjection<CatalogState, CatalogEvent>({
+  name: "Catalog",
+  appliers: {
+    // Both versions land in this one applier, because the map is keyed on the
+    // name. `version` is the discriminant that narrows the payload, so the
+    // older shape stays readable without a cast.
+    BOOK_ADDED: ({ event, state }) => ({
+      ...state,
+      title: event.payload.title,
+      isbn: event.version === 2 ? event.payload.isbn : null,
+    }),
+  },
+});
+```
+
+That is also why it is required rather than optional: an event with no version cannot be evolved
+later without breaking every reader. The entity version that `apply` returns is a different number
+entirely, derived by counting the events folded.
+
+There is deliberately no `entityId`, and no other notion of stream identity. A projection folds the
+events it is handed, in the order it is handed them; deciding which events belong together is the
+caller's job. That is what lets the same primitive rebuild one aggregate from its own stream and a
+read model from many — a read model legitimately folds events from thousands of entities, so there
+is no identity the library could check for you.
 
 Any object of that shape will do, wherever it came from. `ontologic`'s `DomainEvent` happens to
 satisfy it structurally. It exposes `name`, `version` and `payload` as getters. Though nothing in
@@ -272,5 +332,17 @@ before handing it over rather than after.
 
 ## Status
 
-Early. `EventProjection` is the whole public API today; the event store is still yours to provide. Expect additions rather
-than changes to what is here, but the package is pre-1.0 and the surface is not frozen.
+Early, but the shape is settled. `EventProjection` is the whole public API today and the event store
+is still yours to provide.
+
+Three questions came up repeatedly and are now decided, so they are worth stating rather than
+leaving as omissions a reader has to guess at:
+
+| Question                                                        | Decision                                                                                                                   |
+| --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| How are appliers registered?                                    | In one config object at construction, checked exhaustively. There is no mounting afterwards.                               |
+| Why must every event carry a `version` the library never reads? | So an applier can narrow a payload when one event name has more than one shape.                                            |
+| Why is there no `entityId`?                                     | Stream identity belongs to the caller. A read model folds many entities' events, so there is nothing universal to enforce. |
+
+Expect additions rather than changes from here. The package is still pre-1.0, so that is an
+intention rather than a guarantee, but the surface above is the one meant to last.

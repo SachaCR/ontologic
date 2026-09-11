@@ -3,8 +3,10 @@ import { describe, expectTypeOf, test } from "vitest";
 import { EventProjection } from "../index";
 
 import {
+  applyCreationEvent,
   applyTestEventA,
   applyTestEventB,
+  applyTestEventC,
   type CreationEvent,
   type TestEvent,
   type TestEventA,
@@ -18,39 +20,54 @@ import {
  * `pnpm typecheck` fail when one stops holding, and `vitest --typecheck` runs
  * the `expectTypeOf` half as reported tests.
  *
- * They exist because every other suite in this package mounts a *correct*
- * applier, which proves valid code compiles and says nothing about whether
- * invalid code is refused. The per-event narrowing is the package's headline
- * feature and could be loosened to accept anything without a single runtime
- * test noticing.
+ * They exist because every other suite in this package builds a *correct*
+ * projection, which proves valid code compiles and says nothing about whether
+ * invalid code is refused. Two of the package's guarantees live entirely in
+ * the type system and would otherwise have no test at all: the per-event
+ * narrowing, and the exhaustiveness of the applier map.
  */
 
 describe("Component EventProjection types", () => {
-  describe("Given an applier mounted for one event name", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
+  describe("Given an applier declared for one event name", () => {
     test("Then its event is narrowed to that event, not the union", () => {
-      projection.mountEventApplier("EventA", ({ event, state }) => {
-        expectTypeOf(event).toEqualTypeOf<TestEventA>();
-        expectTypeOf(state).toEqualTypeOf<TestState>();
+      new EventProjection<TestState, TestEvent, "CreationEvent">({
+        name: "TestEntity",
+        creation: { event: "CreationEvent", applier: applyCreationEvent },
+        appliers: {
+          EventA: ({ event, state }) => {
+            expectTypeOf(event).toEqualTypeOf<TestEventA>();
+            expectTypeOf(state).toEqualTypeOf<TestState>();
 
-        // The point of the narrowing: a payload typed per event. On the union
-        // this would be the union of all four payload shapes.
-        expectTypeOf(event.payload).toEqualTypeOf<{ message: string }>();
+            // The point of the narrowing: a payload typed per event. On the
+            // union this would be the union of all four payload shapes.
+            expectTypeOf(event.payload).toEqualTypeOf<{ message: string }>();
 
-        return state;
+            return state;
+          },
+          EventB: applyTestEventB,
+          EventC: applyTestEventC,
+        },
       });
     });
   });
 
-  describe("Given a creation event applier", () => {
-    const projection = new EventProjection<TestState, TestEvent>("TestEntity");
-
+  describe("Given a creation applier", () => {
     test("Then it receives the event and no incoming state", () => {
-      projection.mountCreationEventApplier("CreationEvent", (params) => {
-        expectTypeOf(params).toEqualTypeOf<{ event: CreationEvent }>();
+      new EventProjection<TestState, TestEvent, "CreationEvent">({
+        name: "TestEntity",
+        creation: {
+          event: "CreationEvent",
+          applier: (params) => {
+            expectTypeOf(params).toEqualTypeOf<{ event: CreationEvent }>();
 
-        return { result: [] };
+            return { result: [] };
+          },
+        },
+        appliers: {
+          EventA: applyTestEventA,
+          EventB: applyTestEventB,
+          EventC: applyTestEventC,
+        },
       });
     });
   });
@@ -77,49 +94,126 @@ declare const wholeStream: TestEvent[];
  * Every statement in here must fail to compile.
  *
  * `@ts-expect-error` is the assertion: TypeScript reports an unused directive
- * if the line below it ever starts compiling, so each one is a guard against
- * the types becoming *more* permissive.
+ * if the line below it ever starts compiling, so each one guards against the
+ * types becoming *more* permissive.
  *
  * Exported and never called. Exported so `noUnusedLocals` is satisfied, never
  * called because `wholeStream` above is a declaration with no runtime value.
  */
 export function negativeCases(): void {
-  const projection = new EventProjection<TestState, TestEvent>("Negative");
+  // ── The applier map is exhaustive ────────────────────────────────────────
 
-  // An applier typed for one event cannot be mounted under another's name.
-  // This is the assertion that the narrowing actually narrows: without
-  // `Extract`, both appliers would take the whole union and this would compile.
-  // @ts-expect-error
-  projection.mountEventApplier("EventA", applyTestEventB);
+  // EventC is missing. This is the guarantee the config object exists for:
+  // before it, a forgotten applier was an UnknownEventApplierError the first
+  // time that event turned up in a stream.
+  new EventProjection<TestState, TestEvent, "CreationEvent">({
+    name: "Missing",
+    creation: { event: "CreationEvent", applier: applyCreationEvent },
+    // @ts-expect-error
+    appliers: {
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+    },
+  });
 
-  // An event name outside the declared union is not mountable.
-  // @ts-expect-error
-  projection.mountEventApplier("NotAnEvent", applyTestEventA);
+  // The creation event is excluded from the map, so it cannot also pick up an
+  // ordinary applier and end up folded twice.
+  new EventProjection<TestState, TestEvent, "CreationEvent">({
+    name: "Doubled",
+    creation: { event: "CreationEvent", applier: applyCreationEvent },
+    appliers: {
+      // @ts-expect-error
+      CreationEvent: applyTestEventA,
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
 
-  // Nor as a creation event.
-  // @ts-expect-error
-  projection.mountCreationEventApplier("NotAnEvent", () => ({ result: [] }));
+  // Without a declared creation event, every name is required — including the
+  // one that would otherwise have been it.
+  new EventProjection<TestState, TestEvent>({
+    name: "NoCreation",
+    // @ts-expect-error
+    appliers: {
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
 
-  // A creation applier's params carry no `state` to destructure.
-  // @ts-expect-error
-  projection.mountCreationEventApplier("CreationEvent", ({ state }) => state);
+  // ── Appliers are matched to their event ─────────────────────────────────
 
-  // An applier has to return the projection's State.
-  // @ts-expect-error
-  projection.mountEventApplier("EventA", () => ({ wrong: true }));
+  new EventProjection<TestState, TestEvent>({
+    name: "Mismatched",
+    appliers: {
+      CreationEvent: ({ state }) => state,
+      // An applier typed for EventB cannot sit under EventA's key. Without
+      // `Extract`, both would take the whole union and this would compile.
+      // @ts-expect-error
+      EventA: applyTestEventB,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
+
+  new EventProjection<TestState, TestEvent>({
+    name: "UnknownKey",
+    appliers: {
+      CreationEvent: ({ state }) => state,
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+      // @ts-expect-error
+      NotAnEvent: applyTestEventA,
+    },
+  });
+
+  new EventProjection<TestState, TestEvent>({
+    name: "WrongReturn",
+    appliers: {
+      CreationEvent: ({ state }) => state,
+      // @ts-expect-error
+      EventA: () => ({ wrong: true }),
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
+
+  new EventProjection<TestState, TestEvent, "CreationEvent">({
+    name: "CreationWantsState",
+    // A creation applier's params carry no `state` to destructure.
+    // @ts-expect-error
+    creation: { event: "CreationEvent", applier: ({ state }) => state },
+    appliers: {
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
+
+  // ── apply ───────────────────────────────────────────────────────────────
+
+  const projection = new EventProjection<TestState, TestEvent>({
+    name: "Negative",
+    appliers: {
+      CreationEvent: ({ state }) => state,
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
 
   // `events` is not optional: folding requires a stream, even an empty one.
   // @ts-expect-error
   projection.apply({ snapshot: { state: { result: [] }, version: 0 } });
 
-  // A snapshot's state has to be the projection's State.
   projection.apply({
     // @ts-expect-error
     snapshot: { state: { wrong: 1 }, version: 0 },
     events: [],
   });
 
-  // A version is not optional either.
   projection.apply({
     // @ts-expect-error
     snapshot: { state: { result: [] } },
@@ -131,7 +225,10 @@ export function negativeCases(): void {
    * events the model cares about and the compiler refuses the raw stream, so
    * filtering it is an obligation rather than something to remember.
    */
-  const narrow = new EventProjection<TestState, TestEventA>("Narrow");
+  const narrow = new EventProjection<TestState, TestEventA>({
+    name: "Narrow",
+    appliers: { EventA: applyTestEventA },
+  });
 
   narrow.apply({
     snapshot: { state: { result: [] }, version: 0 },

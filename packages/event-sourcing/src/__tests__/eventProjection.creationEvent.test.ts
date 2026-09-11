@@ -20,13 +20,16 @@ import {
 
 describe("Component EventProjection", () => {
   describe("Given an event projection without creation event applier", () => {
-    const testProjection = new EventProjection<TestState, TestEvent>(
-      "TestEntity",
-    );
-
-    testProjection.mountEventApplier("EventA", applyTestEventA);
-    testProjection.mountEventApplier("EventB", applyTestEventB);
-    testProjection.mountEventApplier("EventC", applyTestEventC);
+    // No `creation`, so `apply` has nothing to build a first state from.
+    const testProjection = new EventProjection<TestState, TestEvent>({
+      name: "TestEntity",
+      appliers: {
+        CreationEvent: ({ state }) => state,
+        EventA: applyTestEventA,
+        EventB: applyTestEventB,
+        EventC: applyTestEventC,
+      },
+    });
 
     const eventList = [
       buildTestEvent("EventA"),
@@ -52,18 +55,19 @@ describe("Component EventProjection", () => {
   });
 
   describe("Given an event projection with creation event applier", () => {
-    const testProjection = new EventProjection<TestState, TestEvent>(
-      "TestEntity",
-    );
-
-    testProjection.mountCreationEventApplier(
-      "CreationEvent",
-      applyCreationEvent,
-    );
-
-    testProjection.mountEventApplier("EventA", applyTestEventA);
-    testProjection.mountEventApplier("EventB", applyTestEventB);
-    testProjection.mountEventApplier("EventC", applyTestEventC);
+    const testProjection = new EventProjection<
+      TestState,
+      TestEvent,
+      "CreationEvent"
+    >({
+      name: "TestEntity",
+      creation: { event: "CreationEvent", applier: applyCreationEvent },
+      appliers: {
+        EventA: applyTestEventA,
+        EventB: applyTestEventB,
+        EventC: applyTestEventC,
+      },
+    });
 
     describe("When I apply events without initial state", () => {
       describe("And the first event is a creation event", () => {

@@ -64,39 +64,64 @@ type CartState = {
   lines: CartLine[];
 };
 
-const cartProjection = new EventProjection<CartState, CartEvent>("Cart");
+const cartProjection = new EventProjection<
+  CartState,
+  CartEvent,
+  "CART_CREATED"
+>({
+  name: "Cart",
 
-// The event that brings a cart into existence. It receives no prior state,
-// because there is none yet — which is why it is mounted separately.
-cartProjection.mountCreationEventApplier("CART_CREATED", ({ event }) => ({
-  cartId: event.payload.cartId,
-  currency: event.payload.currency,
-  lines: [],
-}));
+  // The event that brings a cart into existence. It receives no prior state,
+  // because there is none yet — which is why it is declared separately.
+  creation: {
+    event: "CART_CREATED",
+    applier: ({ event }) => ({
+      cartId: event.payload.cartId,
+      currency: event.payload.currency,
+      lines: [],
+    }),
+  },
 
-cartProjection.mountEventApplier("ITEM_ADDED", ({ event, state }) => {
-  const existing = state.lines.find((line) => line.sku === event.payload.sku);
+  // One applier per remaining event. The map is exhaustive over `CartEvent`:
+  // leave one out and this does not compile.
+  appliers: {
+    ITEM_ADDED: ({ event, state }) => {
+      const existing = state.lines.find(
+        (line) => line.sku === event.payload.sku,
+      );
 
-  // Adding a sku already in the cart bumps its quantity rather than opening a
-  // second line for the same product.
-  if (existing) {
-    return {
+      // Adding a sku already in the cart bumps its quantity rather than
+      // opening a second line for the same product.
+      if (existing) {
+        return {
+          ...state,
+          lines: state.lines.map((line) =>
+            line.sku === event.payload.sku
+              ? { ...line, quantity: line.quantity + event.payload.quantity }
+              : line,
+          ),
+        };
+      }
+
+      return { ...state, lines: [...state.lines, { ...event.payload }] };
+    },
+
+    ITEM_REMOVED: ({ event, state }) => ({
+      ...state,
+      lines: state.lines.filter((line) => line.sku !== event.payload.sku),
+    }),
+
+    ITEM_QUANTITY_CHANGED: ({ event, state }) => ({
       ...state,
       lines: state.lines.map((line) =>
         line.sku === event.payload.sku
-          ? { ...line, quantity: line.quantity + event.payload.quantity }
+          ? { ...line, quantity: event.payload.quantity }
           : line,
       ),
-    };
-  }
-
-  return { ...state, lines: [...state.lines, { ...event.payload }] };
+    }),
+  },
 });
 
-cartProjection.mountEventApplier("ITEM_REMOVED", ({ event, state }) => ({
-  ...state,
-  lines: state.lines.filter((line) => line.sku !== event.payload.sku),
-}));
 ```
 
 Projecting a stream is then one call:
@@ -157,8 +182,9 @@ In practice that means storing a `Date` as an ISO string and a `Map` as a plain 
 | ------------------------- | --------------------------------------------------------------------------- |
 | **Events are the truth**  | The stream is persisted; the state is derived and disposable                |
 | **`EventProjection`**     | One applier per event name, folded in order by `apply()`                    |
+| **Exhaustive appliers**   | One applier per event, checked at compile time rather than at fold time     |
 | **Appliers are pure**     | `(state, event) => state` replayed on every rebuild, so no side effects     |
-| **Creation event**        | Mounted separately, takes no prior state, not replayable onto a snapshot    |
+| **Creation event**        | Declared separately, takes no prior state, not replayable onto a snapshot   |
 | **Entity `version`**      | Count of events folded in. It is the optimistic-locking token               |
 | **Event `version`**       | The payload's own contract version, for evolving the event shape            |
 | **Snapshot**              | A `{ state, version }` point in time to start from; never a source of truth |

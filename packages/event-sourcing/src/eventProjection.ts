@@ -7,6 +7,7 @@ import {
 import {
   type CreationEventApplier,
   type EventApplier,
+  type EventProjectionConfig,
   type EventProjectionInterface,
   type Snapshot,
   type SourceEvent,
@@ -16,11 +17,22 @@ import { validateJsonValue } from "./json";
 /**
  * Rebuilds a state by folding a stream of events onto a snapshot.
  *
- * Mount one applier per event name, then call {@link EventProjection.apply}.
- * The projection is pure and holds no state of its own: a snapshot and a list
- * of events go in, a new `{ state, version }` comes out. The same projection
- * can therefore rebuild the same stream from any starting point, which is what
- * makes it cheap to test.
+ * Built from one config carrying an applier per event, then folded with
+ * {@link EventProjection.apply}. The projection is pure and holds no state of
+ * its own: a snapshot and a list of events go in, a new `{ state, version }`
+ * comes out. The same projection can therefore rebuild the same stream from any
+ * starting point, which is what makes it cheap to test.
+ *
+ * ```ts
+ * const cart = new EventProjection<CartState, CartEvent, "CART_CREATED">({
+ *   name: "Cart",
+ *   creation: { event: "CART_CREATED", applier: ({ event }) => … },
+ *   appliers: { ITEM_ADDED: ({ event, state }) => … },
+ * });
+ * ```
+ *
+ * Because `appliers` is a mapped type over the event union, a forgotten
+ * applier is a compile error rather than a surprise at fold time.
  *
  * It has no opinion about what the state *is*. Fold an aggregate's own events
  * back into the write-side state its invariants are checked against; fold a
@@ -42,56 +54,37 @@ import { validateJsonValue } from "./json";
  *
  * @typeParam State - The shape being rebuilt. Must be JSON-compatible.
  * @typeParam Event - The events this projection can fold.
+ * @typeParam CreationName - The creation event's name, or `never` when there
+ * is none. Written out explicitly because TypeScript cannot infer one type
+ * argument while others are given.
  */
 export class EventProjection<
   State,
   Event extends SourceEvent,
+  CreationName extends Event["name"] = never,
 > implements EventProjectionInterface<State, Event> {
   #appliers: Map<Event["name"], EventApplier<Event, State>>;
   #projectionName: string;
   #creationEventApplier: CreationEventApplier<Event, State> | undefined;
   #creationEventName: Event["name"] | undefined;
 
-  constructor(
-    /**
-     * A name for this projection, used to say which one complained when it
-     * throws. Whatever you are rebuilding: `"Cart"`, `"BorrowCounts"`.
-     */
-    projectionName: string,
-  ) {
-    this.#projectionName = projectionName;
+  constructor(config: EventProjectionConfig<State, Event, CreationName>) {
+    this.#projectionName = config.name;
     this.#appliers = new Map<Event["name"], EventApplier<Event, State>>();
-  }
 
-  /**
-   * Mounts an applier for a specific event name. If you mount two appliers for the same event name. The first one will be replaced.
-   * @param eventName - The name of the event.
-   * @param eventApplier - The applier for the event.
-   */
-  mountEventApplier<EventName extends Event["name"]>(
-    eventName: EventName,
-    eventApplier: EventApplier<Extract<Event, { name: EventName }>, State>,
-  ): void {
-    this.#appliers.set(eventName, eventApplier as EventApplier<Event, State>);
-  }
+    // The mapped type has already guaranteed one entry per event name; the
+    // casts only restate for the runtime what the config type proved.
+    for (const [eventName, applier] of Object.entries(config.appliers)) {
+      this.#appliers.set(
+        eventName as Event["name"],
+        applier as EventApplier<Event, State>,
+      );
+    }
 
-  /**
-   * Mounts the applier that will be used to create the initial state of the entity.
-   * @param eventName - The name of the creation event.
-   * @param eventApplier - The applier for the creation event.
-   */
-  mountCreationEventApplier<EventName extends Event["name"]>(
-    eventName: EventName,
-    eventApplier: CreationEventApplier<
-      Extract<Event, { name: EventName }>,
-      State
-    >,
-  ): void {
-    this.#creationEventApplier = eventApplier as CreationEventApplier<
-      Event,
-      State
-    >;
-    this.#creationEventName = eventName;
+    this.#creationEventName = config.creation?.event;
+    this.#creationEventApplier = config.creation?.applier as
+      | CreationEventApplier<Event, State>
+      | undefined;
   }
 
   /**

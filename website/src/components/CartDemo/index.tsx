@@ -90,49 +90,61 @@ type CartEvent = CartCreated | ItemAdded | ItemRemoved | ItemQuantityChanged;
  * set of appliers plus a fold — so one instance serves every render and every
  * reader on the page.
  */
-const cartProjection = new EventProjection<CartState, CartEvent>("Cart");
+const cartProjection = new EventProjection<
+  CartState,
+  CartEvent,
+  "CART_CREATED"
+>({
+  name: "Cart",
 
-cartProjection.mountCreationEventApplier("CART_CREATED", ({ event }) => ({
-  cartId: event.payload.cartId,
-  currency: event.payload.currency,
-  lines: [],
-}));
+  creation: {
+    event: "CART_CREATED",
+    applier: ({ event }) => ({
+      cartId: event.payload.cartId,
+      currency: event.payload.currency,
+      lines: [],
+    }),
+  },
 
-cartProjection.mountEventApplier("ITEM_ADDED", ({ event, state }) => {
-  const existing = state.lines.find((line) => line.sku === event.payload.sku);
+  // One entry per remaining event. The map is exhaustive over `CartEvent`, so
+  // adding a fifth event kind without an applier would not compile.
+  appliers: {
+    ITEM_ADDED: ({ event, state }) => {
+      const existing = state.lines.find(
+        (line) => line.sku === event.payload.sku,
+      );
 
-  // Adding a sku already in the cart bumps its quantity rather than opening a
-  // second line for the same product.
-  if (existing) {
-    return {
+      // Adding a sku already in the cart bumps its quantity rather than
+      // opening a second line for the same product.
+      if (existing) {
+        return {
+          ...state,
+          lines: state.lines.map((line) =>
+            line.sku === event.payload.sku
+              ? { ...line, quantity: line.quantity + event.payload.quantity }
+              : line,
+          ),
+        };
+      }
+
+      return { ...state, lines: [...state.lines, { ...event.payload }] };
+    },
+
+    ITEM_REMOVED: ({ event, state }) => ({
+      ...state,
+      lines: state.lines.filter((line) => line.sku !== event.payload.sku),
+    }),
+
+    ITEM_QUANTITY_CHANGED: ({ event, state }) => ({
       ...state,
       lines: state.lines.map((line) =>
         line.sku === event.payload.sku
-          ? { ...line, quantity: line.quantity + event.payload.quantity }
+          ? { ...line, quantity: event.payload.quantity }
           : line,
       ),
-    };
-  }
-
-  return { ...state, lines: [...state.lines, { ...event.payload }] };
+    }),
+  },
 });
-
-cartProjection.mountEventApplier("ITEM_REMOVED", ({ event, state }) => ({
-  ...state,
-  lines: state.lines.filter((line) => line.sku !== event.payload.sku),
-}));
-
-cartProjection.mountEventApplier(
-  "ITEM_QUANTITY_CHANGED",
-  ({ event, state }) => ({
-    ...state,
-    lines: state.lines.map((line) =>
-      line.sku === event.payload.sku
-        ? { ...line, quantity: event.payload.quantity }
-        : line,
-    ),
-  }),
-);
 
 // ── Demo data and helpers ───────────────────────────────────────────────────
 

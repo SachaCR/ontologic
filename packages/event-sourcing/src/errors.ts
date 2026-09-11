@@ -48,8 +48,8 @@ export class NoCreationEventApplierError extends EventSourcingError {
   constructor(projectionName: string) {
     super(
       projectionName,
-      "No creation event applier configured. Mount one with " +
-        "mountCreationEventApplier, or pass a snapshot to apply from.",
+      "No creation event applier configured. Give the config a " +
+        "`creation` entry, or pass a snapshot to apply from.",
     );
   }
 }
