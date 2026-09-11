@@ -32,8 +32,9 @@ describe("Component EventProjection types", () => {
     test("Then its event is narrowed to that event, not the union", () => {
       new EventProjection<TestState, TestEvent, "CreationEvent">({
         name: "TestEntity",
-        creation: { event: "CreationEvent", applier: applyCreationEvent },
+        creationEvent: "CreationEvent",
         appliers: {
+          CreationEvent: applyCreationEvent,
           EventA: ({ event, state }) => {
             expectTypeOf(event).toEqualTypeOf<TestEventA>();
             expectTypeOf(state).toEqualTypeOf<TestState>();
@@ -51,19 +52,19 @@ describe("Component EventProjection types", () => {
     });
   });
 
-  describe("Given a creation applier", () => {
+  describe("Given the creation event's applier, declared in the same map", () => {
     test("Then it receives the event and no incoming state", () => {
       new EventProjection<TestState, TestEvent, "CreationEvent">({
         name: "TestEntity",
-        creation: {
-          event: "CreationEvent",
-          applier: (params) => {
+        creationEvent: "CreationEvent",
+        appliers: {
+          CreationEvent: (params) => {
+            // The one asymmetry left, and it is invisible unless you look:
+            // no `state` key, because at the first event there is none.
             expectTypeOf(params).toEqualTypeOf<{ event: CreationEvent }>();
 
             return { result: [] };
           },
-        },
-        appliers: {
           EventA: applyTestEventA,
           EventB: applyTestEventB,
           EventC: applyTestEventC,
@@ -105,25 +106,40 @@ export function negativeCases(): void {
 
   // EventC is missing. This is the guarantee the config object exists for:
   // before it, a forgotten applier was an UnknownEventApplierError the first
-  // time that event turned up in a stream.
+  // time that event turned up in a stream. The map now covers the whole union,
+  // creation event included, so nothing is exempt from the check.
   new EventProjection<TestState, TestEvent, "CreationEvent">({
     name: "Missing",
-    creation: { event: "CreationEvent", applier: applyCreationEvent },
+    creationEvent: "CreationEvent",
     // @ts-expect-error
     appliers: {
+      CreationEvent: applyCreationEvent,
       EventA: applyTestEventA,
       EventB: applyTestEventB,
     },
   });
 
-  // The creation event is excluded from the map, so it cannot also pick up an
-  // ordinary applier and end up folded twice.
+  // An ordinary applier cannot sit under the creation event's key: it would be
+  // asking for a state that does not exist yet.
   new EventProjection<TestState, TestEvent, "CreationEvent">({
-    name: "Doubled",
-    creation: { event: "CreationEvent", applier: applyCreationEvent },
+    name: "WantsState",
+    creationEvent: "CreationEvent",
     appliers: {
       // @ts-expect-error
       CreationEvent: applyTestEventA,
+      EventA: applyTestEventA,
+      EventB: applyTestEventB,
+      EventC: applyTestEventC,
+    },
+  });
+
+  // `creationEvent` has to name an event in the union.
+  new EventProjection<TestState, TestEvent, "CreationEvent">({
+    name: "BadName",
+    // @ts-expect-error
+    creationEvent: "NotAnEvent",
+    appliers: {
+      CreationEvent: applyCreationEvent,
       EventA: applyTestEventA,
       EventB: applyTestEventB,
       EventC: applyTestEventC,
@@ -181,11 +197,12 @@ export function negativeCases(): void {
   });
 
   new EventProjection<TestState, TestEvent, "CreationEvent">({
-    name: "CreationWantsState",
-    // A creation applier's params carry no `state` to destructure.
-    // @ts-expect-error
-    creation: { event: "CreationEvent", applier: ({ state }) => state },
+    name: "CreationDestructuresState",
+    creationEvent: "CreationEvent",
     appliers: {
+      // A creation applier's params carry no `state` to destructure.
+      // @ts-expect-error
+      CreationEvent: ({ state }) => state,
       EventA: applyTestEventA,
       EventB: applyTestEventB,
       EventC: applyTestEventC,

@@ -97,18 +97,22 @@ const cartProjection = new EventProjection<
 >({
   name: "Cart",
 
-  creation: {
-    event: "CART_CREATED",
-    applier: ({ event }) => ({
+  // Which event brings a cart into existence. Naming it lets a fold start from
+  // nothing, and stops a stream replaying it onto a cart that already exists.
+  creationEvent: "CART_CREATED",
+
+  // One applier per event. The map is exhaustive over `CartEvent`: leave one
+  // out and this does not compile.
+  appliers: {
+    // Declared like any other applier. The only difference is that it receives
+    // no `state` — at the first event there is none, and asking for it would
+    // not compile.
+    CART_CREATED: ({ event }) => ({
       cartId: event.payload.cartId,
       currency: event.payload.currency,
       lines: [],
     }),
-  },
 
-  // One entry per remaining event. The map is exhaustive over `CartEvent`, so
-  // adding a fifth event kind without an applier would not compile.
-  appliers: {
     ITEM_ADDED: ({ event, state }) => {
       const existing = state.lines.find(
         (line) => line.sku === event.payload.sku,
@@ -319,7 +323,10 @@ export default function CartDemo({ className }: Props): ReactNode {
 
   const state = view.state;
   const itemCount = state.lines.reduce((count, l) => count + l.quantity, 0);
-  const total = state.lines.reduce((sum, l) => sum + l.unitPrice * l.quantity, 0);
+  const total = state.lines.reduce(
+    (sum, l) => sum + l.unitPrice * l.quantity,
+    0,
+  );
 
   function record(event: CartEvent) {
     setEvents((previous) => [...previous, event]);

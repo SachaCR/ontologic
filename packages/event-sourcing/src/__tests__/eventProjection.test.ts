@@ -21,8 +21,9 @@ describe("Component EventProjection", () => {
       "CreationEvent"
     >({
       name: "TestEntity",
-      creation: { event: "CreationEvent", applier: applyCreationEvent },
+      creationEvent: "CreationEvent",
       appliers: {
+        CreationEvent: applyCreationEvent,
         EventA: applyTestEventA,
         EventB: applyTestEventB,
         EventC: applyTestEventC,
@@ -73,8 +74,9 @@ describe("Component EventProjection", () => {
       "CreationEvent"
     >({
       name: "TestEntity",
-      creation: { event: "CreationEvent", applier: applyCreationEvent },
+      creationEvent: "CreationEvent",
       appliers: {
+        CreationEvent: applyCreationEvent,
         EventA: applyTestEventA,
         EventB: applyTestEventB,
         EventC: applyTestEventC,

@@ -54,19 +54,22 @@ export class BookProjection extends EventProjection<
     super({
       name: "Book",
 
-      // The one event that brings a book into existence: no prior state to
-      // fold onto, so its applier receives only the event.
-      creation: {
-        event: "BOOK_ADDED",
-        applier: ({ event }) => ({
+      // Which event brings a book into existence. Naming it is what lets a
+      // fold start from nothing, and what stops a stream replaying it onto a
+      // book that already exists.
+      creationEvent: "BOOK_ADDED",
+
+      // One entry per event. Leave one out and this will not compile.
+      appliers: {
+        // The creation event's applier is declared like any other. The only
+        // difference is that it receives no `state` — at the first event there
+        // is none, and asking for it does not compile.
+        BOOK_ADDED: ({ event }) => ({
           bookId: event.payload.bookId,
           title: event.payload.title,
           borrowedBy: null,
         }),
-      },
 
-      // One entry per remaining event. Leave one out and this will not compile.
-      appliers: {
         BOOK_BORROWED: ({ event, state }) => ({
           ...state,
           borrowedBy: event.payload.memberId,
@@ -136,16 +139,17 @@ Omit `snapshot` and the fold starts from nothing: the first event must be the cr
 the returned version counts from zero. Pass one and every event in `events` is applied on top of
 it, with `version` counting on from `snapshot.version`.
 
-The creation event is deliberately _not_ mountable as an ordinary applier. It takes no incoming
-state, so its applier receives only `{ event }`. As a result, replaying a stream that still
-contains its creation event on top of an existing snapshot is an error rather than a silent
-re-initialization; see the table below.
+The creation event's applier is declared alongside the others but receives only `{ event }`: at the
+first event there is no state to hand it. Naming it in `creationEvent` also lets `apply` refuse a
+stream that replays it onto an existing snapshot, which would otherwise re-create the state and
+hand back a plausible version — a wrong answer that looks right. That is `CreationEventReplayedError`
+in the table below.
 
 ## Folding into a read model
 
 Nothing in a projection assumes the state is an aggregate. A read model is the same fold with a
 different shape on the other side. The only difference is that no event _creates_ it, so there is
-no creation applier to mount.
+no `creationEvent` to name, and so every applier is an ordinary one.
 
 Declare the events the model is interested in:
 
@@ -153,8 +157,8 @@ Declare the events the model is interested in:
 /** memberId → how many books they have borrowed. */
 type BorrowCounts = Record<string, number>;
 
-// No `creation`: nothing brings a read model into existence, so every event
-// in the declared union needs an applier and `apply` needs a snapshot.
+// No `creationEvent`: nothing brings a read model into existence, so every
+// applier is an ordinary one and `apply` needs a snapshot to fold onto.
 const borrowCounts = new EventProjection<BorrowCounts, BookBorrowed>({
   name: "BorrowCounts",
   appliers: {
@@ -200,14 +204,15 @@ begin where it claims to, a state that could not survive being stored. So `apply
 than returning them. Each is a class carrying the context needed to fix the bug, and each sets
 `name` to a stable discriminant you can branch on without parsing a message.
 
-| Class                         | `name`                      | Extra fields                              | Cause                                                                                                                  |
-| ----------------------------- | --------------------------- | ----------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `NoCreationEventApplierError` | `NO_CREATION_EVENT_APPLIER` | —                                         | No `snapshot`, and no creation event applier was mounted.                                                              |
-| `CreationEventNotFoundError`  | `CREATION_EVENT_NOT_FOUND`  | `expected`, `received`                    | No `snapshot`, and `events` is empty or does not start with the creation event.                                        |
-| `UnknownEventApplierError`    | `UNKNOWN_EVENT_APPLIER`     | `eventName`, `eventIndex`, `streamLength` | An event has no applier mounted for its name. Also what you get for the creation event when a `snapshot` _was_ passed. |
-| `InvalidProjectedStateError`  | `INVALID_PROJECTED_STATE`   | `stage`, `code`, `path`, `reason`         | A state is not JSON-compatible. `stage` is `"initial"` or `"projected"`.                                               |
+| Class                        | `name`                     | Extra fields                              | Cause                                                                                                                 |
+| ---------------------------- | -------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `NoCreationEventError`       | `NO_CREATION_EVENT`        | —                                         | No `snapshot`, and the config named no `creationEvent` to start from.                                                 |
+| `CreationEventNotFoundError` | `CREATION_EVENT_NOT_FOUND` | `expected`, `received`                    | No `snapshot`, and `events` is empty or does not start with the creation event.                                       |
+| `CreationEventReplayedError` | `CREATION_EVENT_REPLAYED`  | `eventName`, `eventIndex`                 | The creation event turned up where a state already exists: on top of a snapshot, or partway through a stream.         |
+| `UnknownEventApplierError`   | `UNKNOWN_EVENT_APPLIER`    | `eventName`, `eventIndex`, `streamLength` | An event has no applier declared for its name. Unreachable for well-typed code; fires for a stream that predates one. |
+| `InvalidProjectedStateError` | `INVALID_PROJECTED_STATE`  | `stage`, `code`, `path`, `reason`         | A state is not JSON-compatible. `stage` is `"initial"` or `"projected"`.                                              |
 
-All four extend `EventSourcingError`, which carries `projectionName` and prefixes the message with it.
+All five extend `EventSourcingError`, which carries `projectionName` and prefixes the message with it.
 
 `InvalidProjectedStateError` carries the validator's full diagnosis, so you get the offending
 location rather than only the fact of failure:
@@ -242,14 +247,14 @@ Accepted, by design: sparse arrays (holes come back as `null`) and null-prototyp
 
 ### `class EventProjection<State, Event extends SourceEvent>`
 
-| Member                         | Description                                                                                                                                              |
-| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `constructor(config)`          | Takes `{ name, creation?, appliers }`. Everything is fixed at construction; there is no mounting afterwards.                                             |
-| `config.name`                  | Names this projection, so its errors can say which one complained.                                                                                       |
-| `config.appliers`              | One `({ event, state }) => State` per event name. Exhaustive: a missing entry is a compile error.                                                        |
-| `config.creation`              | `{ event, applier }` for the event that creates the state, where the applier receives only `{ event }`. Omit it for a projection with no creation event. |
-| `apply({ snapshot?, events })` | Folds `events` and returns `{ state, version }`.                                                                                                         |
-| `name()`                       | The name given to the constructor.                                                                                                                       |
+| Member                         | Description                                                                                                                                        |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `constructor(config)`          | Takes `{ name, creationEvent?, appliers }`. Everything is fixed at construction; there is no mounting afterwards.                                  |
+| `config.name`                  | Names this projection, so its errors can say which one complained.                                                                                 |
+| `config.appliers`              | One `({ event, state }) => State` per event name. Exhaustive: a missing entry is a compile error.                                                  |
+| `config.creationEvent`         | The name of the event that creates the state. Its applier lives in `appliers` like any other but receives only `{ event }`. Omit for a read model. |
+| `apply({ snapshot?, events })` | Folds `events` and returns `{ state, version }`.                                                                                                   |
+| `name()`                       | The name given to the constructor.                                                                                                                 |
 
 ### `interface SourceEvent`
 
