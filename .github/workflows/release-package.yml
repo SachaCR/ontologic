@@ -120,9 +120,13 @@ jobs:
       # the manifest to link back to. It is also why a release cannot be run
       # from a fork or a private mirror.
       #
-      # npm's own CLI generates provenance automatically when publishing via a
-      # trusted publisher, but pnpm has its own publish implementation and does
-      # not document that behaviour, so ask for it explicitly rather than
-      # assume. Requesting what you would have got anyway costs nothing.
+      # The flag is not what turns provenance on. Publishing through a trusted
+      # publisher generates it automatically, pnpm included: `ontologic` 1.6.2
+      # through 1.9.1 all carry attestations and none of them were published
+      # with this flag, which is the evidence that pnpm inherits the behaviour.
+      #
+      # It stays because it says the intent out loud. Provenance is currently a
+      # side effect of how we authenticate, so moving off OIDC to a token would
+      # drop it silently; with the flag, that publish fails instead.
       - name: Publish to NPM
         run: pnpm publish --provenance --no-git-checks --filter "${{ github.event.inputs.package }}"
