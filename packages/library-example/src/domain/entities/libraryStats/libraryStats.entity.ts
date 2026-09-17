@@ -16,8 +16,10 @@ export interface LibraryStatsState {
  * what already happened and refuses nothing.
  *
  * Unlike `Book` or `Loan` it emits no events and enforces no rules, because
- * nothing decides anything here — `StatsReport` folds events into it, and the
- * only question it answers is how many.
+ * nothing decides anything here. It holds no counting logic either: how the
+ * tally moves lives in `StatsReport`'s projection, so there is one description
+ * of the rule rather than two that can drift. This is where the answer is
+ * kept, and the only question it answers is how many.
  */
 export class LibraryStats extends DomainEntity<LibraryStatsState> {
   private constructor(id: string, state: LibraryStatsState) {
@@ -31,11 +33,6 @@ export class LibraryStats extends DomainEntity<LibraryStatsState> {
   /** A library that has counted nothing yet. */
   static start() {
     return new LibraryStats(LIBRARY_STATS_ID, { bookCount: 0 });
-  }
-
-  /** One more copy joined the collection. */
-  recordBookAdded() {
-    this.state.bookCount++;
   }
 
   bookCount(): number {

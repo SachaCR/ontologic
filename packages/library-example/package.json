@@ -20,6 +20,7 @@
     "@nestjs/common": "^11.1.18",
     "@nestjs/core": "^11.1.18",
     "@nestjs/platform-express": "^11.1.18",
+    "@ontologics/event-sourcing": "workspace:*",
     "ontologic": "workspace:*",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.2",

@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { GetBookCountUseCase } from "../getBookCount.use-case";
 import { GetBookCountQuery } from "../queries/getBookCount.query";
 import { StatsRegister } from "../../repositories/statsRegister.repository";
-import { LibraryStats } from "../../entities/libraryStats";
+import { LIBRARY_STATS_ID, LibraryStats } from "../../entities/libraryStats";
 
 describe("Given the library has already counted three copies", () => {
   let statsRegister: StatsRegister;
@@ -13,10 +13,9 @@ describe("Given the library has already counted three copies", () => {
     statsRegister = new StatsRegister();
     getBookCount = new GetBookCountUseCase(statsRegister);
 
-    const stats = LibraryStats.start();
-    stats.recordBookAdded();
-    stats.recordBookAdded();
-    stats.recordBookAdded();
+    // Built directly rather than through a mutator: how the tally moves is
+    // the projection's business, and this test only needs a tally that reads 3.
+    const stats = LibraryStats.fromState(LIBRARY_STATS_ID, { bookCount: 3 });
 
     await statsRegister.saveWithEvents(stats, []);
   });
