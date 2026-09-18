@@ -14,6 +14,7 @@ export class InMemoryConnectors {
     const eventEmitter: EventEmitter = new EventEmitter({
       captureRejections: true,
     });
+
     this.listener = new InMemoryListenerConnector(eventEmitter);
     this.publisher = new InMemoryPublisherConnector(eventEmitter);
   }
