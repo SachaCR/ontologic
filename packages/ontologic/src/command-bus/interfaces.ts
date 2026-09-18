@@ -84,16 +84,3 @@ export interface CommandResolver {
 export interface CommandBusMetrics {
   inFlightCommands: number;
 }
-
-export interface BusMessage {
-  /**
-   * The payload of the message.
-   */
-  data: unknown;
-  ack: () => void;
-
-  /**
-   * Rejects the message, indicating a failure in processing.
-   */
-  nack: () => void;
-}
