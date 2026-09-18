@@ -2,7 +2,6 @@ import EventEmitter from "events";
 
 import {
   type BusCommand,
-  type CommandBusMessage,
   type CommandBusResponse,
   type CommandBusStatus,
   type CommandHandlerResponse,
@@ -12,6 +11,7 @@ import {
   IDynamicPublisherConnector,
   IOrderedListenerConnector,
 } from "./connectors/interfaces";
+import { commandBusMessageSchema } from "./schemas";
 
 export class CommandBusReceiver<
   Command extends BusCommand,
@@ -31,7 +31,7 @@ export class CommandBusReceiver<
     this.#commandSubscriber = dependencies.commandSubscriber;
     this.#responsePublisher = dependencies.responsePublisher;
 
-    this.#eventEmitter = new EventEmitter();
+    this.#eventEmitter = new EventEmitter({ captureRejections: true });
   }
 
   /**
@@ -55,90 +55,68 @@ export class CommandBusReceiver<
     this.#consumeCommands = true;
 
     this.#commandSubscriber.onMessage(async (message) => {
-      const busMessage = message.data as CommandBusMessage<Command>;
-
-      const parsedBusMessageResult = busCommandSchema.safeParse(
-        busMessage.command,
+      const parsedBusMessageResult = commandBusMessageSchema.safeParse<Command>(
+        message.data,
       );
 
-      if (parsedBusMessageResult.error) {
+      if (parsedBusMessageResult.isErr()) {
         message.ack();
 
-        this.#eventEmitter.emit("error", parsedBusMessageResult.error);
+        this.#eventEmitter.emit("failure", parsedBusMessageResult.error);
 
         return;
       }
 
-      const { command, responseTopicName } = busMessage;
+      const { command, responseTopicName } = parsedBusMessageResult.value;
+
+      let response: CommandBusResponse;
+
+      // Only the handler is guarded here. Publishing the response is a separate
+      // concern below, so that a broker failure is never reported as a command
+      // handler failure.
+      try {
+        const handlerResult = await commandHandler(command);
+
+        response = handlerResult.isErr()
+          ? failureResponse(command.id, handlerResult.error)
+          : {
+              commandId: command.id,
+              result: "SUCCESS",
+              payload: handlerResult.value,
+            };
+      } catch (err) {
+        response = failureResponse(command.id, this.#handlerThrew(err));
+      }
+
+      // Acked exactly once, whatever the handler decided: a command that failed
+      // must not be reprocessed.
+      message.ack();
 
       try {
-        const response = await commandHandler(command);
-        message.ack();
-
-        if (response.isErr()) {
-          const error = response.error;
-
-          const messageToPublish: CommandBusResponse = {
-            commandId: command.id,
-            result: "FAILURE",
-            error: {
-              name: error.name,
-              code: "OOPS",
-              message: error.message,
-              stack: error.stack ?? null,
-              context: null,
-            },
-          };
-
-          await this.#responsePublisher.publish({
-            to: responseTopicName,
-            message: JSON.stringify(messageToPublish),
-          });
-
-          return;
-        }
-
         await this.#responsePublisher.publish({
           to: responseTopicName,
-          message: JSON.stringify({
-            commandId: command.id,
-            result: "SUCCESS",
-            payload: response.value,
-          }),
+          message: response,
         });
       } catch (err) {
-        message.ack(); // We don't want to reprocess a command that fails.
-
-        let error: Error;
-
-        if (err instanceof Error) {
-          error = new Error(
-            `${this.name}: Command handler threw: ${err.message}`,
-          );
-        } else {
-          error = new Error(
-            `${this.name}: Command handler threw: a non Error object`,
-          );
-        }
-
-        const messageToPublish: CommandBusResponse = {
-          commandId: command.id,
-          result: "FAILURE",
-          error: {
-            name: error.name,
-            code: "OOPS",
-            message: error.message,
-            stack: error.stack ?? null,
-            context: null,
-          },
-        };
-
-        await this.#responsePublisher.publish({
-          to: responseTopicName,
-          message: JSON.stringify(messageToPublish),
-        });
+        // The command WAS handled, we just could not reply. Reporting is all
+        // that is left to do, the emitter will time out on its side.
+        this.#eventEmitter.emit(
+          "failure",
+          new Error(
+            `${this.name}: Failed to publish the response of command ${command.id}`,
+            { cause: err },
+          ),
+        );
       }
     });
+  }
+
+  #handlerThrew(err: unknown): Error {
+    if (err instanceof Error) {
+      return new Error(`${this.name}: Command handler threw: ${err.message}`);
+    }
+
+    return new Error(`${this.name}: Command handler threw: a non Error object`);
   }
 
   async start() {
@@ -176,7 +154,7 @@ export class CommandBusReceiver<
     this.#responsePublisher.onError(errorHandler);
     this.#commandSubscriber.onError(errorHandler);
 
-    this.#eventEmitter.on("error", (error: Error) => {
+    this.#eventEmitter.on("failure", (error: Error) => {
       errorHandler(error);
     });
   }
@@ -184,4 +162,18 @@ export class CommandBusReceiver<
   status(): CommandBusStatus {
     return this.#status;
   }
+}
+
+function failureResponse(commandId: string, error: Error): CommandBusResponse {
+  return {
+    commandId,
+    result: "FAILURE",
+    error: {
+      name: error.name,
+      code: "OOPS",
+      message: error.message,
+      stack: error.stack ?? null,
+      context: null,
+    },
+  };
 }

@@ -9,6 +9,7 @@ import {
   type CommandMap,
   type CommandResolver,
 } from "./interfaces";
+import { busCommandSchema, commandBusResponseSchema } from "./schemas";
 import { waitForTimeout } from "./timeout";
 import { err, ok } from "../result";
 import {
@@ -41,7 +42,7 @@ export class CommandBusEmitter<
     this.#commandPublisher = dependencies.commandPublisher;
     this.#responseSubscriber = dependencies.responseSubscriber;
 
-    this.#eventEmitter = new EventEmitter();
+    this.#eventEmitter = new EventEmitter({ captureRejections: true });
 
     this.#commandMap = new Map<string, CommandResolver>();
   }
@@ -77,7 +78,7 @@ export class CommandBusEmitter<
 
     const validatedCommandResult = busCommandSchema.safeParse(command);
 
-    if (validatedCommandResult.error) {
+    if (validatedCommandResult.isErr()) {
       throw validatedCommandResult.error;
     }
 
@@ -99,23 +100,47 @@ export class CommandBusEmitter<
       },
     );
 
-    await this.#commandPublisher.publish({
-      message: {
-        responseTopicName: this.#responseSubscriber.topicName,
-        command,
-      },
-      orderingKey,
-    });
+    try {
+      await this.#commandPublisher.publish(
+        {
+          responseTopicName: this.#responseSubscriber.topicName(),
+          command,
+        },
+        {
+          orderingKey,
+        },
+      );
+    } catch (err) {
+      this.#commandMap.delete(command.id);
 
-    const response = await Promise.race([
-      commandPromise,
-      waitForTimeout(timeout, command.id),
-    ]);
+      throw err;
+    }
 
-    this.#commandMap.delete(command.id);
+    const commandTimeout = waitForTimeout(timeout, command.id);
+
+    let response: CommandBusResponse;
+
+    try {
+      response = await Promise.race([commandPromise, commandTimeout.promise]);
+    } finally {
+      // Always clear the timer, otherwise a command that answered quickly still
+      // pins one for the full timeout.
+      commandTimeout.cancel();
+
+      this.#commandMap.delete(command.id);
+    }
 
     if (response.result === "FAILURE") {
-      return err(new Error(response.error.message));
+      const error = new Error(response.error.message);
+
+      error.name = response.error.name;
+      error.cause = response.error;
+
+      if (response.error.stack) {
+        error.stack = response.error.stack;
+      }
+
+      return err(error);
     }
 
     return ok(response.payload);
@@ -131,18 +156,18 @@ export class CommandBusEmitter<
       message.data,
     );
 
-    if (parsedBusMessageResult.error) {
-      this.#eventEmitter.emit("error", parsedBusMessageResult.error);
+    if (parsedBusMessageResult.isErr()) {
+      this.#eventEmitter.emit("failure", parsedBusMessageResult.error);
       return Promise.resolve();
     }
 
-    const response: CommandBusResponse = parsedBusMessageResult.data;
+    const response: CommandBusResponse = parsedBusMessageResult.value;
 
     const resolver = this.#commandMap.get(response.commandId);
 
     if (!resolver) {
       this.#eventEmitter.emit(
-        "error",
+        "failure",
         new Error(
           "Resolver not found: The response probably arrived too late and the command has timed out in between.",
         ),
@@ -152,6 +177,7 @@ export class CommandBusEmitter<
     }
 
     resolver.resolve(response);
+
     return Promise.resolve();
   };
 
@@ -188,7 +214,7 @@ export class CommandBusEmitter<
     this.#responseSubscriber.onError(errorHandler);
     this.#commandPublisher.onError(errorHandler);
 
-    this.#eventEmitter.on("error", (error: Error) => {
+    this.#eventEmitter.on("failure", (error: Error) => {
       errorHandler(error);
     });
   }
