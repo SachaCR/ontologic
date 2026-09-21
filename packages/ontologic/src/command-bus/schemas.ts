@@ -14,7 +14,7 @@ import {
  * because both call sites need to keep going on a malformed message rather than
  * unwind.
  *
- * They never call `JSON.parse`. Deserialization belongs to the connector, these
+ * They never call `JSON.parse`. Deserialization belongs to the caller, these
  * schemas only ever see already decoded values.
  */
 

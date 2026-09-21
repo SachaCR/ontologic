@@ -15,3 +15,5 @@ export * from "./messageRelay";
 export * from "./inMemoryRepository";
 export * from "./switchGuard";
 export * from "./workflows";
+export * from "./bus-connectors";
+export * from "./command-bus";

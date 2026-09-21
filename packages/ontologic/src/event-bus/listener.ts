@@ -1,8 +1,8 @@
-import { IListenerConnector, ReceivedMessage } from "./connectors/interfaces";
-import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { EventEmitter } from "node:events";
 import { validateMetadata } from "./validateMetadata";
+import { EventHandler, IDomainEventBusListener } from "./interfaces";
+import { IListenerConnector, ReceivedMessage } from "../bus-connectors";
 
 export class DomainEventBusListener<
   Event extends DomainEventInterface,
@@ -51,26 +51,35 @@ export class DomainEventBusListener<
     }
 
     this.#listenerConnector.onMessage(async (message: ReceivedMessage) => {
-      const eventHandler =
-        this.#eventHandlersMap.get(message.name) ??
-        this.#eventHandlersMap.get("*");
-
-      if (!eventHandler) {
-        // Nothing here subscribed to this event, which is the ordinary result of
-        // `listenTo` being per event name — a consumer takes what it needs, and
-        // `listenTo("*")` is there for the ones that want everything.
-        //
-        // So this is not a failure, and nacking would be wrong twice over: a
-        // nack asks the broker to deliver again, and the second attempt would
-        // meet the same missing handler, forever. Redelivery loops and
-        // dead-letter queues full of other people's events both come from that.
-        this.#eventEmitter.emit("unhandled", message.name);
-        await message.ack();
-        return;
-      }
-
       try {
+        // TODO: Maybe add a type EventBusMessage {event, metadata} and validate it here.
         const { event, metadata } = JSON.parse(message.content);
+
+        if (!event || !event.name) {
+          this.#eventEmitter.emit("failure", "Event Received without a name");
+          await message.ack();
+
+          return;
+        }
+
+        const eventHandler =
+          this.#eventHandlersMap.get(event.name) ??
+          this.#eventHandlersMap.get("*");
+
+        if (!eventHandler) {
+          // Nothing here subscribed to this event, which is the ordinary result of
+          // `listenTo` being per event name — a consumer takes what it needs, and
+          // `listenTo("*")` is there for the ones that want everything.
+          //
+          // So this is not a failure, and nacking would be wrong twice over: a
+          // nack asks the broker to deliver again, and the second attempt would
+          // meet the same missing handler, forever. Redelivery loops and
+          // dead-letter queues full of other people's events both come from that.
+          this.#eventEmitter.emit("unhandled", event.name);
+          await message.ack();
+
+          return;
+        }
 
         const eventToHandle = this.#validator(event);
         const validatedMetadata = validateMetadata(metadata);
