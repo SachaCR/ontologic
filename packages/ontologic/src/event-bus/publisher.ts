@@ -1,7 +1,7 @@
-import { IPublisherConnector } from "./connectors/interfaces";
 import { IDomainEventBusPublisher } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { validateMetadata } from "./validateMetadata";
+import { IPublisherConnector } from "../bus-connectors";
 
 export class DomainEventBusPublisher<
   Event extends DomainEventInterface,
@@ -52,11 +52,7 @@ export class DomainEventBusPublisher<
       metadata: validatedMetadata,
     };
 
-    await this.#publisherConnector.publish(
-      event.name,
-      JSON.stringify(message),
-      options,
-    );
+    await this.#publisherConnector.publish(JSON.stringify(message), options);
   }
 
   async start() {

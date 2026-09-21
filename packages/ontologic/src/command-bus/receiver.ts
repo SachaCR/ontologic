@@ -7,11 +7,11 @@ import {
   type CommandHandlerResponse,
   type CommandReceiver,
 } from "./interfaces";
+import { commandBusMessageSchema } from "./schemas";
 import {
   IDynamicPublisherConnector,
   IOrderedListenerConnector,
-} from "./connectors/interfaces";
-import { commandBusMessageSchema } from "./schemas";
+} from "../bus-connectors";
 
 export class CommandBusReceiver<
   Command extends BusCommand,
@@ -49,18 +49,34 @@ export class CommandBusReceiver<
     return true;
   }
 
-  process(
+  async process(
     commandHandler: (command: Command) => Promise<CommandHandlerResponse>,
   ) {
     this.#consumeCommands = true;
 
     this.#commandSubscriber.onMessage(async (message) => {
-      const parsedBusMessageResult = commandBusMessageSchema.safeParse<Command>(
-        message.data,
-      );
+      let parsedMessage: unknown;
+
+      try {
+        parsedMessage = JSON.parse(message.content);
+      } catch (error: unknown) {
+        await message.ack();
+
+        this.#eventEmitter.emit(
+          "failure",
+          new Error("Invalid command: The command cannot be parsed as JSON", {
+            cause: error,
+          }),
+        );
+
+        return;
+      }
+
+      const parsedBusMessageResult =
+        commandBusMessageSchema.safeParse<Command>(parsedMessage);
 
       if (parsedBusMessageResult.isErr()) {
-        message.ack();
+        await message.ack();
 
         this.#eventEmitter.emit("failure", parsedBusMessageResult.error);
 
@@ -90,12 +106,12 @@ export class CommandBusReceiver<
 
       // Acked exactly once, whatever the handler decided: a command that failed
       // must not be reprocessed.
-      message.ack();
+      await message.ack();
 
       try {
-        await this.#responsePublisher.publish({
-          to: responseTopicName,
-          message: response,
+        await this.#responsePublisher.publishTo({
+          topicName: responseTopicName,
+          message: JSON.stringify(response),
         });
       } catch (err) {
         // The command WAS handled, we just could not reply. Reporting is all

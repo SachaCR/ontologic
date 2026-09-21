@@ -1,9 +1,5 @@
 import { EventEmitter } from "node:events";
-
-import type {
-  IListenerConnector,
-  ReceivedMessage,
-} from "../../connectors/interfaces";
+import { IListenerConnector, ReceivedMessage } from "../../../bus-connectors";
 
 /**
  * A listener connector that records whether each message was acked or nacked.
@@ -33,7 +29,7 @@ export class RecordingListenerConnector implements IListenerConnector {
     this.status = "STOPPED";
   }
 
-  onError(handler: (error: unknown) => void): void {
+  onError(handler: (error: Error) => void): void {
     this.#errors.on("error", handler);
   }
 
@@ -42,7 +38,6 @@ export class RecordingListenerConnector implements IListenerConnector {
     if (!this.#handler) throw new Error("deliver() before onMessage()");
 
     await this.#handler({
-      name,
       content,
       ack: async () => {
         this.acked.push(name);
@@ -51,5 +46,13 @@ export class RecordingListenerConnector implements IListenerConnector {
         this.nacked.push(name);
       },
     });
+  }
+
+  checkConnection() {
+    return Promise.resolve(true);
+  }
+
+  topicName() {
+    return "RecordingListenerConnector";
   }
 }

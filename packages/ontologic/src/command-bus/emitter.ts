@@ -16,7 +16,7 @@ import {
   IListenerConnector,
   IOrderedPublisherConnector,
   ReceivedMessage,
-} from "./connectors/interfaces";
+} from "../bus-connectors";
 
 export class CommandBusEmitter<
   Command extends BusCommand,
@@ -102,10 +102,10 @@ export class CommandBusEmitter<
 
     try {
       await this.#commandPublisher.publish(
-        {
+        JSON.stringify({
           responseTopicName: this.#responseSubscriber.topicName(),
           command,
-        },
+        }),
         {
           orderingKey,
         },
@@ -148,13 +148,26 @@ export class CommandBusEmitter<
 
   // WARNING: As this function is a callback executed in another context (line 61)
   // We must use an arrow function here or we will lose the context of `this` and commandMap will be undefined
-  #responseHandler = (message: ReceivedMessage) => {
+  #responseHandler = async (message: ReceivedMessage) => {
     // response are volatile, it doesn't matter if we lose them.
-    message.ack();
+    await message.ack();
 
-    const parsedBusMessageResult = commandBusResponseSchema.safeParse(
-      message.data,
-    );
+    let parsedMessage: unknown;
+
+    try {
+      parsedMessage = JSON.parse(message.content);
+    } catch (error: unknown) {
+      this.#eventEmitter.emit(
+        "failure",
+        new Error("Invalid response: The response cannot be parsed as JSON", {
+          cause: error,
+        }),
+      );
+      return;
+    }
+
+    const parsedBusMessageResult =
+      commandBusResponseSchema.safeParse(parsedMessage);
 
     if (parsedBusMessageResult.isErr()) {
       this.#eventEmitter.emit("failure", parsedBusMessageResult.error);

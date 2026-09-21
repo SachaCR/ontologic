@@ -1,14 +1,20 @@
 import { EventEmitter } from "node:events";
-import { IListenerConnector, ReceivedMessage } from "../interfaces";
+import { IListenerConnector, ReceivedMessage } from "..";
 
 export class InMemoryListenerConnector implements IListenerConnector {
   #status: "STARTED" | "STOPPED";
   #eventEmitter: EventEmitter;
   #handler?: (message: ReceivedMessage) => Promise<void>;
+  #topic: string;
 
-  constructor(eventEmitter: EventEmitter) {
+  constructor(eventEmitter: EventEmitter, topic?: string) {
     this.#status = "STOPPED";
     this.#eventEmitter = eventEmitter;
+    this.#topic = topic || "message";
+  }
+
+  topicName(): string {
+    return this.#topic;
   }
 
   onMessage(handler: (message: ReceivedMessage) => Promise<void>) {
@@ -32,17 +38,13 @@ export class InMemoryListenerConnector implements IListenerConnector {
 
     const handler = this.#handler;
 
-    this.#eventEmitter.on(
-      "message",
-      async (message: { name: string; content: string }) => {
-        await handler({
-          content: message.content,
-          name: message.name,
-          ack: async () => {},
-          nack: async () => {},
-        });
-      },
-    );
+    this.#eventEmitter.on(this.#topic, async (message: { content: string }) => {
+      await handler({
+        content: message.content,
+        ack: async () => {},
+        nack: async () => {},
+      });
+    });
 
     this.#status = "STARTED";
 
@@ -51,11 +53,15 @@ export class InMemoryListenerConnector implements IListenerConnector {
 
   stop() {
     this.#status = "STOPPED";
-    this.#eventEmitter.removeAllListeners("message");
+    this.#eventEmitter.removeAllListeners(this.#topic);
     return Promise.resolve();
   }
 
-  onError(handler: (error: unknown) => void): void {
+  onError(handler: (error: Error) => void): void {
     this.#eventEmitter.on("error", handler);
+  }
+
+  checkConnection(): Promise<boolean> {
+    return Promise.resolve(true);
   }
 }
