@@ -26,8 +26,10 @@ export interface IDynamicPublisherConnector extends BusConnector {
   publishTo(params: { topicName: string; message: string }): Promise<void>;
 }
 
+export type BusConnectorStatus = "STARTED" | "STOPPED";
+
 export interface BusConnector {
-  status: "STARTED" | "STOPPED";
+  status: BusConnectorStatus;
   start(): Promise<void>;
   stop(): Promise<void>;
   onError(handler: (error: Error) => void): void;
