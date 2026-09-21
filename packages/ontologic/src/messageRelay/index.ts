@@ -63,7 +63,9 @@ export class MessageRelay {
         // never the individual event's `entityId` — a sub-entity event (e.g. a node event on a workflow
         // aggregate) carries the sub-entity id, which would split the stream across FIFO groups and write
         // the checkpoint under a key that lock/getLastEventIdPublished never created.
-        await this.publisher.publish(event, metadata, { orderingKey: entityId });
+        await this.publisher.publish(event, metadata, {
+          orderingKey: entityId,
+        });
 
         await this.stateRepository.updateLastEventIdPublished({
           eventId: metadata.id,

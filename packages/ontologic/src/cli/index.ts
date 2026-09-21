@@ -31,7 +31,10 @@ interface Options {
   skillsDir: string;
 }
 
-function parseArgs(argv: string[]): { command: string | undefined; options: Options } {
+function parseArgs(argv: string[]): {
+  command: string | undefined;
+  options: Options;
+} {
   const positional = argv.filter((arg) => !arg.startsWith("-"));
 
   const dirFlag = argv.find((arg) => arg.startsWith("--skills-dir="));
@@ -88,7 +91,10 @@ function ontologicSection(): string {
 }
 
 /** Insert or replace the Ontologic block, leaving the rest of the file untouched. */
-function upsertAgentsMd(targetPath: string, force: boolean): "created" | "updated" | "skipped" {
+function upsertAgentsMd(
+  targetPath: string,
+  force: boolean,
+): "created" | "updated" | "skipped" {
   const section = ontologicSection();
 
   if (!existsSync(targetPath)) {
@@ -104,7 +110,9 @@ function upsertAgentsMd(targetPath: string, force: boolean): "created" | "update
     if (!force) return "skipped";
 
     const updated =
-      current.slice(0, start) + section + current.slice(end + MARKER_END.length);
+      current.slice(0, start) +
+      section +
+      current.slice(end + MARKER_END.length);
     writeFileSync(targetPath, updated, "utf8");
     return "updated";
   }

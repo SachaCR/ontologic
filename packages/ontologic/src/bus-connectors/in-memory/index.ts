@@ -33,3 +33,29 @@ export class InMemoryConnectors {
     this.dynamicPublisher = new InMemoryPublisherConnector(eventEmitter);
   }
 }
+
+export class InMemoryCommandBusConnectors {
+  responseListener: IListenerConnector;
+  responseDynamicPublisher: IDynamicPublisherConnector;
+  commandOrderedPublisher: IOrderedPublisherConnector;
+  commandOrderedListener: IOrderedListenerConnector;
+
+  constructor() {
+    const eventEmitter: EventEmitter = new EventEmitter({
+      captureRejections: true,
+    });
+
+    this.commandOrderedListener = new InMemoryListenerConnector(eventEmitter);
+
+    this.commandOrderedPublisher = new InMemoryPublisherConnector(eventEmitter);
+
+    this.responseDynamicPublisher = new InMemoryPublisherConnector(
+      eventEmitter,
+    );
+
+    this.responseListener = new InMemoryListenerConnector(
+      eventEmitter,
+      "response-topic",
+    );
+  }
+}

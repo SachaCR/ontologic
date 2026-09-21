@@ -1,11 +1,6 @@
 import { randomUUID } from "crypto";
 
-import {
-  Result,
-  err,
-  ok,
-  DomainEntity,
-} from "../../../../..";
+import { Result, err, ok, DomainEntity } from "../../../../..";
 
 import { NotEnoughFunds } from "./errors/notEnoughFunds.error";
 

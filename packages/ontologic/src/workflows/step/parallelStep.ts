@@ -32,7 +32,10 @@ export async function aggregateFunction<
 ): Promise<AggregateOutput<H>> {
   const entries = await Promise.all(
     handlers.map(async ({ name, handler }) => {
-      const started: WorkflowChangeEvent = { step: name, status: "IN_PROGRESS" };
+      const started: WorkflowChangeEvent = {
+        step: name,
+        status: "IN_PROGRESS",
+      };
       eventEmitter.emit("change", started);
 
       const result = await handler(input);

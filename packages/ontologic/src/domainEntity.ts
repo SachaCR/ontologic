@@ -55,7 +55,8 @@ export class DomainEntity<State, Serialized = State> implements IDomainEntity {
       // No custom serialize: the state is treated as plain, structuredClone-able
       // data throughout. Defensively clone on ingest so callers cannot mutate
       // the entity through the reference they passed in.
-      this.#serialize = (state) => structuredClone(state) as unknown as Serialized;
+      this.#serialize = (state) =>
+        structuredClone(state) as unknown as Serialized;
       this.state = structuredClone(state);
     }
 

@@ -5,7 +5,7 @@ import {
   type IDynamicPublisherConnector,
   type IOrderedListenerConnector,
   type ReceivedMessage,
-} from "../connectors/interfaces";
+} from "../../bus-connectors";
 import {
   type BusCommand,
   type CommandBusResponse,
@@ -22,55 +22,71 @@ function command(): BusCommand {
   };
 }
 
-function receivedMessage(data: unknown): ReceivedMessage {
+function receivedMessage(content: string): ReceivedMessage {
   return {
-    data,
-    ack: vi.fn(),
-    nack: vi.fn(),
+    content,
+    ack: vi.fn(async () => {}),
+    nack: vi.fn(async () => {}),
   };
+}
+
+/** Connectors carry strings, so every published response has to be parsed back. */
+function parseResponse(message: string | undefined): CommandBusResponse {
+  if (message === undefined) {
+    throw new Error("Nothing was published");
+  }
+
+  return JSON.parse(message) as CommandBusResponse;
 }
 
 /**
  * Drives a receiver through a single message and returns everything the test
  * needs to assert on: the message it acked, what got published, and the errors
  * reported to `onError`.
+ *
+ * The two connectors below are typed as the interfaces rather than cast to
+ * them. An earlier version used `as unknown as`, which is exactly why this file
+ * kept compiling against a contract that no longer existed.
  */
 async function processOneMessage(params: {
-  data: unknown;
+  content: string;
   handler: (command: BusCommand) => Promise<CommandHandlerResponse>;
   publishFails?: Error;
 }) {
-  const published: { to: string; message: unknown }[] = [];
+  const published: { topicName: string; message: string }[] = [];
 
-  const publish = vi.fn(async (args: { to: string; message: unknown }) => {
-    if (params.publishFails) {
-      throw params.publishFails;
-    }
+  const publishTo = vi.fn(
+    async (args: { topicName: string; message: string }): Promise<void> => {
+      if (params.publishFails) {
+        throw params.publishFails;
+      }
 
-    published.push(args);
-  });
+      published.push(args);
+    },
+  );
 
   let handle: (message: ReceivedMessage) => Promise<void> = async () => {};
 
-  const commandSubscriber = {
+  const commandSubscriber: IOrderedListenerConnector = {
     status: "STOPPED",
-    start: vi.fn(async () => {}),
-    stop: vi.fn(async () => {}),
-    onError: vi.fn(),
-    checkConnection: vi.fn(async () => true),
-    onMessage: vi.fn((handler) => {
+    start: async () => {},
+    stop: async () => {},
+    onError: () => {},
+    checkConnection: async () => true,
+    topicName: () => "commands",
+    onMessage: (handler) => {
       handle = handler;
-    }),
-  } as unknown as IOrderedListenerConnector;
+    },
+  };
 
-  const responsePublisher = {
+  const responsePublisher: IDynamicPublisherConnector = {
     status: "STOPPED",
-    start: vi.fn(async () => {}),
-    stop: vi.fn(async () => {}),
-    onError: vi.fn(),
-    checkConnection: vi.fn(async () => true),
-    publish,
-  } as unknown as IDynamicPublisherConnector;
+    start: async () => {},
+    stop: async () => {},
+    onError: () => {},
+    checkConnection: async () => true,
+    publishTo,
+  };
 
   const receiver = new CommandBusReceiver<BusCommand>({
     commandSubscriber,
@@ -82,35 +98,46 @@ async function processOneMessage(params: {
 
   receiver.process(params.handler);
 
-  const message = receivedMessage(params.data);
+  const message = receivedMessage(params.content);
   await handle(message);
 
-  return { message, published, reportedErrors, publish };
+  return { message, published, reportedErrors, publishTo };
 }
 
-const validData = {
+const validContent = JSON.stringify({
   responseTopicName: "responses",
   command: command(),
-};
+});
 
 describe("CommandBusReceiver.process", () => {
   it("publishes a SUCCESS response and acks once when the handler succeeds", async () => {
     const { message, published } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => ok({ ok: true }),
     });
 
     expect(message.ack).toHaveBeenCalledTimes(1);
-    expect(published).toEqual([
-      {
-        to: "responses",
-        message: {
-          commandId: "cmd-1",
-          result: "SUCCESS",
-          payload: { ok: true },
-        },
+    expect(published).toHaveLength(1);
+    expect(published[0]?.topicName).toBe("responses");
+    expect(parseResponse(published[0]?.message)).toEqual({
+      commandId: "cmd-1",
+      result: "SUCCESS",
+      payload: { ok: true },
+    });
+  });
+
+  it("hands the handler the deserialized command", async () => {
+    const seen: BusCommand[] = [];
+
+    await processOneMessage({
+      content: validContent,
+      handler: async (received) => {
+        seen.push(received);
+        return ok(null);
       },
-    ]);
+    });
+
+    expect(seen).toEqual([command()]);
   });
 
   it("publishes a FAILURE response and acks once when the handler returns an error", async () => {
@@ -118,13 +145,13 @@ describe("CommandBusReceiver.process", () => {
     domainError.name = "ORDER_ALREADY_PAID";
 
     const { message, published } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => err(domainError),
     });
 
     expect(message.ack).toHaveBeenCalledTimes(1);
 
-    const response = published[0]?.message as CommandBusResponse;
+    const response = parseResponse(published[0]?.message);
 
     expect(response.result).toBe("FAILURE");
     expect(response).toMatchObject({
@@ -135,7 +162,7 @@ describe("CommandBusReceiver.process", () => {
 
   it("publishes a FAILURE response and acks once when the handler throws", async () => {
     const { message, published } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => {
         throw new Error("boom");
       },
@@ -143,9 +170,7 @@ describe("CommandBusReceiver.process", () => {
 
     expect(message.ack).toHaveBeenCalledTimes(1);
 
-    const response = published[0]?.message as CommandBusResponse;
-
-    expect(response).toMatchObject({
+    expect(parseResponse(published[0]?.message)).toMatchObject({
       commandId: "cmd-1",
       result: "FAILURE",
       error: {
@@ -156,15 +181,13 @@ describe("CommandBusReceiver.process", () => {
 
   it("reports a non Error throw without leaking it", async () => {
     const { published } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => {
         throw "a string";
       },
     });
 
-    const response = published[0]?.message as CommandBusResponse;
-
-    expect(response).toMatchObject({
+    expect(parseResponse(published[0]?.message)).toMatchObject({
       result: "FAILURE",
       error: {
         message:
@@ -175,7 +198,7 @@ describe("CommandBusReceiver.process", () => {
 
   it("acks only once when publishing the response fails", async () => {
     const { message } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => ok({ ok: true }),
       publishFails: new Error("broker is down"),
     });
@@ -184,20 +207,20 @@ describe("CommandBusReceiver.process", () => {
   });
 
   it("does not attempt to publish again when publishing the response fails", async () => {
-    const { publish } = await processOneMessage({
-      data: validData,
+    const { publishTo } = await processOneMessage({
+      content: validContent,
       handler: async () => ok({ ok: true }),
       publishFails: new Error("broker is down"),
     });
 
-    expect(publish).toHaveBeenCalledTimes(1);
+    expect(publishTo).toHaveBeenCalledTimes(1);
   });
 
   it("reports a publish failure as a publish failure, not a handler failure", async () => {
     const brokerError = new Error("broker is down");
 
     const { reportedErrors } = await processOneMessage({
-      data: validData,
+      content: validContent,
       handler: async () => ok({ ok: true }),
       publishFails: brokerError,
     });
@@ -209,9 +232,12 @@ describe("CommandBusReceiver.process", () => {
     expect(reportedErrors[0]?.cause).toBe(brokerError);
   });
 
-  it("acks and reports without publishing when the message is invalid", async () => {
+  it("acks and reports without publishing when the command fails validation", async () => {
     const { message, published, reportedErrors } = await processOneMessage({
-      data: { responseTopicName: "responses", command: { id: "" } },
+      content: JSON.stringify({
+        responseTopicName: "responses",
+        command: { id: "", name: "PlaceOrder", payload: null, metadata: null },
+      }),
       handler: async () => ok({ ok: true }),
     });
 
@@ -220,5 +246,28 @@ describe("CommandBusReceiver.process", () => {
     expect(reportedErrors[0]?.message).toBe(
       "Invalid BusCommand: id is an empty string",
     );
+  });
+
+  it("acks and reports without publishing when the content is not JSON", async () => {
+    const { message, published, reportedErrors } = await processOneMessage({
+      content: "not json at all",
+      handler: async () => ok({ ok: true }),
+    });
+
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(published).toEqual([]);
+    expect(reportedErrors).toHaveLength(1);
+    expect(reportedErrors[0]?.message).toBe(
+      "Invalid command: The command cannot be parsed as JSON",
+    );
+    expect(reportedErrors[0]?.cause).toBeInstanceOf(SyntaxError);
+  });
+
+  it("does not run the handler when the content is not JSON", async () => {
+    const handler = vi.fn(async () => ok({ ok: true }));
+
+    await processOneMessage({ content: "not json at all", handler });
+
+    expect(handler).not.toHaveBeenCalled();
   });
 });
