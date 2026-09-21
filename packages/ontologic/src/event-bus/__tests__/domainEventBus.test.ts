@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
 import type { EventMetadata } from "../../repository";
-import { InMemoryConnectors } from "../connectors/in-memory";
+import { InMemoryConnectors } from "../../bus-connectors";
 import { DomainEventBusListener } from "../listener";
 import { DomainEventBusPublisher } from "../publisher";
 import { DomainEvent } from "../../domainEvent";
@@ -18,6 +18,24 @@ function makeMetadata(overrides?: Partial<EventMetadata>): EventMetadata {
     createdAt: overrides?.createdAt ?? "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
+}
+
+/**
+ * A well-formed envelope for an event nobody subscribed to.
+ *
+ * Routing reads `event.name` out of the body, so an empty body would take the
+ * missing-name branch rather than the unhandled one.
+ */
+function otherEventEnvelope(): string {
+  return JSON.stringify({
+    event: {
+      entityId: "entity-1",
+      name: "OtherEvent",
+      version: 1,
+      payload: { foo: "bar" },
+    },
+    metadata: makeMetadata(),
+  });
 }
 
 describe("DomainEventBusPublisher", () => {
@@ -50,7 +68,7 @@ describe("DomainEventBusPublisher", () => {
     expect(publisher.status()).toBe("STOPPED");
   });
 
-  it("publish sends JSON envelope with event name as routing key", async () => {
+  it("publish sends the event and its metadata as one JSON envelope", async () => {
     const received: { event: TestEvent; metadata: EventMetadata }[] = [];
 
     const listener = new DomainEventBusListener<TestEvent>({
@@ -191,7 +209,7 @@ describe("DomainEventBusListener", () => {
     listener.listenTo("TestEvent", async () => {});
     await listener.start();
 
-    await recording.deliver("OtherEvent", "{}");
+    await recording.deliver("OtherEvent", otherEventEnvelope());
 
     expect(recording.acked).toEqual(["OtherEvent"]);
     expect(recording.nacked).toEqual([]);
@@ -209,7 +227,7 @@ describe("DomainEventBusListener", () => {
     listener.onError(onError);
     await listener.start();
 
-    await recording.deliver("OtherEvent", "{}");
+    await recording.deliver("OtherEvent", otherEventEnvelope());
 
     expect(onError).not.toHaveBeenCalled();
   });
@@ -226,7 +244,7 @@ describe("DomainEventBusListener", () => {
     listener.onUnhandled(onUnhandled);
     await listener.start();
 
-    await recording.deliver("OtherEvent", "{}");
+    await recording.deliver("OtherEvent", otherEventEnvelope());
 
     expect(onUnhandled).toHaveBeenCalledWith("OtherEvent");
   });
@@ -245,8 +263,72 @@ describe("DomainEventBusListener", () => {
     listener.listenTo("TestEvent", async () => {});
     await listener.start();
 
-    await expect(recording.deliver("OtherEvent", "{}")).resolves.toBeUndefined();
+    await expect(
+      recording.deliver("OtherEvent", otherEventEnvelope()),
+    ).resolves.toBeUndefined();
     expect(recording.acked).toEqual(["OtherEvent"]);
+  });
+
+  it.each([
+    ["an empty envelope", "{}"],
+    [
+      "an event with no name",
+      JSON.stringify({ event: { entityId: "e1" }, metadata: makeMetadata() }),
+    ],
+  ])("acks %s rather than nacking it", async (_label, content) => {
+    // Routing needs `event.name`. A body that cannot supply one will not supply
+    // one on redelivery either, so nacking would loop — the same reasoning as
+    // the unhandled branch above.
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {});
+    await listener.start();
+
+    await recording.deliver("Nameless", content);
+
+    expect(recording.acked).toEqual(["Nameless"]);
+    expect(recording.nacked).toEqual([]);
+  });
+
+  it("reports a message with no event name through onError", async () => {
+    const onError = vi.fn<(error: unknown) => void>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {});
+    listener.onError(onError);
+    await listener.start();
+
+    await recording.deliver("Nameless", "{}");
+
+    expect(onError).toHaveBeenCalledTimes(1);
+    // Pinned as-is: this branch reports a bare string where every other
+    // "failure" carries an Error. Worth knowing if that ever changes.
+    expect(onError).toHaveBeenCalledWith("Event Received without a name");
+  });
+
+  it("does not run the handler for a message with no event name", async () => {
+    const handler =
+      vi.fn<(event: TestEvent, metadata: EventMetadata) => Promise<void>>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("*", handler);
+    await listener.start();
+
+    await recording.deliver("Nameless", "{}");
+
+    expect(handler).not.toHaveBeenCalled();
   });
 
   it("still nacks when a handler throws", async () => {
@@ -437,19 +519,29 @@ describe("event validator option", () => {
 
     await listener.start();
 
+    // The event has to carry a name to be routed at all — routing happens before
+    // validation — so "invalid" here means well-named but malformed: no
+    // entityId. A null event never reaches the validator; it is acked by the
+    // missing-name guard instead, which has its own tests above.
+    const invalidEvent = {
+      name: "TestEvent",
+      version: 1,
+      payload: { foo: "bar" },
+    };
+
     await recording.deliver(
       "TestEvent",
-      JSON.stringify({ event: null, metadata: makeMetadata() }),
+      JSON.stringify({ event: invalidEvent, metadata: makeMetadata() }),
     );
 
     expect(validator).toHaveBeenCalledTimes(1);
-    expect(validator).toHaveBeenCalledWith(null);
+    expect(validator).toHaveBeenCalledWith(invalidEvent);
     expect(handler).not.toHaveBeenCalled();
     expect(recording.nacked).toEqual(["TestEvent"]);
     expect(recording.acked).toEqual([]);
     expect(onError.mock.calls[0]?.[0]).toBeInstanceOf(Error);
     expect((onError.mock.calls[0]?.[0] as Error).message).toBe(
-      "TestEvent: expected an object",
+      "TestEvent: expected non-empty string entityId",
     );
   });
 

@@ -123,7 +123,10 @@ describe("DomainEntity invariant violation", () => {
 
 describe("DomainEntity constructor (defensive copy on ingest)", () => {
   it("clones the passed-in state when no custom serialize is provided, so later mutations don't bleed in", () => {
-    const seed: BalanceState = { amount: 50, ledger: [{ id: "e0", delta: 50 }] };
+    const seed: BalanceState = {
+      amount: 50,
+      ledger: [{ id: "e0", delta: 50 }],
+    };
     const balance = new Balance("balance-1", seed);
 
     // Mutate the object we handed to the constructor.
