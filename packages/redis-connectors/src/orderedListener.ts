@@ -1,9 +1,9 @@
 import { EventEmitter } from "node:events";
 import { type RedisClientType, createClient } from "redis";
-import {
-  type IOrderedListenerConnector,
-  type BusConnectorStatus,
-  type ReceivedMessage,
+import type {
+  IOrderedListenerConnector,
+  BusConnectorStatus,
+  ReceivedMessage,
 } from "ontologic";
 
 import { redisSocketOptions } from "./socketOptions";
@@ -26,6 +26,7 @@ import { redisSocketOptions } from "./socketOptions";
  */
 export class RedisOrderedListener implements IOrderedListenerConnector {
   public readonly name: string = "Redis/OrderedListener";
+  public readonly kind = "ordered-listener";
 
   #eventEmitter: EventEmitter;
   #status: BusConnectorStatus;

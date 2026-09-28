@@ -1,9 +1,20 @@
 import { EventEmitter } from "node:events";
-import { IDynamicPublisherConnector, IPublisherConnector } from "..";
+import {
+  BusConnectorKind,
+  IDynamicPublisherConnector,
+  IOrderedPublisherConnector,
+  IPublisherConnector,
+} from "..";
 
-export class InMemoryPublisherConnector
-  implements IPublisherConnector, IDynamicPublisherConnector
-{
+/**
+ * Everything an in-memory publisher does, including both `publish` and
+ * `publishTo`. The three concrete classes below pick a `kind`; the extra
+ * method each one carries is harmless, and sharing the implementation keeps
+ * them behaving identically.
+ */
+abstract class InMemoryPublisherBase {
+  abstract readonly kind: BusConnectorKind;
+
   #status: "STARTED" | "STOPPED";
   #eventEmitter: EventEmitter;
 
@@ -43,4 +54,25 @@ export class InMemoryPublisherConnector
   checkConnection(): Promise<boolean> {
     return Promise.resolve(true);
   }
+}
+
+export class InMemoryPublisherConnector
+  extends InMemoryPublisherBase
+  implements IPublisherConnector
+{
+  public readonly kind = "publisher";
+}
+
+export class InMemoryOrderedPublisherConnector
+  extends InMemoryPublisherBase
+  implements IOrderedPublisherConnector
+{
+  public readonly kind = "ordered-publisher";
+}
+
+export class InMemoryDynamicPublisherConnector
+  extends InMemoryPublisherBase
+  implements IDynamicPublisherConnector
+{
+  public readonly kind = "dynamic-publisher";
 }

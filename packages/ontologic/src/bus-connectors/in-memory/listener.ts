@@ -1,7 +1,19 @@
 import { EventEmitter } from "node:events";
-import { IListenerConnector, ReceivedMessage } from "..";
+import {
+  BusConnectorKind,
+  IListenerConnector,
+  IOrderedListenerConnector,
+  ReceivedMessage,
+} from "..";
 
-export class InMemoryListenerConnector implements IListenerConnector {
+/**
+ * Everything an in-memory listener does. The two concrete classes below add
+ * nothing but their `kind`, which is what keeps a plain listener from being
+ * accepted where an ordered one is required.
+ */
+abstract class InMemoryListenerBase {
+  abstract readonly kind: BusConnectorKind;
+
   #status: "STARTED" | "STOPPED";
   #eventEmitter: EventEmitter;
   #handler?: (message: ReceivedMessage) => Promise<void>;
@@ -64,4 +76,18 @@ export class InMemoryListenerConnector implements IListenerConnector {
   checkConnection(): Promise<boolean> {
     return Promise.resolve(true);
   }
+}
+
+export class InMemoryListenerConnector
+  extends InMemoryListenerBase
+  implements IListenerConnector
+{
+  public readonly kind = "listener";
+}
+
+export class InMemoryOrderedListenerConnector
+  extends InMemoryListenerBase
+  implements IOrderedListenerConnector
+{
+  public readonly kind = "ordered-listener";
 }

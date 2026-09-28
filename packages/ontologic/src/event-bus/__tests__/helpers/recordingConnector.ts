@@ -9,6 +9,8 @@ import { IListenerConnector, ReceivedMessage } from "../../../bus-connectors";
  * decisions went unpinned. This exists to pin them.
  */
 export class RecordingListenerConnector implements IListenerConnector {
+  readonly kind = "listener";
+
   status: "STARTED" | "STOPPED" = "STOPPED";
 
   readonly acked: string[] = [];

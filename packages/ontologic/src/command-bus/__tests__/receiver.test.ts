@@ -68,6 +68,7 @@ async function processOneMessage(params: {
   let handle: (message: ReceivedMessage) => Promise<void> = async () => {};
 
   const commandSubscriber: IOrderedListenerConnector = {
+    kind: "ordered-listener",
     status: "STOPPED",
     start: async () => {},
     stop: async () => {},
@@ -80,6 +81,7 @@ async function processOneMessage(params: {
   };
 
   const responsePublisher: IDynamicPublisherConnector = {
+    kind: "dynamic-publisher",
     status: "STOPPED",
     start: async () => {},
     stop: async () => {},
