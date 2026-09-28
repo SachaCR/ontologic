@@ -1,15 +1,16 @@
 import { EventEmitter } from "node:events";
 import { type RedisClientType, createClient } from "redis";
-import {
-  type IListenerConnector,
-  type BusConnectorStatus,
-  type ReceivedMessage,
+import type {
+  IListenerConnector,
+  BusConnectorStatus,
+  ReceivedMessage,
 } from "ontologic";
 
 import { redisSocketOptions } from "./socketOptions";
 
 export class RedisListener implements IListenerConnector {
   public readonly name: string = "Redis/Listener";
+  public readonly kind = "listener";
   #eventEmitter: EventEmitter;
   #status: BusConnectorStatus;
   #topicName: string;

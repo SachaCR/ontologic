@@ -77,6 +77,7 @@ function rig(options?: { timeout?: number; publishFails?: Error }) {
   let handle: (message: ReceivedMessage) => Promise<void> = async () => {};
 
   const commandPublisher: IOrderedPublisherConnector = {
+    kind: "ordered-publisher",
     status: "STOPPED",
     start: async () => {},
     stop: async () => {},
@@ -86,6 +87,7 @@ function rig(options?: { timeout?: number; publishFails?: Error }) {
   };
 
   const responseSubscriber: IListenerConnector = {
+    kind: "listener",
     status: "STOPPED",
     start: async () => {},
     stop: async () => {},

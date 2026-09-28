@@ -21,10 +21,11 @@
   "author": "SachaCR",
   "license": "MIT",
   "dependencies": {
-    "ontologic": "workspace:*",
-    "redis": "^6.2.1"
+    "ontologic": "workspace:*"
   },
   "devDependencies": {
+    "@ontologics/redis-connectors": "workspace:*",
+    "@ontologics/sqs-connectors": "workspace:*",
     "@types/node": "^25.4.0",
     "@vitest/coverage-v8": "^4.1.3",
     "@vitest/ui": "^4.1.3",

@@ -1,11 +1,12 @@
 import { type RedisClientType, createClient } from "redis";
 
-import { type IDynamicPublisherConnector, BusConnectorStatus } from "ontologic";
+import type { IDynamicPublisherConnector, BusConnectorStatus } from "ontologic";
 
 import { redisSocketOptions } from "./socketOptions";
 
 export class RedisDynamicPublisher implements IDynamicPublisherConnector {
   public readonly name: string = "Redis/DynamicPublisher";
+  public readonly kind = "dynamic-publisher";
 
   #status: BusConnectorStatus;
   #publisher: RedisClientType;
@@ -18,13 +19,28 @@ export class RedisDynamicPublisher implements IDynamicPublisherConnector {
     this.#status = "STOPPED";
   }
 
+  /**
+   * Publishes to whatever topic the caller names.
+   *
+   * The topic is per call rather than fixed at construction because the emitter
+   * announces its own response topic in every command it sends, and the
+   * receiver replies to whichever name arrived. That is what lets many emitters
+   * share one receiver.
+   */
   async publishTo(params: {
     topicName: string;
     message: string;
   }): Promise<void> {
     const { topicName, message } = params;
 
-    await this.#publisher.publish(topicName, message);
+    try {
+      await this.#publisher.publish(topicName, message);
+    } catch (error: unknown) {
+      throw new Error(
+        `[${this.name}] Failed to publish to topic "${topicName}"`,
+        { cause: error },
+      );
+    }
   }
 
   get status() {

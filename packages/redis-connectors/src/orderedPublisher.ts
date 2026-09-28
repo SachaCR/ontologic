@@ -1,11 +1,12 @@
 import { type RedisClientType, createClient } from "redis";
 
-import { type IOrderedPublisherConnector, BusConnectorStatus } from "ontologic";
+import type { IOrderedPublisherConnector, BusConnectorStatus } from "ontologic";
 
 import { redisSocketOptions } from "./socketOptions";
 
 export class RedisOrderedPublisher implements IOrderedPublisherConnector {
   public readonly name: string = "Redis/OrderedPublisher";
+  public readonly kind = "ordered-publisher";
 
   #status: BusConnectorStatus;
   #topicName: string;

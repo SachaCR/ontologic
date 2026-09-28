@@ -5,10 +5,12 @@ import {
   type ConnectorContractHarness,
 } from "./contract";
 import { type CommandBusConnectors } from "../../commandBus";
-import { RedisOrderedListener } from "../redis/orderedListener";
-import { RedisOrderedPublisher } from "../redis/orderedPublisher";
-import { RedisListener } from "../redis/listener";
-import { RedisDynamicPublisher } from "../redis/dynamicPublisher";
+import {
+  RedisDynamicPublisher,
+  RedisListener,
+  RedisOrderedListener,
+  RedisOrderedPublisher,
+} from "@ontologics/redis-connectors";
 
 /**
  * Opt-in: these tests need a reachable Redis, so they are skipped unless

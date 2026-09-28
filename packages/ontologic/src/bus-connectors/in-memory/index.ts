@@ -1,6 +1,13 @@
 import { EventEmitter } from "node:events";
-import { InMemoryListenerConnector } from "./listener";
-import { InMemoryPublisherConnector } from "./publisher";
+import {
+  InMemoryListenerConnector,
+  InMemoryOrderedListenerConnector,
+} from "./listener";
+import {
+  InMemoryDynamicPublisherConnector,
+  InMemoryOrderedPublisherConnector,
+  InMemoryPublisherConnector,
+} from "./publisher";
 import {
   IDynamicPublisherConnector,
   IListenerConnector,
@@ -25,12 +32,12 @@ export class InMemoryConnectors {
     });
 
     this.listener = new InMemoryListenerConnector(eventEmitter);
-    this.orderedListener = new InMemoryListenerConnector(eventEmitter);
+    this.orderedListener = new InMemoryOrderedListenerConnector(eventEmitter);
 
     this.publisher = new InMemoryPublisherConnector(eventEmitter);
-    this.orderedPublisher = new InMemoryPublisherConnector(eventEmitter);
+    this.orderedPublisher = new InMemoryOrderedPublisherConnector(eventEmitter);
 
-    this.dynamicPublisher = new InMemoryPublisherConnector(eventEmitter);
+    this.dynamicPublisher = new InMemoryDynamicPublisherConnector(eventEmitter);
   }
 }
 
@@ -45,11 +52,15 @@ export class InMemoryCommandBusConnectors {
       captureRejections: true,
     });
 
-    this.commandOrderedListener = new InMemoryListenerConnector(eventEmitter);
+    this.commandOrderedListener = new InMemoryOrderedListenerConnector(
+      eventEmitter,
+    );
 
-    this.commandOrderedPublisher = new InMemoryPublisherConnector(eventEmitter);
+    this.commandOrderedPublisher = new InMemoryOrderedPublisherConnector(
+      eventEmitter,
+    );
 
-    this.responseDynamicPublisher = new InMemoryPublisherConnector(
+    this.responseDynamicPublisher = new InMemoryDynamicPublisherConnector(
       eventEmitter,
     );
 
