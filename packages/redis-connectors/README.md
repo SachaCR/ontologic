@@ -1,6 +1,6 @@
 # @ontologics/redis-connectors
 
-Redis connectors for the [Ontologic](https://ontologic.site) command bus.
+Redis connectors for the [Ontologic](https://ontologic.site) command bus, and the event bus.
 
 ```bash
 npm install @ontologics/redis-connectors
@@ -23,6 +23,11 @@ command is not volatile — someone is blocked waiting for its answer, and it ha
 handler crashing, so an entry stays in the pending list until it is acked. Responses go through
 **pub/sub** because a response whose caller has already timed out is worth nothing; `ack` and
 `nack` are honest no-ops there.
+
+**For the event bus**, use the stream pair: `RedisOrderedPublisher` with `DomainEventBusPublisher`
+and `RedisOrderedListener` with `DomainEventBusListener` (the event bus accepts ordered
+connectors). Not `RedisListener`: pub/sub keeps nothing, so an event published while no listener is
+subscribed is gone. The stream pair keeps the ordering caveat below.
 
 ## Usage
 

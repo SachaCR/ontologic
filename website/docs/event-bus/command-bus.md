@@ -272,18 +272,21 @@ import { InMemoryCommandBusConnectors } from "ontologic";
 
 const connectors = new InMemoryCommandBusConnectors();
 
-const receiver = new CommandBusReceiver<PlaceOrder>({
-  commandSubscriber: connectors.commandOrderedListener,
-  responsePublisher: connectors.responseDynamicPublisher,
-});
+const receiver = new CommandBusReceiver<PlaceOrderCommand, PlaceOrderMetadata>(
+  {
+    commandSubscriber: connectors.commandOrderedListener,
+    responsePublisher: connectors.responseDynamicPublisher,
+  },
+  { validator: parsePlaceOrder },
+);
 
-const emitter = new CommandBusEmitter<PlaceOrder>({
+const emitter = new CommandBusEmitter<PlaceOrderCommand, PlaceOrderMetadata>({
   commandPublisher: connectors.commandOrderedPublisher,
   responseSubscriber: connectors.responseListener,
 });
 ```
 
-Same caveats as the event bus in-memory connectors: single process, no persistence. Do not use them in production.
+Same caveats as the event bus in-memory connectors: single process, no persistence. Do not use them in production. One set serves **one emitter and one receiver**: in-memory listeners broadcast every message to every subscriber, so a second receiver would handle every command again, and a second emitter would see the first one's responses.
 
 ### Redis and SQS
 
@@ -304,6 +307,7 @@ What to know before running them in production:
 - **Redis streams keep per-key order only with a single consumer.** A consumer group spreads entries across consumers. SQS FIFO keeps per-key order across several listeners.
 - **Redis: call `onError()` before `start()`**, or node-redis gives up reconnecting on the first failure.
 - **SQS: the queue needs `ContentBasedDeduplication`**, and a visibility timeout longer than your slowest handler.
+- **SQS: a receiver's `stop()` can take up to `waitTimeSeconds`** (20 by default). It lets the long poll in progress finish instead of aborting it, because an aborted poll can stay open on the broker side (observed on LocalStack) and swallow the next commands until their visibility timeout expires. Lower `waitTimeSeconds` for faster shutdowns.
 - **SQS: set `maxDeliveries` on the command listener.** A command delivered more times than that is dropped and reported to `onDiscard`, so a poison command no longer holds up the commands behind it with the same ordering key. `SqsOrderedListener` handles each ordering key in order and different keys in parallel, up to `maxInFlight` (default 50).
 
 Each package's README has the details.

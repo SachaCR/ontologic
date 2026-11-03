@@ -1,7 +1,7 @@
 {
   "name": "@ontologics/redis-connectors",
   "version": "0.1.0",
-  "description": "Redis connectors for the Ontologic command bus: streams for commands, pub/sub for responses.",
+  "description": "Redis connectors for the Ontologic command and event buses: streams for commands and events, pub/sub for responses.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {

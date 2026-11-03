@@ -32,13 +32,13 @@ The listener subscribes to incoming messages from the broker and dispatches them
 
 The connector is the adapter between the event bus and the underlying broker. It is the only thing that knows about Kafka, SQS, RabbitMQ, or whatever you're running. The publisher and listener each depend on a connector interface — swap the connector, keep everything else.
 
-
 ### Ordered or not
 
 Whether events are delivered in order is your choice, per consumer. Sometimes order matters (a projection that applies an entity's events one after the other), sometimes it doesn't (sending an email per event).
 
 - The **publisher** takes a plain publisher connector (`kind: "publisher"`) or an ordered one (`kind: "ordered-publisher"`). An ordered connector requires an `orderingKey` on every `publish`, usually the entity id, which is what the [message relay](./message-relay.mdx) passes.
 - The **listener** takes a plain listener connector (`kind: "listener"`) or an ordered one (`kind: "ordered-listener"`), which hands a key's events over one after the other.
+
 ---
 
 ## Defining your event union
@@ -96,6 +96,12 @@ await publisher.stop();
 ```
 
 The `publish` method validates the metadata before forwarding. An invalid `id` or `createdAt` throws immediately — the event is never sent.
+
+With an ordered publisher connector, pass the key whose events must stay in order, usually the entity id. Publishing to an ordered connector without one throws:
+
+```typescript
+await publisher.publish(event, metadata, { orderingKey: event.entityId });
+```
 
 ### Event metadata
 
@@ -237,7 +243,7 @@ The connector interfaces are intentionally thin. Any broker that can route named
 | **Apache Kafka**   | Topic per event name, or a single topic with the event name in the key          |
 | **Google Pub/Sub** | One topic per event, subscription per listener                                  |
 | **RabbitMQ**       | Topic exchanges with the event name as the routing key                          |
-| **Redis Streams**  | Stream per event name, consumer groups for competing consumers                  |
+| **Redis Streams**  | `@ontologics/redis-connectors`: `RedisOrderedPublisher`/`RedisOrderedListener` (a stream and a consumer group). Per-key order holds only with a single consumer |
 
 ---
 
@@ -259,7 +265,7 @@ const listener = new DomainEventBusListener<OrderEvents>({
 });
 ```
 
-The connectors share an internal `EventEmitter`. Publishing an event immediately delivers it to any registered listener in the same process.
+The connectors share an internal `EventEmitter`. Publishing an event immediately delivers it to every registered listener in the same process: in-memory listeners broadcast, there are no competing consumers. `connectors.orderedPublisher` and `connectors.orderedListener` are there too, to test against the ordered connector kinds.
 
 **These connectors are intended for tests and local prototyping only.** They have no persistence, no retry logic, no dead-letter queue, and no cross-process delivery. If the process restarts, unprocessed messages are gone. Ack and nack are no-ops. Do not use them in production.
 
@@ -376,7 +382,7 @@ Both publisher and listener follow the same lifecycle:
 1. **Configure** — pass connectors and options to the constructor
 2. **Register handlers** (listener only) — call `listenTo` before `start`
 3. **Start** — call `start()` to initialize the connector and begin processing
-4. **Stop** — call `stop()` to drain and shut down cleanly
+4. **Stop** — call `stop()` to stop the connector. Whether messages already received finish first is the connector's behaviour: `@ontologics/sqs-connectors` listeners wait for them, the in-memory ones don't
 
 ```typescript
 await publisher.start();

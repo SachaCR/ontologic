@@ -113,12 +113,17 @@ let counter = 0;
 const harness: ConnectorContractHarness = {
   create: () => {
     counter += 1;
+    // A namespace per test: a stream, its consumer group and its pending list
+    // all outlive the test that made them, so a shared topic means every test
+    // starts by draining the last one's leftovers.
+    const namespace = `${process.pid}-${Date.now()}-${counter}`;
+
     return new RedisCommandBusConnectors({
       redisUrl: REDIS_URL ?? "redis://127.0.0.1:6379",
-      // A namespace per test: a stream, its consumer group and its pending list
-      // all outlive the test that made them, so a shared topic means every test
-      // starts by draining the last one's leftovers.
-      namespace: `${process.pid}-${Date.now()}-${counter}`,
+      commandTopic: `commands-${namespace}`,
+      responseTopic: `responses-${namespace}`,
+      // Caps how long stop() waits on the read loop, so teardown stays quick.
+      blockMs: 200,
     });
   },
 
@@ -137,10 +142,12 @@ describe.skipIf(!REDIS_URL)("redis (set REDIS_URL to run)", () => {
 });
 ```
 
-Run them with:
+The connector sets themselves (`RedisCommandBusConnectors`, `SqsCommandBusConnectors`) live in
+`src/connectors/`, shared with the CLI. Run the broker suites against the brokers named in `.env`
+with:
 
 ```bash
-REDIS_URL=redis://127.0.0.1:6379 pnpm --filter command-bus-examples test
+pnpm --filter command-bus-examples test:brokers
 ```
 
 The third case in the contract — three commands in flight at once, each

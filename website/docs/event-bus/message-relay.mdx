@@ -61,7 +61,7 @@ const relay = new MessageRelay(
 The relay exposes a `handler` method that you call with an `entityId`. In the simplest setup where the relay runs in the same process as your application. You can wire it directly to the repository's `onChanges` callback:
 
 ```typescript
-repository.onChanges(relay.handler);
+repository.onChanges(relay.handler.bind(relay));
 ```
 
 This works well for prototyping and single-process deployments. In production however, **you may want to run the relay in a separate process** to isolate it from your application and scale it independently. In that case `onChanges` is no longer available, and you need another way to trigger the handler. Common approaches include:
@@ -124,7 +124,7 @@ If the relay runs in a separate process from your application, the state reposit
 
 ## Error handling
 
-Errors thrown during publishing are emitted as `"error"` events on the relay. Wire up a handler before the relay starts processing:
+A failure while relaying (reading the outbox, publishing an event, moving the checkpoint, or a lock already held by another run) is reported through `onError`, always as an `Error`. The run stops at the failed event, and the next run for that entity starts again from the last checkpoint. `handler()` itself never rejects, so a relay wired to `onChanges` cannot take the process down. Register `onError` so failures are not silent:
 
 ```typescript
 relay.onError((error) => {
@@ -132,7 +132,7 @@ relay.onError((error) => {
 });
 ```
 
-The `unlock` step always runs — even when an error occurs — so a failed relay run never leaves an entity permanently locked.
+A run that took the lock always releases it, even when an error occurs, so a failed relay run never leaves an entity permanently locked. A run that could not take it, because another run for the same entity holds it, leaves that lock alone.
 
 ---
 
@@ -147,9 +147,9 @@ import {
 } from "ontologic";
 
 // Set up the event bus
-const { publisherConnector } = InMemoryConnectors.create();
+const connectors = new InMemoryConnectors();
 const publisher = new DomainEventBusPublisher<OrderEvents>({
-  publisherConnector,
+  publisherConnector: connectors.publisher,
 });
 await publisher.start();
 
