@@ -12,6 +12,8 @@ on:
           - "ontologic"
           - "@ontologics/domain-explorer"
           - "@ontologics/event-sourcing"
+          - "@ontologics/redis-connectors"
+          - "@ontologics/sqs-connectors"
 
       release_type:
         description: Release type ("none" publishes the version already on main)
