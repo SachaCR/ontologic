@@ -8,9 +8,11 @@ import {
   type CommandHandlerResponse,
   type CommandMap,
   type CommandResolver,
+  type StopOptions,
 } from "./interfaces";
 import { busCommandSchema, commandBusResponseSchema } from "./schemas";
 import { waitForTimeout } from "./timeout";
+import { DEFAULT_STOP_TIMEOUT_MS, settlesWithin } from "./stopTimeout";
 import { err, ok } from "../result";
 import {
   IListenerConnector,
@@ -29,6 +31,11 @@ export class CommandBusEmitter<
   #responseSubscriber: IListenerConnector;
   #commandPublisher: IOrderedPublisherConnector;
   #commandMap: CommandMap;
+
+  /** Every `send` call that has not returned yet, publish included. */
+  #inFlight = new Set<Promise<CommandHandlerResponse>>();
+  /** Shared by concurrent `stop` calls while the drain is under way. */
+  #stopping: Promise<void> | undefined;
 
   constructor(
     dependencies: {
@@ -70,10 +77,36 @@ export class CommandBusEmitter<
       timeout?: number;
     },
   ): Promise<CommandHandlerResponse> {
+    if (this.#status === "STOPPING") {
+      throw new Error("Command Bus Emitter is stopping");
+    }
+
     if (this.#status === "STOPPED") {
       throw new Error("Command Bus Emitter is not started");
     }
 
+    // Tracked so `stop` can wait for it. The promise covers the whole call, so
+    // a command still being published counts as in flight too.
+    const sending = this.#send(params, options);
+
+    this.#inFlight.add(sending);
+
+    try {
+      return await sending;
+    } finally {
+      this.#inFlight.delete(sending);
+    }
+  }
+
+  async #send(
+    params: {
+      command: Command;
+      orderingKey: string;
+    },
+    options?: {
+      timeout?: number;
+    },
+  ): Promise<CommandHandlerResponse> {
     const { command, orderingKey } = params;
 
     const validatedCommandResult = busCommandSchema.safeParse(command);
@@ -90,15 +123,12 @@ export class CommandBusEmitter<
       );
     }
 
-    const commandPromise = new Promise<CommandBusResponse>(
-      (resolve, reject) => {
-        this.#commandMap.set(command.id, {
-          resolve,
-          reject,
-          startTime: new Date().getTime(),
-        });
-      },
-    );
+    const commandPromise = new Promise<CommandBusResponse>((resolve) => {
+      this.#commandMap.set(command.id, {
+        resolve,
+        startTime: new Date().getTime(),
+      });
+    });
 
     try {
       await this.#commandPublisher.publish(
@@ -199,6 +229,10 @@ export class CommandBusEmitter<
       return;
     }
 
+    if (this.#status === "STOPPING") {
+      throw new Error(`[${this.name}] Cannot start while stopping`);
+    }
+
     this.#responseSubscriber.onMessage(this.#responseHandler);
 
     await this.#responseSubscriber.start();
@@ -207,9 +241,56 @@ export class CommandBusEmitter<
     this.#status = "STARTED";
   }
 
-  async stop() {
+  /**
+   * Stops gracefully, like an HTTP server draining its connections.
+   *
+   * New `send` calls are refused at once. Commands already in flight keep
+   * waiting for their response, and the response subscriber stays up so it can
+   * still deliver it. Each one is bounded by its own timeout, and the whole
+   * drain by `options.timeout` (2 minutes by default). If that limit hits
+   * first, the commands still waiting are settled with an `EMITTER_STOPPED`
+   * failure and reported through `onError`. Either way, the connectors are
+   * stopped last.
+   *
+   * A second call during the drain joins the first one, options included.
+   */
+  async stop(options?: StopOptions): Promise<void> {
     if (this.#status === "STOPPED") {
       return;
+    }
+
+    const timeout = options?.timeout ?? DEFAULT_STOP_TIMEOUT_MS;
+
+    this.#stopping ??= this.#drainAndStop(timeout).finally(() => {
+      this.#stopping = undefined;
+    });
+
+    return this.#stopping;
+  }
+
+  async #drainAndStop(timeout: number): Promise<void> {
+    this.#status = "STOPPING";
+
+    const drained = await settlesWithin(
+      Promise.allSettled([...this.#inFlight]),
+      timeout,
+    );
+
+    if (!drained) {
+      const abandoned = this.#commandMap.size;
+
+      // Forced: nobody should be left waiting on a bus that is going away.
+      // Each `send` clears its own entry from the map.
+      for (const [commandId, resolver] of this.#commandMap) {
+        resolver.resolve(emitterStoppedResponse(commandId, timeout));
+      }
+
+      this.#eventEmitter.emit(
+        "failure",
+        new Error(
+          `[${this.name}] Stop timed out after ${timeout}ms: ${abandoned} command(s) still in flight were settled with EMITTER_STOPPED`,
+        ),
+      );
     }
 
     try {
@@ -241,4 +322,33 @@ export class CommandBusEmitter<
   status(): CommandBusStatus {
     return this.#status;
   }
+}
+
+/**
+ * What a `send` still waiting resolves with when a forced stop gives up on it.
+ *
+ * Like a timeout, it says nothing about the command itself: it was published,
+ * so a receiver may still handle it.
+ */
+function emitterStoppedResponse(
+  commandId: string,
+  stopTimeout: number,
+): CommandBusResponse {
+  const error = new Error(
+    `The command bus emitter was stopped (stop timeout of ${stopTimeout}ms exceeded) before the command answered. Please verify if the command has been handled or not with idempotency mechanism.`,
+  );
+
+  error.name = "EMITTER_STOPPED_ERROR";
+
+  return {
+    commandId,
+    result: "FAILURE",
+    error: {
+      name: error.name,
+      code: "EMITTER_STOPPED",
+      message: error.message,
+      stack: error.stack ?? null,
+      context: { commandId },
+    },
+  };
 }

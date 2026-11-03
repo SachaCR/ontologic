@@ -53,6 +53,10 @@ The event bus delivers domain events to the rest of your system. A pluggable con
 
 The message relay is the bridge between the outbox table and the event bus. It reads events that were persisted by the repository and forwards them to the broker, tracking exactly what has been published so the system can recover from failures without skipping or restarting from scratch.
 
+### [Command Bus](./event-bus/command-bus.md)
+
+The command bus is request/response over a broker: a caller sends a command to the service that handles it and gets its answer back as a `Result`, with a timeout. It uses the same pluggable connectors as the event bus, with Redis and SQS connectors available as companion packages.
+
 ### [Workflows](./workflows/index.md)
 
 A workflow is a typed, resumable orchestration for multi-step business processes. `ontologic` provides two flavors: a step-by-step chain for linear pipelines and a graph for processes where steps fan out and combine results in parallel. Both give you observability, persistence, and the ability to resume after a failure exactly where the previous run stopped.

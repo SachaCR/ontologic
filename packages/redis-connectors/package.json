@@ -45,7 +45,7 @@
     "redis": "^6.2.1"
   },
   "peerDependencies": {
-    "ontologic": ">=1.9.0"
+    "ontologic": ">=1.10.0"
   },
   "devDependencies": {
     "@types/node": "^25.4.0",

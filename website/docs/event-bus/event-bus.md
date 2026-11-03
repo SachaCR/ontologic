@@ -24,6 +24,7 @@ The listener subscribes to incoming messages from the broker and dispatches them
 | --- | --- | --- |
 | Your handler resolves | `ack()` | — |
 | No handler registered for the event | `ack()` | `onUnhandled(name)` |
+| Envelope has no `event.name` | `ack()` | `onError(error)` |
 | Content is not JSON, or fails the validator | `nack()` | `onError(error)` |
 | Your handler throws | `nack()` | `onError(error)` |
 
@@ -108,6 +109,7 @@ import { DomainEventBusListener } from "ontologic";
 
 const listener = new DomainEventBusListener<OrderEvents>({
   listenerConnector: myConnector,
+  options: { validator: parseOrderEvents },
 });
 
 listener.listenTo("ORDER_PLACED", async (event, metadata) => {
@@ -157,17 +159,19 @@ The connector is the only environment-specific piece of the event bus. Everythin
 
 ### Implementing a connector
 
-To integrate a broker, implement two interfaces:
+To integrate a broker, implement two interfaces. They live in `ontologic`'s shared bus connector contract, which the [command bus](./command-bus.md) uses too:
 
 **Publisher connector:**
 
 ```typescript
 interface IPublisherConnector {
+  readonly kind: "publisher";
   status: "STARTED" | "STOPPED";
   start(): Promise<void>;
   stop(): Promise<void>;
-  publish(name: string, message: string): Promise<void>;
-  onError(handler: (error: unknown) => void): void;
+  publish(message: string, options?: { orderingKey?: string }): Promise<void>;
+  onError(handler: (error: Error) => void): void;
+  checkConnection(): Promise<boolean>;
 }
 ```
 
@@ -175,11 +179,14 @@ interface IPublisherConnector {
 
 ```typescript
 interface IListenerConnector {
+  readonly kind: "listener";
   status: "STARTED" | "STOPPED";
   start(): Promise<void>;
   stop(): Promise<void>;
   onMessage(handler: (message: ReceivedMessage) => Promise<void>): void;
-  onError(handler: (error: unknown) => void): void;
+  topicName(): string;
+  onError(handler: (error: Error) => void): void;
+  checkConnection(): Promise<boolean>;
 }
 ```
 
@@ -187,14 +194,27 @@ interface IListenerConnector {
 
 ```typescript
 interface ReceivedMessage {
-  name: string; // Event name, used to route to the right handler
   content: string; // JSON-serialized { event, metadata } envelope
   ack(): Promise<void>;
   nack(): Promise<void>;
 }
 ```
 
-That's the full contract. The listener calls `ack()` after your handler resolves successfully, and `nack()` if it throws. How ack/nack are implemented is entirely up to the connector — requeue, dead-letter, or discard are all valid choices depending on your broker and your requirements.
+That's the full contract. The connector never sees the event name: the listener reads it from `event.name` inside the envelope to route to the right handler. An envelope without an event name is acked and reported through `onError`, because redelivering it cannot make it routable.
+
+The `kind` field is a discriminator. Several connector interfaces are otherwise structurally identical, and without it TypeScript would accept a listener where an ordered listener was expected.
+
+The listener calls `ack()` after your handler resolves successfully, and `nack()` if it throws. How ack/nack are implemented is entirely up to the connector — requeue, dead-letter, or discard are all valid choices depending on your broker and your requirements.
+
+:::note[Upgrading a connector written for 1.9]
+1.10 changed the connector contract:
+
+- `publish(name, message, options)` is now `publish(message, options)`.
+- `ReceivedMessage.name` is gone; routing reads `event.name` from the envelope.
+- Every connector declares a `kind` and implements `checkConnection()`. Listeners also implement `topicName()`.
+- `onError` handlers receive an `Error`.
+- The interfaces and in-memory connectors moved from `event-bus/connectors` to the shared bus connectors. They are still exported from `ontologic`.
+:::
 
 ### Supported brokers
 
@@ -217,18 +237,18 @@ The connector interfaces are intentionally thin. Any broker that can route named
 ```typescript
 import { InMemoryConnectors } from "ontologic";
 
-const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
+const connectors = new InMemoryConnectors();
 
 const publisher = new DomainEventBusPublisher<OrderEvents>({
-  publisherConnector,
+  publisherConnector: connectors.publisher,
 });
 const listener = new DomainEventBusListener<OrderEvents>({
-  listenerConnector,
+  listenerConnector: connectors.listener,
   options: { validator: parseOrderEvents },
 });
 ```
 
-The two connectors share an internal `EventEmitter`. Publishing an event immediately delivers it to any registered listener in the same process.
+The connectors share an internal `EventEmitter`. Publishing an event immediately delivers it to any registered listener in the same process.
 
 **These connectors are intended for tests and local prototyping only.** They have no persistence, no retry logic, no dead-letter queue, and no cross-process delivery. If the process restarts, unprocessed messages are gone. Ack and nack are no-ops. Do not use them in production.
 
@@ -242,13 +262,13 @@ import {
 } from "ontologic";
 
 test("listener receives published events", async () => {
-  const { publisherConnector, listenerConnector } = InMemoryConnectors.create();
+  const connectors = new InMemoryConnectors();
 
   const publisher = new DomainEventBusPublisher<OrderEvents>({
-    publisherConnector,
+    publisherConnector: connectors.publisher,
   });
   const listener = new DomainEventBusListener<OrderEvents>({
-    listenerConnector,
+    listenerConnector: connectors.listener,
     options: { validator: parseOrderEvents },
   });
 
@@ -274,7 +294,7 @@ test("listener receives published events", async () => {
 });
 ```
 
-Each test gets its own `InMemoryConnectors.create()` call, so there is no shared state between tests.
+Each test builds its own `new InMemoryConnectors()`, so there is no shared state between tests.
 
 ---
 

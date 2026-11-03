@@ -35,7 +35,7 @@ function successResponse(
 function remoteError() {
   return {
     name: "ORDER_ALREADY_PAID",
-    code: "OOPS",
+    code: "COMMAND_REJECTED",
     message: "order already paid",
     stack: "Error: order already paid\n    at <anonymous>",
     context: { orderId: "order-1" },
@@ -76,11 +76,16 @@ function rig(options?: { timeout?: number; publishFails?: Error }) {
 
   let handle: (message: ReceivedMessage) => Promise<void> = async () => {};
 
+  /** The order the connectors were stopped in. */
+  const stopped: string[] = [];
+
   const commandPublisher: IOrderedPublisherConnector = {
     kind: "ordered-publisher",
     status: "STOPPED",
     start: async () => {},
-    stop: async () => {},
+    stop: async () => {
+      stopped.push("commandPublisher");
+    },
     onError: () => {},
     checkConnection: async () => true,
     publish,
@@ -90,7 +95,9 @@ function rig(options?: { timeout?: number; publishFails?: Error }) {
     kind: "listener",
     status: "STOPPED",
     start: async () => {},
-    stop: async () => {},
+    stop: async () => {
+      stopped.push("responseSubscriber");
+    },
     onError: () => {},
     checkConnection: async () => true,
     topicName: () => "responses",
@@ -138,8 +145,12 @@ function rig(options?: { timeout?: number; publishFails?: Error }) {
     reportedErrors,
     deliver,
     publishedMessage,
+    stopped,
   };
 }
+
+/** Lets pending promise callbacks and short timers run. */
+const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
 
 describe("CommandBusEmitter.send", () => {
   it("rejects when the emitter has not been started", async () => {
@@ -422,6 +433,214 @@ describe("CommandBusEmitter lifecycle", () => {
     await emitter.stop();
 
     expect(emitter.status()).toBe("STOPPED");
+  });
+
+  it("waits for a command in flight and hands it its real response", async () => {
+    const { emitter, deliver } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = emitter.stop();
+    await deliver(JSON.stringify(successResponse()));
+    await stopping;
+
+    expect((await sending)._unsafeUnwrap()).toEqual({ status: "PLACED" });
+  });
+
+  it("lets a command with no answer time out while stopping", async () => {
+    const { emitter } = rig({ timeout: 20 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    await emitter.stop();
+
+    expect((await sending)._unsafeUnwrapErr().name).toBe("TIMEOUT_ERROR");
+  });
+
+  it("refuses new commands while stopping", async () => {
+    const { emitter } = rig({ timeout: 20 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = emitter.stop();
+
+    await expect(
+      emitter.send({
+        command: { ...command(), id: "cmd-2" },
+        orderingKey: "order-2",
+      }),
+    ).rejects.toThrow("Command Bus Emitter is stopping");
+
+    await Promise.all([sending, stopping]);
+  });
+
+  it("reports STOPPING while commands are draining", async () => {
+    const { emitter, deliver } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = emitter.stop();
+    await tick();
+
+    expect(emitter.status()).toBe("STOPPING");
+
+    await deliver(JSON.stringify(successResponse()));
+    await Promise.all([sending, stopping]);
+  });
+
+  it("keeps its connectors running until the drain is over", async () => {
+    const { emitter, deliver, stopped } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = emitter.stop();
+    await tick();
+
+    expect(stopped).toEqual([]);
+
+    await deliver(JSON.stringify(successResponse()));
+    await Promise.all([sending, stopping]);
+  });
+
+  it("stops the publisher, then the response subscriber", async () => {
+    const { emitter, stopped } = rig();
+    await emitter.start();
+
+    await emitter.stop();
+
+    expect(stopped).toEqual(["commandPublisher", "responseSubscriber"]);
+  });
+
+  it("stops its connectors once when stop is called twice during the drain", async () => {
+    const { emitter, deliver, stopped } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = [emitter.stop(), emitter.stop()];
+    await deliver(JSON.stringify(successResponse()));
+    await Promise.all([sending, ...stopping]);
+
+    expect(stopped).toEqual(["commandPublisher", "responseSubscriber"]);
+  });
+
+  it("does not force the stop before 2 minutes by default", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { emitter } = rig({ timeout: 600_000 });
+      await emitter.start();
+
+      void emitter.send({ command: command(), orderingKey: "order-1" });
+      let stopped = false;
+      void emitter.stop().then(() => {
+        stopped = true;
+      });
+      await vi.advanceTimersByTimeAsync(119_999);
+
+      expect(stopped).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("forces the stop after 2 minutes by default", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { emitter } = rig({ timeout: 600_000 });
+      await emitter.start();
+
+      void emitter.send({ command: command(), orderingKey: "order-1" });
+      const stopping = emitter.stop();
+      await vi.advanceTimersByTimeAsync(120_000);
+      await stopping;
+
+      expect(emitter.status()).toBe("STOPPED");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("settles a command still waiting with EMITTER_STOPPED when the stop is forced", async () => {
+    const { emitter } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    await emitter.stop({ timeout: 20 });
+
+    const error = (await sending)._unsafeUnwrapErr();
+
+    expect(error.name).toBe("EMITTER_STOPPED_ERROR");
+    expect(error.cause).toMatchObject({
+      code: "EMITTER_STOPPED",
+      context: { commandId: "cmd-1" },
+    });
+  });
+
+  it("reports a forced stop through onError", async () => {
+    const { emitter, reportedErrors } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    await emitter.stop({ timeout: 20 });
+    await sending;
+
+    expect((reportedErrors[0] as Error).message).toBe(
+      "[CommandBusEmitter] Stop timed out after 20ms: 1 command(s) still in flight were settled with EMITTER_STOPPED",
+    );
+  });
+
+  it("stops its connectors when the stop is forced", async () => {
+    const { emitter, stopped } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    await emitter.stop({ timeout: 20 });
+    await sending;
+
+    expect(stopped).toEqual(["commandPublisher", "responseSubscriber"]);
+  });
+
+  it("reports nothing when the drain finishes in time", async () => {
+    const { emitter, deliver, reportedErrors } = rig({ timeout: 10000 });
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: command(),
+      orderingKey: "order-1",
+    });
+    const stopping = emitter.stop();
+    await deliver(JSON.stringify(successResponse()));
+    await Promise.all([sending, stopping]);
+
+    expect(reportedErrors).toEqual([]);
   });
 
   it("checks both connectors", async () => {

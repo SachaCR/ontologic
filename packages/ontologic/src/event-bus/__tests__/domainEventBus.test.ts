@@ -309,9 +309,10 @@ describe("DomainEventBusListener", () => {
     await recording.deliver("Nameless", "{}");
 
     expect(onError).toHaveBeenCalledTimes(1);
-    // Pinned as-is: this branch reports a bare string where every other
-    // "failure" carries an Error. Worth knowing if that ever changes.
-    expect(onError).toHaveBeenCalledWith("Event Received without a name");
+    expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    expect((onError.mock.calls[0]?.[0] as Error).message).toBe(
+      "Invalid EventBusMessage: event is not an object",
+    );
   });
 
   it("does not run the handler for a message with no event name", async () => {
