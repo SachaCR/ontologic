@@ -32,6 +32,13 @@ The listener subscribes to incoming messages from the broker and dispatches them
 
 The connector is the adapter between the event bus and the underlying broker. It is the only thing that knows about Kafka, SQS, RabbitMQ, or whatever you're running. The publisher and listener each depend on a connector interface — swap the connector, keep everything else.
 
+
+### Ordered or not
+
+Whether events are delivered in order is your choice, per consumer. Sometimes order matters (a projection that applies an entity's events one after the other), sometimes it doesn't (sending an email per event).
+
+- The **publisher** takes a plain publisher connector (`kind: "publisher"`) or an ordered one (`kind: "ordered-publisher"`). An ordered connector requires an `orderingKey` on every `publish`, usually the entity id, which is what the [message relay](./message-relay.mdx) passes.
+- The **listener** takes a plain listener connector (`kind: "listener"`) or an ordered one (`kind: "ordered-listener"`), which hands a key's events over one after the other.
 ---
 
 ## Defining your event union
@@ -206,6 +213,10 @@ The `kind` field is a discriminator. Several connector interfaces are otherwise 
 
 The listener calls `ack()` after your handler resolves successfully, and `nack()` if it throws. How ack/nack are implemented is entirely up to the connector — requeue, dead-letter, or discard are all valid choices depending on your broker and your requirements.
 
+:::warning[A failing event blocks its group]
+An event whose handler throws is nacked. On `SqsOrderedListener`, nothing behind it with the same ordering key then runs until it succeeds. That is deliberate: skipping it would corrupt everything downstream. Set `nackVisibilitySeconds` as the retry delay, never set `maxDeliveries` on an event listener, and use no redrive policy (or a very high `maxReceiveCount`) on event queues.
+:::
+
 :::note[Upgrading a connector written for 1.9]
 1.10 changed the connector contract:
 
@@ -222,7 +233,7 @@ The connector interfaces are intentionally thin. Any broker that can route named
 
 | Broker             | Notes                                                                           |
 | ------------------ | ------------------------------------------------------------------------------- |
-| **AWS SQS**        | One queue per event name, or a single queue with message attributes for routing |
+| **AWS SQS**        | `@ontologics/sqs-connectors`: `SqsPublisher`/`SqsListener` on a standard queue, or `SqsOrderedPublisher`/`SqsOrderedListener` on a FIFO queue for per-entity order |
 | **Apache Kafka**   | Topic per event name, or a single topic with the event name in the key          |
 | **Google Pub/Sub** | One topic per event, subscription per listener                                  |
 | **RabbitMQ**       | Topic exchanges with the event name as the routing key                          |

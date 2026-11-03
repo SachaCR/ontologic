@@ -1,15 +1,16 @@
 {
   "name": "command-bus-examples",
   "version": "1.0.0",
-  "description": "Runnable command bus examples, and the home of the Redis and SQS connectors.",
+  "description": "An interactive command bus CLI over in-memory, Redis or SQS connectors, and the contract those connectors are tested against.",
   "private": true,
   "scripts": {
     "build": "tsc",
     "build:release": "tsc",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "test": "vitest run",
+    "test:brokers": "vitest run --mode brokers",
     "test:report": "vitest run && vite preview --outDir reports",
-    "example:in-memory": "pnpx tsx src/example.ts"
+    "cli": "tsx src/cli/index.ts"
   },
   "keywords": [
     "ontologic",
@@ -21,14 +22,15 @@
   "author": "SachaCR",
   "license": "MIT",
   "dependencies": {
+    "@ontologics/redis-connectors": "workspace:*",
+    "@ontologics/sqs-connectors": "workspace:*",
     "ontologic": "workspace:*"
   },
   "devDependencies": {
-    "@ontologics/redis-connectors": "workspace:*",
-    "@ontologics/sqs-connectors": "workspace:*",
     "@types/node": "^25.4.0",
     "@vitest/coverage-v8": "^4.1.3",
     "@vitest/ui": "^4.1.3",
+    "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^4.1.3"
   },

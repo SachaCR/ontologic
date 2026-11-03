@@ -1,17 +1,19 @@
-import { IDomainEventBusPublisher } from "./interfaces";
+import {
+  type EventBusPublisherConnector,
+  IDomainEventBusPublisher,
+} from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { validateMetadata } from "./validateMetadata";
-import { IPublisherConnector } from "../bus-connectors";
 import { type ErrorHandler } from "../messaging";
 
 export class DomainEventBusPublisher<
   Event extends DomainEventInterface,
 > implements IDomainEventBusPublisher<Event> {
-  #publisherConnector: IPublisherConnector;
+  #publisherConnector: EventBusPublisherConnector;
   #validator?: (event: unknown) => Event;
 
   constructor(params: {
-    publisherConnector: IPublisherConnector;
+    publisherConnector: EventBusPublisherConnector;
     options?: { validator?: (event: unknown) => Event };
   }) {
     const { publisherConnector, options } = params;
@@ -40,6 +42,10 @@ export class DomainEventBusPublisher<
       orderingKey?: string;
     },
   ) {
+    // Resolved first: a missing ordering key is a caller bug, reported before
+    // anything else is checked.
+    const send = this.#sender(options);
+
     const validatedMetadata = validateMetadata(metadata);
 
     let eventToPublish = event;
@@ -53,7 +59,27 @@ export class DomainEventBusPublisher<
       metadata: validatedMetadata,
     };
 
-    await this.#publisherConnector.publish(JSON.stringify(message), options);
+    await send(JSON.stringify(message));
+  }
+
+  #sender(options?: {
+    orderingKey?: string;
+  }): (content: string) => Promise<void> {
+    const connector = this.#publisherConnector;
+
+    if (connector.kind === "ordered-publisher") {
+      const orderingKey = options?.orderingKey;
+
+      if (!orderingKey) {
+        throw new Error(
+          "[DomainEventBusPublisher] An ordered publisher connector needs an orderingKey",
+        );
+      }
+
+      return (content) => connector.publish(content, { orderingKey });
+    }
+
+    return (content) => connector.publish(content, options);
   }
 
   async start() {

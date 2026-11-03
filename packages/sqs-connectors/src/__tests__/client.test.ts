@@ -4,6 +4,7 @@ import type { SQSClient } from "@aws-sdk/client-sqs";
 import { rejectionOf } from "./helpers/sqsClientMock";
 import {
   assertFifoQueueName,
+  assertStandardQueueName,
   assertOrderingKey,
   createSqsClient,
   resolveQueueUrl,
@@ -151,6 +152,36 @@ describe("resolveQueueUrl", () => {
     });
   });
 
+  it("creates a standard queue without FIFO attributes", async () => {
+    const client = clientStub(() => ({ QueueUrl: queueUrl }));
+
+    await resolveQueueUrl("C", client, {
+      queueName: "events",
+      ensureQueue: true,
+    });
+
+    expect(client.send.mock.calls[0]?.[0]).toMatchObject({
+      input: { Attributes: { VisibilityTimeout: "30" } },
+    });
+  });
+
+  it("gives a standard queue no FifoQueue attribute", async () => {
+    const client = clientStub(() => ({ QueueUrl: queueUrl }));
+
+    await resolveQueueUrl("C", client, {
+      queueName: "events",
+      ensureQueue: true,
+    });
+
+    const command = client.send.mock.calls[0]?.[0] as {
+      input: { Attributes: Record<string, string> };
+    };
+
+    expect(Object.keys(command.input.Attributes)).toEqual([
+      "VisibilityTimeout",
+    ]);
+  });
+
   it("defaults the visibility timeout to 30 seconds", async () => {
     const client = clientStub(() => ({ QueueUrl: queueUrl }));
 
@@ -208,5 +239,17 @@ describe("resolveQueueUrl", () => {
     );
 
     expect(failure.cause).toBe(denied);
+  });
+});
+
+describe("assertStandardQueueName", () => {
+  it("accepts a name without the FIFO suffix", () => {
+    expect(() => assertStandardQueueName("C", "events")).not.toThrow();
+  });
+
+  it("rejects a FIFO name, pointing at the ordered connector", () => {
+    expect(() => assertStandardQueueName("C", "events.fifo")).toThrow(
+      '[C] A standard queue name must not end in ".fifo", got "events.fifo". Use the ordered connector for a FIFO queue',
+    );
   });
 });

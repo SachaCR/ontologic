@@ -2,20 +2,24 @@ import { DomainEventInterface } from "../domainEvent";
 import { EventEmitter } from "node:events";
 import { validateMetadata } from "./validateMetadata";
 import { eventBusMessageSchema } from "./schemas";
-import { EventHandler, IDomainEventBusListener } from "./interfaces";
-import { IListenerConnector, ReceivedMessage } from "../bus-connectors";
+import {
+  type EventBusListenerConnector,
+  EventHandler,
+  IDomainEventBusListener,
+} from "./interfaces";
+import { ReceivedMessage } from "../bus-connectors";
 import { type ErrorHandler } from "../messaging";
 
 export class DomainEventBusListener<
   Event extends DomainEventInterface,
 > implements IDomainEventBusListener<Event> {
-  #listenerConnector: IListenerConnector;
+  #listenerConnector: EventBusListenerConnector;
   #eventHandlersMap: Map<Event["name"] | "*", EventHandler<Event>>;
   #eventEmitter: EventEmitter;
   #validator: (event: unknown) => Event;
 
   constructor(params: {
-    listenerConnector: IListenerConnector;
+    listenerConnector: EventBusListenerConnector;
     options: { validator: (event: unknown) => Event };
   }) {
     const { listenerConnector, options } = params;

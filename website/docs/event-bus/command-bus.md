@@ -292,7 +292,7 @@ Production connectors ship as separate packages, so `ontologic` itself stays dep
 | Package | Provides | Use it for |
 | --- | --- | --- |
 | `@ontologics/redis-connectors` | `RedisOrderedPublisher`, `RedisOrderedListener` (streams + consumer group), `RedisDynamicPublisher`, `RedisListener` (pub/sub) | Both channels |
-| `@ontologics/sqs-connectors` | `SqsOrderedPublisher`, `SqsOrderedListener` (FIFO queue, `orderingKey` → `MessageGroupId`) | Commands only. Pair with Redis for responses |
+| `@ontologics/sqs-connectors` | `SqsOrderedPublisher`, `SqsOrderedListener` (FIFO queue, `orderingKey` → `MessageGroupId`, groups in parallel) | Commands. Pair with Redis for responses |
 
 ```bash
 npm install @ontologics/redis-connectors
@@ -303,6 +303,7 @@ What to know before running them in production:
 
 - **Redis streams keep per-key order only with a single consumer.** A consumer group spreads entries across consumers. SQS FIFO keeps per-key order across several listeners.
 - **Redis: call `onError()` before `start()`**, or node-redis gives up reconnecting on the first failure.
-- **SQS: the queue needs `ContentBasedDeduplication`**, a visibility timeout longer than your slowest handler, and a redrive policy for poison messages.
+- **SQS: the queue needs `ContentBasedDeduplication`**, and a visibility timeout longer than your slowest handler.
+- **SQS: set `maxDeliveries` on the command listener.** A command delivered more times than that is dropped and reported to `onDiscard`, so a poison command no longer holds up the commands behind it with the same ordering key. `SqsOrderedListener` handles each ordering key in order and different keys in parallel, up to `maxInFlight` (default 50).
 
 Each package's README has the details.
