@@ -3,13 +3,18 @@ import EventEmitter from "events";
 import {
   type BusCommand,
   type CommandBusResponse,
-  type CommandBusStatus,
   type CommandEmitter,
   type CommandHandlerResponse,
   type CommandMap,
+  type CommandMetadata,
   type CommandResolver,
-  type StopOptions,
 } from "./interfaces";
+import {
+  type BusStatus,
+  type ErrorHandler,
+  type StopOptions,
+} from "../messaging";
+import { validateMessageMetadata } from "../messaging/wireGuards";
 import { busCommandSchema, commandBusResponseSchema } from "./schemas";
 import { waitForTimeout } from "./timeout";
 import { DEFAULT_STOP_TIMEOUT_MS, settlesWithin } from "./stopTimeout";
@@ -22,9 +27,10 @@ import {
 
 export class CommandBusEmitter<
   Command extends BusCommand,
-> implements CommandEmitter<Command> {
+  Metadata extends CommandMetadata = CommandMetadata,
+> implements CommandEmitter<Command, Metadata> {
   public readonly name = "CommandBusEmitter";
-  #status: CommandBusStatus = "STOPPED";
+  #status: BusStatus = "STOPPED";
 
   #defaultTimeout: number;
   #eventEmitter: EventEmitter;
@@ -71,6 +77,7 @@ export class CommandBusEmitter<
   async send(
     params: {
       command: Command;
+      metadata: Metadata;
       orderingKey: string;
     },
     options?: {
@@ -101,13 +108,14 @@ export class CommandBusEmitter<
   async #send(
     params: {
       command: Command;
+      metadata: Metadata;
       orderingKey: string;
     },
     options?: {
       timeout?: number;
     },
   ): Promise<CommandHandlerResponse> {
-    const { command, orderingKey } = params;
+    const { command, metadata, orderingKey } = params;
 
     const validatedCommandResult = busCommandSchema.safeParse(command);
 
@@ -115,16 +123,23 @@ export class CommandBusEmitter<
       throw validatedCommandResult.error;
     }
 
-    const timeout = options?.timeout ?? this.#defaultTimeout;
+    const validatedMetadataResult = validateMessageMetadata(metadata);
 
-    if (this.#commandMap.has(command.id)) {
+    if (validatedMetadataResult.isErr()) {
+      throw validatedMetadataResult.error;
+    }
+
+    const timeout = options?.timeout ?? this.#defaultTimeout;
+    const commandId = metadata.id;
+
+    if (this.#commandMap.has(commandId)) {
       throw new Error(
-        `Command with id ${command.id} already in flight. Please use a unique command id for each command or wait for the first one to return or timeout. Or add await to your code...`,
+        `Command with id ${commandId} already in flight. Please use a unique metadata.id for each command or wait for the first one to return or timeout. Or add await to your code...`,
       );
     }
 
     const commandPromise = new Promise<CommandBusResponse>((resolve) => {
-      this.#commandMap.set(command.id, {
+      this.#commandMap.set(commandId, {
         resolve,
         startTime: new Date().getTime(),
       });
@@ -132,21 +147,23 @@ export class CommandBusEmitter<
 
     try {
       await this.#commandPublisher.publish(
+        // A use-case `Command` serializes through its own `toJSON`.
         JSON.stringify({
-          responseTopicName: this.#responseSubscriber.topicName(),
           command,
+          metadata,
+          responseTopicName: this.#responseSubscriber.topicName(),
         }),
         {
           orderingKey,
         },
       );
     } catch (err) {
-      this.#commandMap.delete(command.id);
+      this.#commandMap.delete(commandId);
 
       throw err;
     }
 
-    const commandTimeout = waitForTimeout(timeout, command.id);
+    const commandTimeout = waitForTimeout(timeout, commandId);
 
     let response: CommandBusResponse;
 
@@ -157,7 +174,7 @@ export class CommandBusEmitter<
       // pins one for the full timeout.
       commandTimeout.cancel();
 
-      this.#commandMap.delete(command.id);
+      this.#commandMap.delete(commandId);
     }
 
     if (response.result === "FAILURE") {
@@ -304,7 +321,7 @@ export class CommandBusEmitter<
     }
   }
 
-  onError(errorHandler: (error: Error) => void) {
+  onError(errorHandler: ErrorHandler) {
     this.#responseSubscriber.onError(errorHandler);
     this.#commandPublisher.onError(errorHandler);
 
@@ -319,7 +336,7 @@ export class CommandBusEmitter<
     };
   }
 
-  status(): CommandBusStatus {
+  status(): BusStatus {
     return this.#status;
   }
 }

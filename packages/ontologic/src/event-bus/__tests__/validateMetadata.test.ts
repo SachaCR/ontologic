@@ -42,10 +42,23 @@ describe("validateMetadata", () => {
     expect(validateMetadata(base({ createdAt })).createdAt).toBe(createdAt);
   });
 
-  it("rejects createdAt with a non-zero UTC offset (isExactISODateTime compares literal H:M:S to UTC parts)", () => {
-    expect(() =>
-      validateMetadata({ id: "x", createdAt: "2026-01-15T08:30:45+05:30" }),
-    ).toThrow(
+  it.each([
+    ["a positive offset", "2026-01-15T08:30:45+05:30"],
+    ["a negative offset", "2026-01-15T08:30:45-08:00"],
+    ["an offset that crosses midnight", "2026-01-15T23:30:00-02:00"],
+    ["an offset that crosses a year", "2026-01-01T00:30:00+02:00"],
+    ["an offset and fractional seconds", "2026-01-15T08:30:45.123+01:00"],
+  ] as const)("accepts createdAt with %s", (_label, createdAt) => {
+    expect(validateMetadata(base({ createdAt })).createdAt).toBe(createdAt);
+  });
+
+  it.each([
+    ["an offset hour above 23", "2026-01-15T08:30:45+24:00"],
+    ["an offset minute above 59", "2026-01-15T08:30:45+05:60"],
+    ["hour 24 with an offset", "2026-01-15T24:00:00+01:00"],
+    ["February 30th with an offset", "2026-02-30T08:30:45+01:00"],
+  ] as const)("rejects createdAt with %s", (_label, createdAt) => {
+    expect(() => validateMetadata(base({ createdAt }))).toThrow(
       "Invalid Metadata: createdAt is not a valid ISO date time string",
     );
   });

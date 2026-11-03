@@ -19,8 +19,15 @@ class CapturingListener implements IDomainEventBusListener<LibraryEvent> {
     this.handlers.set(eventName, handler as EventHandler<LibraryEvent>);
   }
 
-  start() {}
-  stop() {}
+  async start() {}
+  async stop() {}
+  onError() {}
+  status() {
+    return "STARTED" as const;
+  }
+  async checkConnection() {
+    return true;
+  }
 
   async deliver(event: LibraryEvent) {
     const handler = this.handlers.get(event.name);

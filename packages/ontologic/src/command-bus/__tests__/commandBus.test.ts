@@ -3,17 +3,30 @@ import { describe, it, expect } from "vitest";
 import { InMemoryCommandBusConnectors } from "../../bus-connectors";
 import { CommandBusEmitter } from "../emitter";
 import { CommandBusReceiver } from "../receiver";
-import { type BusCommand, type CommandHandlerResponse } from "../interfaces";
+import {
+  type BusCommand,
+  type CommandHandler,
+  type CommandMetadata,
+} from "../interfaces";
+import { Command } from "../../action";
 import { err, ok } from "../../result";
 
 function command(overrides?: Partial<BusCommand>): BusCommand {
   return {
-    id: "cmd-1",
     name: "PlaceOrder",
     payload: { orderId: "order-1" },
-    metadata: { correlationId: "corr-1" },
     ...overrides,
   };
+}
+
+function metadata(): CommandMetadata {
+  return { id: "cmd-1", createdAt: "2026-01-01T00:00:00.000Z" };
+}
+
+class PlaceOrderCommand extends Command<"PLACE_ORDER", { orderId: string }> {
+  constructor(payload: { orderId: string }) {
+    super({ name: "PLACE_ORDER", payload });
+  }
 }
 
 /**
@@ -25,17 +38,21 @@ function command(overrides?: Partial<BusCommand>): BusCommand {
  * string one side writes have to be the string the other side reads.
  */
 async function rig(params: {
-  handler: (command: BusCommand) => Promise<CommandHandlerResponse>;
+  handler: CommandHandler<BusCommand>;
+  validator?: (command: unknown) => BusCommand;
   /** Left stopped to exercise the timeout: nothing consumes the command. */
   startReceiver?: boolean;
   timeout?: number;
 }) {
   const connectors = new InMemoryCommandBusConnectors();
 
-  const receiver = new CommandBusReceiver<BusCommand>({
-    commandSubscriber: connectors.commandOrderedListener,
-    responsePublisher: connectors.responseDynamicPublisher,
-  });
+  const receiver = new CommandBusReceiver<BusCommand>(
+    {
+      commandSubscriber: connectors.commandOrderedListener,
+      responsePublisher: connectors.responseDynamicPublisher,
+    },
+    { validator: params.validator ?? ((raw) => raw as BusCommand) },
+  );
 
   const emitter = new CommandBusEmitter<BusCommand>(
     {
@@ -64,6 +81,7 @@ describe("command bus round trip", () => {
 
     const result = await emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -83,9 +101,90 @@ describe("command bus round trip", () => {
       },
     });
 
-    await emitter.send({ command: command(), orderingKey: "order-1" });
+    await emitter.send({
+      command: command(),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
 
     expect(seen).toEqual([command()]);
+  });
+
+  it("delivers a use-case Command as an instance of its class", async () => {
+    const seen: unknown[] = [];
+    const { emitter } = await rig({
+      validator: (raw) =>
+        new PlaceOrderCommand((raw as PlaceOrderCommand).payload),
+      handler: async (received) => {
+        seen.push(received);
+        return ok(null);
+      },
+    });
+
+    await emitter.send({
+      command: new PlaceOrderCommand({ orderId: "order-1" }),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
+
+    expect(seen[0]).toBeInstanceOf(PlaceOrderCommand);
+  });
+
+  it("delivers the command's payload intact", async () => {
+    const seen: PlaceOrderCommand[] = [];
+    const { emitter } = await rig({
+      validator: (raw) =>
+        new PlaceOrderCommand((raw as PlaceOrderCommand).payload),
+      handler: async (received) => {
+        seen.push(received as PlaceOrderCommand);
+        return ok(null);
+      },
+    });
+
+    await emitter.send({
+      command: new PlaceOrderCommand({ orderId: "order-1" }),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
+
+    expect(seen[0]?.payload).toEqual({ orderId: "order-1" });
+  });
+
+  it("delivers the metadata next to the command", async () => {
+    const seen: CommandMetadata[] = [];
+    const { emitter } = await rig({
+      handler: async (_command, received) => {
+        seen.push(received);
+        return ok(null);
+      },
+    });
+
+    await emitter.send({
+      command: command(),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
+
+    expect(seen).toEqual([metadata()]);
+  });
+
+  it("returns INVALID_COMMAND when the receiver's validator refuses it", async () => {
+    const { emitter } = await rig({
+      validator: () => {
+        throw new Error("orderId must be a UUID");
+      },
+      handler: async () => ok(null),
+    });
+
+    const result = await emitter.send({
+      command: command(),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
+
+    expect(result._unsafeUnwrapErr().cause).toMatchObject({
+      code: "INVALID_COMMAND",
+    });
   });
 
   it("returns the handler's domain error", async () => {
@@ -96,6 +195,7 @@ describe("command bus round trip", () => {
 
     const result = await emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -114,6 +214,7 @@ describe("command bus round trip", () => {
 
     const result = await emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -131,6 +232,7 @@ describe("command bus round trip", () => {
 
     const result = await emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -143,7 +245,11 @@ describe("command bus round trip", () => {
   it("clears the command from the in-flight map once it settles", async () => {
     const { emitter } = await rig({ handler: async () => ok(null) });
 
-    await emitter.send({ command: command(), orderingKey: "order-1" });
+    await emitter.send({
+      command: command(),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
 
     expect(emitter.metrics().inFlightCommands).toBe(0);
   });

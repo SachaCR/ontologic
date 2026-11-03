@@ -29,47 +29,71 @@ responses  receiver --dynamic publish-->  emitter    (one topic per emitter)
 
 ### Commands
 
-A command is a JSON-serializable envelope:
+A command on the bus is the same [use-case `Command`](../application/use-case.md) you hand to a use case in-process: a `name` and a JSON-serializable `payload`. Plain objects with that shape work too.
 
 ```typescript
-interface BusCommand {
-  id: string; // unique per command, used to match the response
-  name: string;
-  payload: unknown;
-  metadata: unknown;
+import { Command, type CommandMetadata } from "ontologic";
+
+interface PlaceOrderPayload {
+  orderId: string;
+  items: { sku: string; quantity: number }[];
+}
+
+class PlaceOrderCommand extends Command<"PLACE_ORDER", PlaceOrderPayload> {
+  constructor(payload: PlaceOrderPayload) {
+    super({ name: "PLACE_ORDER", payload });
+  }
 }
 ```
 
-Narrow `payload` and `metadata` to make a command yours:
+Like an event, a command travels with **metadata**, which identifies this occurrence:
+
+| Field | Type | Required | Description |
+| --- | --- | --- | --- |
+| `id` | `string` | Yes | Unique per command. The emitter matches the response on it; use it for idempotency |
+| `createdAt` | `string` | Yes | ISO 8601 date time with timezone |
+
+Extend `CommandMetadata` for anything else you want to carry, such as a correlation id:
 
 ```typescript
-import type { BusCommand } from "ontologic";
-
-interface PlaceOrder extends BusCommand {
-  name: "PlaceOrder";
-  payload: {
-    orderId: string;
-    items: { sku: string; quantity: number }[];
-  };
-  metadata: { correlationId: string };
+interface PlaceOrderMetadata extends CommandMetadata {
+  correlationId: string;
 }
 ```
 
-:::warning
-The receiver checks the envelope (`id`, `name`, and that `payload` and `metadata` are present), not your payload. The `Command` type parameter is trust, not validation. Validate the payload at the top of your handler.
-:::
+On the wire the envelope is `{ command, metadata, responseTopicName }`, the same shape as the event bus's `{ event, metadata }`. The response topic is added by the emitter.
 
 ---
 
 ## Handling commands
 
-A handler returns a [`Result`](../domain-model/result-pattern.md). A business refusal is a value, not an exception:
+A command arrives as plain JSON, not as an instance of your class. As on the event bus listener, the receiver therefore takes a **required validator**. It checks the raw command and rebuilds your class:
+
+```typescript
+function parsePlaceOrder(raw: unknown): PlaceOrderCommand {
+  const data = PlaceOrderSchema.parse(raw); // Zod, or hand-written checks
+  return new PlaceOrderCommand(data.payload);
+}
+
+const receiver = new CommandBusReceiver<PlaceOrderCommand, PlaceOrderMetadata>(
+  {
+    commandSubscriber: commandOrderedListener,
+    responsePublisher: responseDynamicPublisher,
+  },
+  { validator: parsePlaceOrder },
+);
+```
+
+If the validator throws, the handler never runs and the emitter gets an `INVALID_COMMAND` failure right away, instead of waiting for a timeout.
+
+A handler receives the command and its metadata, like an event handler, and returns a [`Result`](../domain-model/result-pattern.md). A business refusal is a value, not an exception:
 
 ```typescript
 import { DomainError, err, ok, type CommandHandlerResponse } from "ontologic";
 
 async function handlePlaceOrder(
-  command: PlaceOrder,
+  command: PlaceOrderCommand,
+  metadata: PlaceOrderMetadata,
 ): Promise<CommandHandlerResponse> {
   const { orderId, items } = command.payload;
 
@@ -78,18 +102,13 @@ async function handlePlaceOrder(
       new DomainError({
         name: "EMPTY_ORDER",
         message: `Order ${orderId} has no item`,
-        context: { orderId },
+        context: { orderId, correlationId: metadata.correlationId },
       }),
     );
   }
 
   return ok({ orderId, status: "PLACED" });
 }
-
-const receiver = new CommandBusReceiver<PlaceOrder>({
-  commandSubscriber: commandOrderedListener,
-  responsePublisher: responseDynamicPublisher,
-});
 
 receiver.process(handlePlaceOrder);
 await receiver.start();
@@ -104,7 +123,7 @@ Throwing works too: the receiver catches it and answers with a failure. Keep thr
 ## Sending commands
 
 ```typescript
-const emitter = new CommandBusEmitter<PlaceOrder>(
+const emitter = new CommandBusEmitter<PlaceOrderCommand, PlaceOrderMetadata>(
   {
     commandPublisher: commandOrderedPublisher,
     responseSubscriber: responseListener,
@@ -116,11 +135,14 @@ await emitter.start();
 
 const result = await emitter.send(
   {
-    command: {
+    command: new PlaceOrderCommand({
+      orderId: "order-1",
+      items: [{ sku: "BOOK-1", quantity: 2 }],
+    }),
+    metadata: {
       id: crypto.randomUUID(),
-      name: "PlaceOrder",
-      payload: { orderId: "order-1", items: [{ sku: "BOOK-1", quantity: 2 }] },
-      metadata: { correlationId: "corr-1" },
+      createdAt: new Date().toISOString(),
+      correlationId: "corr-1",
     },
     // Commands sharing a key are handled in order.
     orderingKey: "order-1",
@@ -133,7 +155,13 @@ if (result.isErr()) {
 }
 ```
 
-`send()` **throws** rather than returning an `Err` when the command never left. That happens when the emitter is not started, the command fails envelope validation, another command with the same `id` is already in flight, or the publish itself fails. Once the command is on the broker, every outcome is a `Result`.
+`send()` **throws** rather than returning an `Err` when the command never left. That happens when:
+- the emitter is not started, or is stopping;
+- the command or its metadata fails validation;
+- another command with the same `metadata.id` is already in flight;
+- the publish itself fails.
+
+Once the command is on the broker, every outcome is a `Result`.
 
 ### Failure responses
 
@@ -143,6 +171,7 @@ Every `Err` coming out of `send()` keeps the full wire error as its `cause`, inc
 | --- | --- | --- | --- |
 | Handler returned `err(error)` | the error's name | the error's `code`, or `COMMAND_REJECTED` | the error's `context` (e.g. a `DomainError`), or `null` |
 | Handler threw | the thrown error's name | its `code`, or `HANDLER_THREW` | its `context`, or `null` |
+| Receiver's validator threw | the thrown error's name | its `code`, or `INVALID_COMMAND` | its `context`, or `null` |
 | No answer within the timeout | `TIMEOUT_ERROR` | `COMMAND_TIMEOUT` | `{ commandId }` |
 | Still waiting when a forced `stop()` gives up | `EMITTER_STOPPED_ERROR` | `EMITTER_STOPPED` | `{ commandId }` |
 
@@ -166,7 +195,7 @@ A handler's error `context` crosses the wire as JSON. Keep it serializable.
 - **A receiver that crashes mid-handler** leaves the command unacked, so the broker can deliver it again. SQS does this once the visibility timeout expires. Redis does it only when a consumer with the same name restarts. Either way, a handler can run more than once for the same command.
 - **A timeout or a forced stop does not cancel anything.** The command was published, and a receiver may still handle it.
 
-So make handlers idempotent on `command.id`. On a timeout, check whether the command was handled before retrying it.
+So make handlers idempotent on `metadata.id`. On a timeout, check whether the command was handled before retrying it.
 
 ---
 

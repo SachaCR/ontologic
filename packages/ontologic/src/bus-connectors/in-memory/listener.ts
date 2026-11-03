@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import {
   BusConnectorKind,
+  BusConnectorStatus,
   IListenerConnector,
   IOrderedListenerConnector,
   ReceivedMessage,
 } from "..";
+import { type ErrorHandler } from "../../messaging";
 
 /**
  * Everything an in-memory listener does. The two concrete classes below add
@@ -14,7 +16,7 @@ import {
 abstract class InMemoryListenerBase {
   abstract readonly kind: BusConnectorKind;
 
-  #status: "STARTED" | "STOPPED";
+  #status: BusConnectorStatus;
   #eventEmitter: EventEmitter;
   #handler?: (message: ReceivedMessage) => Promise<void>;
   #topic: string;
@@ -33,7 +35,7 @@ abstract class InMemoryListenerBase {
     this.#handler = handler;
   }
 
-  get status(): "STARTED" | "STOPPED" {
+  get status(): BusConnectorStatus {
     return this.#status;
   }
 
@@ -69,7 +71,7 @@ abstract class InMemoryListenerBase {
     return Promise.resolve();
   }
 
-  onError(handler: (error: Error) => void): void {
+  onError(handler: ErrorHandler): void {
     this.#eventEmitter.on("error", handler);
   }
 

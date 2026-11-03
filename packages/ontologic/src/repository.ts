@@ -2,16 +2,15 @@ import { Result } from "./result/index";
 
 import { DomainEntity } from "./domainEntity";
 import { DomainEventInterface } from "./domainEvent";
+import { type MessageMetadata } from "./messaging";
 
 export interface EventWithMetadata<Event extends DomainEventInterface> {
   event: Event;
   metadata: EventMetadata;
 }
 
-export interface EventMetadata {
-  id: string;
+export interface EventMetadata extends MessageMetadata {
   offset?: number;
-  createdAt: string;
 }
 export interface Repository<
   Entity extends DomainEntity<any, ReturnType<Entity["readState"]>>,

@@ -4,6 +4,7 @@ import { validateMetadata } from "./validateMetadata";
 import { eventBusMessageSchema } from "./schemas";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { IListenerConnector, ReceivedMessage } from "../bus-connectors";
+import { type ErrorHandler } from "../messaging";
 
 export class DomainEventBusListener<
   Event extends DomainEventInterface,
@@ -100,7 +101,10 @@ export class DomainEventBusListener<
         //
         // Reported before the nack, so the reason survives even if the nack
         // itself fails.
-        this.#eventEmitter.emit("failure", error);
+        this.#eventEmitter.emit(
+          "failure",
+          error instanceof Error ? error : new Error(String(error)),
+        );
         await message.nack();
       }
     });
@@ -116,7 +120,16 @@ export class DomainEventBusListener<
     return this.#listenerConnector.status;
   }
 
-  onError(handler: (error: unknown) => void): void {
+  /**
+   * Delegates to the connector.
+   *
+   * @throws if its connection check fails.
+   */
+  async checkConnection(): Promise<boolean> {
+    return this.#listenerConnector.checkConnection();
+  }
+
+  onError(handler: ErrorHandler): void {
     this.#listenerConnector.onError(handler);
     // Deliberately not the "error" channel: Node throws an 'error' event that
     // has no listener, so emitting on it would turn "we nacked, here is why"

@@ -1,8 +1,14 @@
 import { err, ok, type Result } from "../result";
 import {
+  isRecord,
+  nonEmptyString,
+  validateMessageMetadata,
+} from "../messaging/wireGuards";
+import {
   type BusCommand,
   type CommandBusMessage,
   type CommandBusResponse,
+  type CommandMetadata,
 } from "./interfaces";
 
 /**
@@ -18,55 +24,24 @@ import {
  * schemas only ever see already decoded values.
  */
 
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function nonEmptyString(
-  record: Record<string, unknown>,
-  key: string,
-  shape: string,
-): Error | null {
-  const value = record[key];
-
-  if (typeof value !== "string") {
-    return new Error(`Invalid ${shape}: ${key} is not a string`);
-  }
-
-  if (value.length === 0) {
-    return new Error(`Invalid ${shape}: ${key} is an empty string`);
-  }
-
-  return null;
-}
-
 export const busCommandSchema = {
   /**
-   * Validates the `BusCommand` envelope: `id`, `name`, and the presence of
-   * `payload` and `metadata`.
-   *
-   * `payload` and `metadata` are typed `unknown`, so only their presence is
-   * checked, any value passes.
+   * Validates the `BusCommand` shape: a non-empty `name` and the presence of a
+   * `payload`. Any payload value passes, it is typed `unknown`.
    *
    * WARNING: The `Command` type parameter is structural trust, not a check.
-   * This package cannot know a caller's concrete command subtype, exactly like
-   * the event bus, which asks the caller for an `(event: unknown) => Event`
-   * validator rather than guessing. Validate your own payload before or after
-   * this call.
+   * The receiver takes a `(command: unknown) => Command` validator for that,
+   * exactly like the event bus listener.
    */
   safeParse<Command extends BusCommand>(
     input: unknown,
   ): Result<Command, Error> {
     const shape = "BusCommand";
 
+    // A use-case `Command` is a class instance whose fields are getters, so
+    // this reads through them rather than requiring own properties.
     if (!isRecord(input)) {
       return err(new Error(`Invalid ${shape}: not an object`));
-    }
-
-    const idError = nonEmptyString(input, "id", shape);
-
-    if (idError) {
-      return err(idError);
     }
 
     const nameError = nonEmptyString(input, "name", shape);
@@ -79,11 +54,7 @@ export const busCommandSchema = {
       return err(new Error(`Invalid ${shape}: payload is missing`));
     }
 
-    if (!("metadata" in input)) {
-      return err(new Error(`Invalid ${shape}: metadata is missing`));
-    }
-
-    return ok(input as Command);
+    return ok(input as unknown as Command);
   },
 };
 
@@ -153,14 +124,15 @@ export const commandBusResponseSchema = {
 export const commandBusMessageSchema = {
   /**
    * Validates the envelope the emitter publishes on the command topic: the
-   * command itself plus the topic its response must be published back to.
+   * command, its metadata, and the topic its response must be published to.
    *
    * The same structural trust warning as `busCommandSchema.safeParse` applies
-   * to the `Command` type parameter.
+   * to the `Command` and `Metadata` type parameters.
    */
-  safeParse<Command extends BusCommand>(
-    input: unknown,
-  ): Result<CommandBusMessage<Command>, Error> {
+  safeParse<
+    Command extends BusCommand,
+    Metadata extends CommandMetadata = CommandMetadata,
+  >(input: unknown): Result<CommandBusMessage<Command, Metadata>, Error> {
     const shape = "CommandBusMessage";
 
     if (!isRecord(input)) {
@@ -183,6 +155,12 @@ export const commandBusMessageSchema = {
       return err(commandResult.error);
     }
 
-    return ok(input as unknown as CommandBusMessage<Command>);
+    const metadataResult = validateMessageMetadata(input["metadata"]);
+
+    if (metadataResult.isErr()) {
+      return err(metadataResult.error);
+    }
+
+    return ok(input as unknown as CommandBusMessage<Command, Metadata>);
   },
 };

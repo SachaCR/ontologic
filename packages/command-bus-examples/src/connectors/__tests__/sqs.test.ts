@@ -4,7 +4,6 @@ import {
   testCommandBusConnectors,
   type ConnectorContractHarness,
 } from "./contract";
-import { type CommandBusConnectors } from "../../commandBus";
 import {
   SqsOrderedListener,
   SqsOrderedPublisher,
@@ -13,6 +12,7 @@ import {
   RedisDynamicPublisher,
   RedisListener,
 } from "@ontologics/redis-connectors";
+import { type CommandBusConnectors } from "ontologic";
 
 /**
  * Opt-in, and it needs *two* services: the architecture under test is SQS FIFO

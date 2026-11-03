@@ -649,3 +649,61 @@ describe("DomainEventBusListener + DomainEventBusPublisher (in-memory)", () => {
     expect(received[0]?.metadata).toEqual(metadata);
   });
 });
+
+describe("event bus components share the BusComponent contract", () => {
+  class UnreachableListenerConnector extends RecordingListenerConnector {
+    override checkConnection(): Promise<boolean> {
+      return Promise.reject(new Error("broker unreachable"));
+    }
+  }
+
+  it("resolves the listener's connection check when the connector passes", async () => {
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: new RecordingListenerConnector(),
+      options: { validator: parseTestEvent },
+    });
+
+    await expect(listener.checkConnection()).resolves.toBe(true);
+  });
+
+  it("rejects the listener's connection check when the connector fails it", async () => {
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: new UnreachableListenerConnector(),
+      options: { validator: parseTestEvent },
+    });
+
+    await expect(listener.checkConnection()).rejects.toThrow(
+      "broker unreachable",
+    );
+  });
+
+  it("resolves the publisher's connection check through its connector", async () => {
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: new InMemoryConnectors().publisher,
+    });
+
+    await expect(publisher.checkConnection()).resolves.toBe(true);
+  });
+
+  it("reports a non Error thrown by a handler as an Error", async () => {
+    const onError = vi.fn<(error: Error) => void>();
+    const recording = new RecordingListenerConnector();
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: recording,
+      options: { validator: parseTestEvent },
+    });
+
+    listener.listenTo("TestEvent", async () => {
+      throw "a string";
+    });
+    listener.onError(onError);
+    await listener.start();
+
+    await recording.deliver(
+      "TestEvent",
+      JSON.stringify({ event: makeEvent(), metadata: makeMetadata() }),
+    );
+
+    expect(onError.mock.calls[0]?.[0]).toEqual(new Error("a string"));
+  });
+});

@@ -9,20 +9,27 @@ import {
 import {
   type BusCommand,
   type CommandBusResponse,
-  type CommandHandlerResponse,
+  type CommandHandler,
+  type CommandMetadata,
 } from "../interfaces";
 import { err, ok } from "../../result";
+import { Command } from "../../action";
 import { DomainError } from "../../domainError";
 import { commandBusResponseSchema } from "../schemas";
 
 function command(): BusCommand {
   return {
-    id: "cmd-1",
     name: "PlaceOrder",
     payload: { orderId: "order-1" },
-    metadata: null,
   };
 }
+
+function metadata(): CommandMetadata {
+  return { id: "cmd-1", createdAt: "2026-01-01T00:00:00.000Z" };
+}
+
+/** Trusts the wire shape, for tests about anything but validation. */
+const passThrough = (raw: unknown) => raw as BusCommand;
 
 function receivedMessage(content: string): ReceivedMessage {
   return {
@@ -52,7 +59,8 @@ function parseResponse(message: string | undefined): CommandBusResponse {
  */
 async function processOneMessage(params: {
   content: string;
-  handler: (command: BusCommand) => Promise<CommandHandlerResponse>;
+  handler: CommandHandler<BusCommand>;
+  validator?: (command: unknown) => BusCommand;
   publishFails?: Error;
 }) {
   const published: { topicName: string; message: string }[] = [];
@@ -92,10 +100,10 @@ async function processOneMessage(params: {
     publishTo,
   };
 
-  const receiver = new CommandBusReceiver<BusCommand>({
-    commandSubscriber,
-    responsePublisher,
-  });
+  const receiver = new CommandBusReceiver<BusCommand>(
+    { commandSubscriber, responsePublisher },
+    { validator: params.validator ?? passThrough },
+  );
 
   const reportedErrors: Error[] = [];
   receiver.onError((error) => reportedErrors.push(error));
@@ -109,8 +117,9 @@ async function processOneMessage(params: {
 }
 
 const validContent = JSON.stringify({
-  responseTopicName: "responses",
   command: command(),
+  metadata: metadata(),
+  responseTopicName: "responses",
 });
 
 describe("CommandBusReceiver.process", () => {
@@ -349,11 +358,12 @@ describe("CommandBusReceiver.process", () => {
     expect(reportedErrors[0]?.cause).toBe(brokerError);
   });
 
-  it("acks and reports without publishing when the command fails validation", async () => {
+  it("acks and reports without publishing when the command envelope is malformed", async () => {
     const { message, published, reportedErrors } = await processOneMessage({
       content: JSON.stringify({
+        command: { name: "", payload: null },
+        metadata: metadata(),
         responseTopicName: "responses",
-        command: { id: "", name: "PlaceOrder", payload: null, metadata: null },
       }),
       handler: async () => ok({ ok: true }),
     });
@@ -361,8 +371,104 @@ describe("CommandBusReceiver.process", () => {
     expect(message.ack).toHaveBeenCalledTimes(1);
     expect(published).toEqual([]);
     expect(reportedErrors[0]?.message).toBe(
-      "Invalid BusCommand: id is an empty string",
+      "Invalid BusCommand: name is an empty string",
     );
+  });
+
+  it("acks and reports without publishing when the metadata is malformed", async () => {
+    const { message, published, reportedErrors } = await processOneMessage({
+      content: JSON.stringify({
+        command: command(),
+        metadata: { id: "", createdAt: "2026-01-01T00:00:00.000Z" },
+        responseTopicName: "responses",
+      }),
+      handler: async () => ok({ ok: true }),
+    });
+
+    expect(message.ack).toHaveBeenCalledTimes(1);
+    expect(published).toEqual([]);
+    expect(reportedErrors[0]?.message).toBe(
+      "Invalid Metadata: id is an empty string",
+    );
+  });
+
+  it("hands the handler the command's metadata", async () => {
+    const seen: CommandMetadata[] = [];
+
+    await processOneMessage({
+      content: validContent,
+      handler: async (_command, received) => {
+        seen.push(received);
+        return ok(null);
+      },
+    });
+
+    expect(seen).toEqual([metadata()]);
+  });
+
+  it("hands the handler what the validator returned", async () => {
+    class PlaceOrderCommand extends Command<"PlaceOrder", { orderId: string }> {
+      constructor(payload: { orderId: string }) {
+        super({ name: "PlaceOrder", payload });
+      }
+    }
+    const seen: unknown[] = [];
+
+    await processOneMessage({
+      content: validContent,
+      validator: (raw) =>
+        new PlaceOrderCommand(
+          (raw as { payload: { orderId: string } }).payload,
+        ),
+      handler: async (received) => {
+        seen.push(received);
+        return ok(null);
+      },
+    });
+
+    expect(seen[0]).toBeInstanceOf(PlaceOrderCommand);
+  });
+
+  it("answers INVALID_COMMAND when the validator throws", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      validator: () => {
+        throw new Error("orderId must be a UUID");
+      },
+      handler: async () => ok(null),
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      commandId: "cmd-1",
+      result: "FAILURE",
+      error: { code: "INVALID_COMMAND", message: "orderId must be a UUID" },
+    });
+  });
+
+  it("does not run the handler when the validator throws", async () => {
+    const handler = vi.fn(async () => ok(null));
+
+    await processOneMessage({
+      content: validContent,
+      validator: () => {
+        throw new Error("orderId must be a UUID");
+      },
+      handler,
+    });
+
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  it("acks once when the validator throws", async () => {
+    const { message } = await processOneMessage({
+      content: validContent,
+      validator: () => {
+        throw new Error("orderId must be a UUID");
+      },
+      handler: async () => ok(null),
+    });
+
+    expect(message.ack).toHaveBeenCalledTimes(1);
   });
 
   it("acks and reports without publishing when the content is not JSON", async () => {
@@ -444,10 +550,10 @@ async function startedReceiverWithSlowHandler(options?: {
     },
   };
 
-  const receiver = new CommandBusReceiver<BusCommand>({
-    commandSubscriber,
-    responsePublisher,
-  });
+  const receiver = new CommandBusReceiver<BusCommand>(
+    { commandSubscriber, responsePublisher },
+    { validator: passThrough },
+  );
 
   const reportedErrors: Error[] = [];
   receiver.onError((error) => reportedErrors.push(error));

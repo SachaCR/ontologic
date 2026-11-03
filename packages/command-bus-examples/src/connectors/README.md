@@ -18,13 +18,13 @@ find yourself reaching for `JSON.parse` in here, the abstraction has slipped.
 They live in `ontologic` (`src/bus-connectors/interfaces.ts`). A command bus
 needs four of the five:
 
-| Interface | `kind` | Used for | Beyond `BusConnector` |
-|---|---|---|---|
-| `IOrderedListenerConnector` | `"ordered-listener"` | receiving commands | `onMessage(handler)`, `topicName()` |
-| `IOrderedPublisherConnector` | `"ordered-publisher"` | sending commands | `publish(message, { orderingKey })` |
-| `IListenerConnector` | `"listener"` | receiving responses | `onMessage(handler)`, `topicName()` |
-| `IDynamicPublisherConnector` | `"dynamic-publisher"` | sending responses | `publishTo({ topicName, message })` |
-| `IPublisherConnector` | `"publisher"` | the event bus | `publish(message, options?)` |
+| Interface                    | `kind`                | Used for            | Beyond `BusConnector`               |
+| ---------------------------- | --------------------- | ------------------- | ----------------------------------- |
+| `IOrderedListenerConnector`  | `"ordered-listener"`  | receiving commands  | `onMessage(handler)`, `topicName()` |
+| `IOrderedPublisherConnector` | `"ordered-publisher"` | sending commands    | `publish(message, { orderingKey })` |
+| `IListenerConnector`         | `"listener"`          | receiving responses | `onMessage(handler)`, `topicName()` |
+| `IDynamicPublisherConnector` | `"dynamic-publisher"` | sending responses   | `publishTo({ topicName, message })` |
+| `IPublisherConnector`        | `"publisher"`         | the event bus       | `publish(message, options?)`        |
 
 All extend `BusConnector`: `kind`, `status`, `start()`, `stop()`, `onError(handler)`,
 `checkConnection()`. A delivered message is
@@ -63,7 +63,7 @@ sharing a key must reach the handler in the order they were published. Commands
 with different keys have no ordering relationship, which is what lets a broker
 parallelise them.
 
-Read that as a constraint on the *whole path*, not just the publish, and note
+Read that as a constraint on the _whole path_, not just the publish, and note
 that the two transports differ on exactly this point.
 
 **Redis** appends to one stream, which is ordered — but a consumer group spreads
@@ -123,7 +123,8 @@ const harness: ConnectorContractHarness = {
   },
 
   // Without this every test leaks its clients and vitest may not exit.
-  destroy: (connectors) => (connectors as RedisCommandBusConnectors).disconnect(),
+  destroy: (connectors) =>
+    (connectors as RedisCommandBusConnectors).disconnect(),
 
   // A socket, against the in-process fake's 2s default.
   timeout: 10_000,
@@ -144,7 +145,7 @@ REDIS_URL=redis://127.0.0.1:6379 pnpm --filter command-bus-examples test
 
 The third case in the contract — three commands in flight at once, each
 receiving its own answer — is the one a real broker is most likely to fail. The
-bus correlates on `commandId`, so a connector that duplicates or crosses
+bus correlates on `metadata.id`, so a connector that duplicates or crosses
 responses is caught by it.
 
 ## What ships today

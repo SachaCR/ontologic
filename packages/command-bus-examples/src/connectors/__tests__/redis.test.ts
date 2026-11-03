@@ -4,13 +4,13 @@ import {
   testCommandBusConnectors,
   type ConnectorContractHarness,
 } from "./contract";
-import { type CommandBusConnectors } from "../../commandBus";
 import {
   RedisDynamicPublisher,
   RedisListener,
   RedisOrderedListener,
   RedisOrderedPublisher,
 } from "@ontologics/redis-connectors";
+import { type CommandBusConnectors } from "ontologic";
 
 /**
  * Opt-in: these tests need a reachable Redis, so they are skipped unless
