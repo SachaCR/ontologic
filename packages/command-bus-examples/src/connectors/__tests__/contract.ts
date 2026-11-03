@@ -1,10 +1,9 @@
 import { describe, it, expect } from "vitest";
 
-import {
-  startPlaceOrderBus,
-  type CommandBusConnectors,
-} from "../../commandBus";
-import { placeOrderCommand } from "../../domain/placeOrder";
+import { type CommandBusConnectors } from "ontologic";
+
+import { startPlaceOrderBus } from "../../commandBus";
+import { placeOrder } from "../../domain/placeOrder";
 
 export interface ConnectorContractHarness {
   /** A fresh, unstarted connector set. Called once per test. */
@@ -49,7 +48,7 @@ export function testCommandBusConnectors(
     it("carries a command to the handler and its result back", async () => {
       const result = await withBus((bus) =>
         bus.emitter.send({
-          command: placeOrderCommand({
+          ...placeOrder({
             id: "cmd-1",
             orderId: "order-1",
             customerId: "customer-1",
@@ -70,7 +69,7 @@ export function testCommandBusConnectors(
     it("carries a refusal back as an error, name and message intact", async () => {
       const result = await withBus((bus) =>
         bus.emitter.send({
-          command: placeOrderCommand({
+          ...placeOrder({
             id: "cmd-2",
             orderId: "order-2",
             customerId: "customer-1",
@@ -90,13 +89,13 @@ export function testCommandBusConnectors(
     it("routes each response back to the command that asked for it", async () => {
       // The one a real broker is most likely to get wrong. Two commands are in
       // flight at once, and each caller has to receive its own answer — the bus
-      // correlates on commandId, so a connector that reorders or duplicates is
+      // correlates on metadata.id, so a connector that reorders or duplicates is
       // caught here rather than in production.
       const results = await withBus((bus) =>
         Promise.all(
           ["a", "b", "c"].map((suffix, index) =>
             bus.emitter.send({
-              command: placeOrderCommand({
+              ...placeOrder({
                 id: `cmd-${suffix}`,
                 orderId: `order-${suffix}`,
                 customerId: "customer-1",

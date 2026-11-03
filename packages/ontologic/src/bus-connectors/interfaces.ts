@@ -1,3 +1,5 @@
+import { type ErrorHandler } from "../messaging";
+
 /**
  * Which role a connector plays on a bus.
  *
@@ -14,16 +16,21 @@ export type BusConnectorKind =
   | "ordered-publisher"
   | "dynamic-publisher";
 
-export interface IListenerConnector extends BusConnector {
-  readonly kind: "listener";
+/**
+ * What both listener kinds share. They differ only by `kind`, which is the
+ * whole point: it keeps one from being accepted where the other is required.
+ */
+export interface MessageListenerConnector extends BusConnector {
   onMessage(handler: (message: ReceivedMessage) => Promise<void>): void;
   topicName(): string;
 }
 
-export interface IOrderedListenerConnector extends BusConnector {
+export interface IListenerConnector extends MessageListenerConnector {
+  readonly kind: "listener";
+}
+
+export interface IOrderedListenerConnector extends MessageListenerConnector {
   readonly kind: "ordered-listener";
-  onMessage(handler: (message: ReceivedMessage) => Promise<void>): void;
-  topicName(): string;
 }
 
 export interface ReceivedMessage {
@@ -54,6 +61,25 @@ export interface BusConnector {
   status: BusConnectorStatus;
   start(): Promise<void>;
   stop(): Promise<void>;
-  onError(handler: (error: Error) => void): void;
+  onError(handler: ErrorHandler): void;
   checkConnection(): Promise<boolean>;
+}
+
+/**
+ * The four connectors a command bus needs, in one bundle.
+ *
+ * A command bus is two one-way channels, not one duplex channel:
+ *
+ *   commands   emitter  --ordered publish-->  receiver   (one topic, ordered)
+ *   responses  receiver --dynamic publish-->  emitter    (one topic per emitter)
+ *
+ * The response side is dynamic because the emitter names its own response
+ * topic in every command it sends, and the receiver replies to whatever name it
+ * was given. That is what lets many emitters share one receiver.
+ */
+export interface CommandBusConnectors {
+  commandOrderedListener: IOrderedListenerConnector;
+  commandOrderedPublisher: IOrderedPublisherConnector;
+  responseListener: IListenerConnector;
+  responseDynamicPublisher: IDynamicPublisherConnector;
 }

@@ -1,30 +1,56 @@
 import { Result } from "../result";
+import {
+  type BusComponent,
+  type MessageMetadata,
+  type StopOptions,
+} from "../messaging";
 
 /**
- * `STOPPING` is the drain: new work is refused while in-flight work finishes.
- */
-export type CommandBusStatus = "STOPPED" | "STARTED" | "STOPPING";
-
-/**
- * This interface describes the structure of a command. A command is a message that contains a name and a payload.
- * The payload must be serializable to JSON.
+ * What a command must look like to cross the bus: a name and a JSON
+ * serializable payload, nothing else.
+ *
+ * The use-case `Command` class satisfies it as it is, so the command a use case
+ * takes is the command the bus carries. Plain objects work too.
  */
 export interface BusCommand {
-  id: string;
   name: string;
   payload: unknown;
-  metadata: unknown;
 }
 
-export interface CommandBusMessage<Command extends BusCommand> {
-  responseTopicName: string;
+/**
+ * Travels next to every command, the same way `EventMetadata` travels next to
+ * every event. `id` is unique per command: the emitter matches the response on
+ * it, and handlers should use it for idempotency.
+ *
+ * Extend it for extra fields, such as a correlation id, and pass your type as
+ * the `Metadata` parameter of the emitter, receiver and handler.
+ */
+export type CommandMetadata = MessageMetadata;
+
+/** The envelope on the command topic. Mirrors the event bus `{ event, metadata }`. */
+export interface CommandBusMessage<
+  Command extends BusCommand,
+  Metadata extends CommandMetadata = CommandMetadata,
+> {
   command: Command;
+  metadata: Metadata;
+  responseTopicName: string;
 }
 
-export interface CommandEmitter<Command extends BusCommand> {
+/** Mirrors `EventHandler`: the command, then its metadata. */
+export type CommandHandler<
+  Command extends BusCommand,
+  Metadata extends CommandMetadata = CommandMetadata,
+> = (command: Command, metadata: Metadata) => Promise<CommandHandlerResponse>;
+
+export interface CommandEmitter<
+  Command extends BusCommand,
+  Metadata extends CommandMetadata = CommandMetadata,
+> extends BusComponent {
   send(
     params: {
       command: Command;
+      metadata: Metadata;
       orderingKey: string;
     },
     options?: {
@@ -32,33 +58,17 @@ export interface CommandEmitter<Command extends BusCommand> {
     },
   ): Promise<CommandHandlerResponse>;
 
-  start(): Promise<void>;
   stop(options?: StopOptions): Promise<void>;
-  onError(errorHandler: (error: Error) => void): void;
   metrics(): CommandBusMetrics;
-  status(): CommandBusStatus;
-  checkConnection(): Promise<boolean>;
 }
 
-export interface CommandReceiver<Command extends BusCommand> {
-  process(
-    commandHandler: (command: Command) => Promise<CommandHandlerResponse>,
-  ): void;
+export interface CommandReceiver<
+  Command extends BusCommand,
+  Metadata extends CommandMetadata = CommandMetadata,
+> extends BusComponent {
+  process(commandHandler: CommandHandler<Command, Metadata>): void;
 
-  start(): Promise<void>;
   stop(options?: StopOptions): Promise<void>;
-  onError(errorHandler: (error: Error) => void): void;
-  status(): CommandBusStatus;
-  checkConnection(): Promise<boolean>;
-}
-
-export interface StopOptions {
-  /**
-   * Hard limit, in ms, on the graceful drain. Once it elapses, `stop()` stops
-   * the connectors anyway and reports the work it abandoned through
-   * `onError`. Defaults to 2 minutes.
-   */
-  timeout?: number;
 }
 
 /**

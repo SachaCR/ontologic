@@ -1,39 +1,26 @@
 import {
   CommandBusEmitter,
   CommandBusReceiver,
-  type IDynamicPublisherConnector,
-  type IListenerConnector,
-  type IOrderedListenerConnector,
-  type IOrderedPublisherConnector,
+  type CommandBusConnectors,
 } from "ontologic";
 
-import { handlePlaceOrder, type PlaceOrder } from "./domain/placeOrder";
+import {
+  handlePlaceOrder,
+  parsePlaceOrder,
+  type PlaceOrderCommand,
+  type PlaceOrderMetadata,
+} from "./domain/placeOrder";
 
 /**
- * The four connectors a command bus needs, in one bag.
- *
- * A command bus is two one-way channels, not one duplex one:
- *
- *   commands   emitter  --ordered publish-->  receiver   (one topic, ordered)
- *   responses  receiver --dynamic publish-->  emitter    (one topic per emitter)
- *
- * The response side is *dynamic* because the emitter names its own response
- * topic in every command it sends, and the receiver publishes back to whatever
- * name it was given. That is what lets many emitters share one receiver.
- *
- * `InMemoryCommandBusConnectors` from `ontologic` satisfies this shape, and so
- * should the Redis and SQS implementations — see `src/connectors/README.md`.
+ * `CommandBusConnectors` lives in `ontologic`: the four connectors a command
+ * bus needs. `InMemoryCommandBusConnectors` implements it, and so do the Redis
+ * and SQS sets in `src/connectors/__tests__/`.
  */
-export interface CommandBusConnectors {
-  commandOrderedListener: IOrderedListenerConnector;
-  commandOrderedPublisher: IOrderedPublisherConnector;
-  responseListener: IListenerConnector;
-  responseDynamicPublisher: IDynamicPublisherConnector;
-}
+export type { CommandBusConnectors };
 
 export interface PlaceOrderBus {
-  emitter: CommandBusEmitter<PlaceOrder>;
-  receiver: CommandBusReceiver<PlaceOrder>;
+  emitter: CommandBusEmitter<PlaceOrderCommand, PlaceOrderMetadata>;
+  receiver: CommandBusReceiver<PlaceOrderCommand, PlaceOrderMetadata>;
   stop: () => Promise<void>;
 }
 
@@ -47,12 +34,18 @@ export async function startPlaceOrderBus(
   connectors: CommandBusConnectors,
   options?: { timeout?: number },
 ): Promise<PlaceOrderBus> {
-  const receiver = new CommandBusReceiver<PlaceOrder>({
-    commandSubscriber: connectors.commandOrderedListener,
-    responsePublisher: connectors.responseDynamicPublisher,
-  });
+  const receiver = new CommandBusReceiver<
+    PlaceOrderCommand,
+    PlaceOrderMetadata
+  >(
+    {
+      commandSubscriber: connectors.commandOrderedListener,
+      responsePublisher: connectors.responseDynamicPublisher,
+    },
+    { validator: parsePlaceOrder },
+  );
 
-  const emitter = new CommandBusEmitter<PlaceOrder>(
+  const emitter = new CommandBusEmitter<PlaceOrderCommand, PlaceOrderMetadata>(
     {
       commandPublisher: connectors.commandOrderedPublisher,
       responseSubscriber: connectors.responseListener,

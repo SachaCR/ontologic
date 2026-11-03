@@ -1,4 +1,5 @@
 import { err, ok, type Result } from "../result";
+import { isRecord } from "../messaging/wireGuards";
 
 /**
  * The envelope `DomainEventBusPublisher` writes on the wire, as seen before any
@@ -11,10 +12,6 @@ import { err, ok, type Result } from "../result";
 export interface EventBusMessage {
   event: { name: string } & Record<string, unknown>;
   metadata: unknown;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 export const eventBusMessageSchema = {

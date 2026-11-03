@@ -1,10 +1,12 @@
 import { EventEmitter } from "node:events";
 import {
   BusConnectorKind,
+  BusConnectorStatus,
   IDynamicPublisherConnector,
   IOrderedPublisherConnector,
   IPublisherConnector,
 } from "..";
+import { type ErrorHandler } from "../../messaging";
 
 /**
  * Everything an in-memory publisher does, including both `publish` and
@@ -15,7 +17,7 @@ import {
 abstract class InMemoryPublisherBase {
   abstract readonly kind: BusConnectorKind;
 
-  #status: "STARTED" | "STOPPED";
+  #status: BusConnectorStatus;
   #eventEmitter: EventEmitter;
 
   constructor(eventEmitter: EventEmitter) {
@@ -33,7 +35,7 @@ abstract class InMemoryPublisherBase {
     return Promise.resolve();
   }
 
-  get status(): "STARTED" | "STOPPED" {
+  get status(): BusConnectorStatus {
     return this.#status;
   }
 
@@ -47,7 +49,7 @@ abstract class InMemoryPublisherBase {
     return Promise.resolve();
   }
 
-  onError(handler: (error: Error) => void): void {
+  onError(handler: ErrorHandler): void {
     this.#eventEmitter.on("error", handler);
   }
 

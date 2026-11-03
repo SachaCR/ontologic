@@ -352,6 +352,8 @@ listener.onError((error) => {
 });
 ```
 
+The handler always receives an `Error`: anything else that gets thrown is wrapped in one first.
+
 Handler-level errors (thrown inside a `listenTo` callback) result in an automatic `nack()` and are reported through `onError`. Events with no matching handler do not reach `onError` — they are acknowledged and reported through `onUnhandled` instead, because an event you did not subscribe to is not a failure.
 
 ---
@@ -376,3 +378,5 @@ await listener.stop();
 ```
 
 Starting a publisher or listener whose connector is already started, or stopping one that is already stopped, has no effect.
+
+Both also expose `status()` and `checkConnection()`, which delegates to the connector and throws if its check fails. These are the same lifecycle methods the [command bus](./command-bus.md) emitter and receiver expose.

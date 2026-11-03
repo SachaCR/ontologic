@@ -9,6 +9,7 @@ import {
   InMemoryPublisherConnector,
 } from "./publisher";
 import {
+  CommandBusConnectors,
   IDynamicPublisherConnector,
   IListenerConnector,
   IOrderedListenerConnector,
@@ -41,7 +42,7 @@ export class InMemoryConnectors {
   }
 }
 
-export class InMemoryCommandBusConnectors {
+export class InMemoryCommandBusConnectors implements CommandBusConnectors {
   responseListener: IListenerConnector;
   responseDynamicPublisher: IDynamicPublisherConnector;
   commandOrderedPublisher: IOrderedPublisherConnector;

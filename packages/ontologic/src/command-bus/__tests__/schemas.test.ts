@@ -11,13 +11,12 @@ import {
   commandBusResponseSchema,
 } from "../schemas";
 import { waitForTimeout } from "../timeout";
+import { Command } from "../../action";
 
 function command(overrides?: Record<string, unknown>): BusCommand {
   return {
-    id: "cmd-1",
     name: "PlaceOrder",
     payload: { orderId: "order-1" },
-    metadata: { correlationId: "corr-1" },
     ...overrides,
   } as BusCommand;
 }
@@ -54,8 +53,9 @@ function busMessage(
   overrides?: Record<string, unknown>,
 ): CommandBusMessage<BusCommand> {
   return {
-    responseTopicName: "responses",
     command: command(),
+    metadata: { id: "cmd-1", createdAt: "2026-01-01T00:00:00.000Z" },
+    responseTopicName: "responses",
     ...overrides,
   } as CommandBusMessage<BusCommand>;
 }
@@ -67,14 +67,14 @@ describe("busCommandSchema", () => {
     expect(busCommandSchema.safeParse(input)._unsafeUnwrap()).toBe(input);
   });
 
-  it("accepts a null payload and a null metadata", () => {
-    const input = command({ payload: null, metadata: null });
+  it("accepts a null payload", () => {
+    const input = command({ payload: null });
 
     expect(busCommandSchema.safeParse(input).isOk()).toBe(true);
   });
 
   it("accepts an undefined payload as long as the key is present", () => {
-    const input = { id: "a", name: "b", payload: undefined, metadata: null };
+    const input = { name: "b", payload: undefined };
 
     expect(busCommandSchema.safeParse(input).isOk()).toBe(true);
   });
@@ -96,13 +96,6 @@ describe("busCommandSchema", () => {
 
   it.each([
     [
-      "id is missing",
-      { id: undefined },
-      "Invalid BusCommand: id is not a string",
-    ],
-    ["id is not a string", { id: 1 }, "Invalid BusCommand: id is not a string"],
-    ["id is empty", { id: "" }, "Invalid BusCommand: id is an empty string"],
-    [
       "name is missing",
       { name: undefined },
       "Invalid BusCommand: name is not a string",
@@ -119,27 +112,28 @@ describe("busCommandSchema", () => {
   });
 
   it("rejects a command with no payload key", () => {
-    const result = busCommandSchema.safeParse({
-      id: "a",
-      name: "b",
-      metadata: null,
-    });
+    const result = busCommandSchema.safeParse({ name: "b" });
 
     expect(result._unsafeUnwrapErr().message).toBe(
       "Invalid BusCommand: payload is missing",
     );
   });
 
-  it("rejects a command with no metadata key", () => {
-    const result = busCommandSchema.safeParse({
-      id: "a",
-      name: "b",
-      payload: null,
-    });
+  it("accepts a use-case Command instance, whose fields are getters", () => {
+    class PlaceOrderCommand extends Command<
+      "PLACE_ORDER",
+      { orderId: string }
+    > {
+      constructor(payload: { orderId: string }) {
+        super({ name: "PLACE_ORDER", payload });
+      }
+    }
 
-    expect(result._unsafeUnwrapErr().message).toBe(
-      "Invalid BusCommand: metadata is missing",
+    const result = busCommandSchema.safeParse(
+      new PlaceOrderCommand({ orderId: "order-1" }),
     );
+
+    expect(result.isOk()).toBe(true);
   });
 });
 
@@ -330,16 +324,35 @@ describe("commandBusMessageSchema", () => {
 
   it("surfaces the busCommandSchema error when the nested command is invalid", () => {
     const result = commandBusMessageSchema.safeParse(
-      busMessage({ command: command({ id: "" }) }),
+      busMessage({ command: command({ name: "" }) }),
     );
 
     expect(result._unsafeUnwrapErr().message).toBe(
-      "Invalid BusCommand: id is an empty string",
+      "Invalid BusCommand: name is an empty string",
     );
+  });
+
+  it("surfaces the metadata error when the metadata is invalid", () => {
+    const result = commandBusMessageSchema.safeParse(
+      busMessage({ metadata: { id: "cmd-1", createdAt: "yesterday" } }),
+    );
+
+    expect(result._unsafeUnwrapErr().message).toBe(
+      "Invalid Metadata: createdAt is not a valid ISO date time string",
+    );
+  });
+
+  it("rejects a message with no metadata", () => {
+    const result = commandBusMessageSchema.safeParse(
+      busMessage({ metadata: undefined }),
+    );
+
+    expect(result._unsafeUnwrapErr().message).toBe("Invalid Metadata");
   });
 
   it("rejects a message with no command", () => {
     const result = commandBusMessageSchema.safeParse({
+      metadata: { id: "cmd-1", createdAt: "2026-01-01T00:00:00.000Z" },
       responseTopicName: "responses",
     });
 

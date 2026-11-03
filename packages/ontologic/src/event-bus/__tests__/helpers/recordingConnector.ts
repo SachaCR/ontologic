@@ -1,5 +1,9 @@
 import { EventEmitter } from "node:events";
-import { IListenerConnector, ReceivedMessage } from "../../../bus-connectors";
+import {
+  BusConnectorStatus,
+  IListenerConnector,
+  ReceivedMessage,
+} from "../../../bus-connectors";
 
 /**
  * A listener connector that records whether each message was acked or nacked.
@@ -11,7 +15,7 @@ import { IListenerConnector, ReceivedMessage } from "../../../bus-connectors";
 export class RecordingListenerConnector implements IListenerConnector {
   readonly kind = "listener";
 
-  status: "STARTED" | "STOPPED" = "STOPPED";
+  status: BusConnectorStatus = "STOPPED";
 
   readonly acked: string[] = [];
   readonly nacked: string[] = [];

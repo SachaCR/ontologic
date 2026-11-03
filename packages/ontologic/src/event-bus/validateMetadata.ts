@@ -1,4 +1,5 @@
 import { EventMetadata } from "../repository";
+import { validateMessageMetadata } from "../messaging/wireGuards";
 
 export function validateMetadata(metadata: unknown): EventMetadata {
   if (!metadata) {
@@ -9,25 +10,13 @@ export function validateMetadata(metadata: unknown): EventMetadata {
     throw new Error("Invalid Metadata");
   }
 
+  const messageMetadataResult = validateMessageMetadata(metadata);
+
+  if (messageMetadataResult.isErr()) {
+    throw messageMetadataResult.error;
+  }
+
   const typedMetadata = metadata as EventMetadata;
-
-  if (typeof typedMetadata.id !== "string") {
-    throw new Error("Invalid Metadata: id is not a string");
-  }
-
-  if (typedMetadata.id.length === 0) {
-    throw new Error("Invalid Metadata: id is an empty string");
-  }
-
-  if (typeof typedMetadata.createdAt !== "string") {
-    throw new Error("Invalid Metadata: createdAt is not a string");
-  }
-
-  if (!isExactISODateTime(typedMetadata.createdAt)) {
-    throw new Error(
-      "Invalid Metadata: createdAt is not a valid ISO date time string",
-    );
-  }
 
   if (typedMetadata.offset !== undefined) {
     if (typeof typedMetadata.offset !== "number") {
@@ -41,25 +30,4 @@ export function validateMetadata(metadata: unknown): EventMetadata {
   }
 
   return typedMetadata;
-}
-
-function isExactISODateTime(value: string): boolean {
-  const match = value.match(
-    /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(\.\d+)?(Z|([+-]\d{2}:\d{2}))$/,
-  );
-  if (!match) return false;
-
-  const [_, y, m, d, h, min, s] = match;
-
-  const date = new Date(value);
-
-  return (
-    !isNaN(date.getTime()) &&
-    date.getUTCFullYear() === Number(y) &&
-    date.getUTCMonth() + 1 === Number(m) &&
-    date.getUTCDate() === Number(d) &&
-    date.getUTCHours() === Number(h) &&
-    date.getUTCMinutes() === Number(min) &&
-    date.getUTCSeconds() === Number(s)
-  );
 }

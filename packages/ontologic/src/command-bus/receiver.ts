@@ -3,11 +3,15 @@ import EventEmitter from "events";
 import {
   type BusCommand,
   type CommandBusResponse,
-  type CommandBusStatus,
-  type CommandHandlerResponse,
+  type CommandHandler,
+  type CommandMetadata,
   type CommandReceiver,
-  type StopOptions,
 } from "./interfaces";
+import {
+  type BusStatus,
+  type ErrorHandler,
+  type StopOptions,
+} from "../messaging";
 import { commandBusMessageSchema } from "./schemas";
 import { DEFAULT_STOP_TIMEOUT_MS, settlesWithin } from "./stopTimeout";
 import {
@@ -18,26 +22,38 @@ import {
 
 export class CommandBusReceiver<
   Command extends BusCommand,
-> implements CommandReceiver<Command> {
+  Metadata extends CommandMetadata = CommandMetadata,
+> implements CommandReceiver<Command, Metadata> {
   public readonly name = "CommandBusReceiver";
-  #status: CommandBusStatus = "STOPPED";
+  #status: BusStatus = "STOPPED";
   #consumeCommands = false;
 
   #eventEmitter: EventEmitter;
   #commandSubscriber: IOrderedListenerConnector;
   #responsePublisher: IDynamicPublisherConnector;
+  #validator: (command: unknown) => Command;
 
   /** Every message still being handled: parse, handler, ack and reply. */
   #inFlight = new Set<Promise<void>>();
   /** Shared by concurrent `stop` calls while the drain is under way. */
   #stopping: Promise<void> | undefined;
 
-  constructor(dependencies: {
-    commandSubscriber: IOrderedListenerConnector;
-    responsePublisher: IDynamicPublisherConnector;
-  }) {
+  /**
+   * `options.validator` is required, as on the event bus listener. A command
+   * arrives as plain JSON, not as an instance of your class. The validator is
+   * what turns it back into one, and what checks the payload: if it throws,
+   * the emitter gets an `INVALID_COMMAND` failure and the handler never runs.
+   */
+  constructor(
+    dependencies: {
+      commandSubscriber: IOrderedListenerConnector;
+      responsePublisher: IDynamicPublisherConnector;
+    },
+    options: { validator: (command: unknown) => Command },
+  ) {
     this.#commandSubscriber = dependencies.commandSubscriber;
     this.#responsePublisher = dependencies.responsePublisher;
+    this.#validator = options.validator;
 
     this.#eventEmitter = new EventEmitter({ captureRejections: true });
   }
@@ -57,9 +73,7 @@ export class CommandBusReceiver<
     return true;
   }
 
-  async process(
-    commandHandler: (command: Command) => Promise<CommandHandlerResponse>,
-  ) {
+  async process(commandHandler: CommandHandler<Command, Metadata>) {
     this.#consumeCommands = true;
 
     this.#commandSubscriber.onMessage(async (message) => {
@@ -84,7 +98,7 @@ export class CommandBusReceiver<
   }
 
   async #handleMessage(
-    commandHandler: (command: Command) => Promise<CommandHandlerResponse>,
+    commandHandler: CommandHandler<Command, Metadata>,
     message: ReceivedMessage,
   ): Promise<void> {
     let parsedMessage: unknown;
@@ -104,8 +118,10 @@ export class CommandBusReceiver<
       return;
     }
 
-    const parsedBusMessageResult =
-      commandBusMessageSchema.safeParse<Command>(parsedMessage);
+    const parsedBusMessageResult = commandBusMessageSchema.safeParse<
+      BusCommand,
+      Metadata
+    >(parsedMessage);
 
     if (parsedBusMessageResult.isErr()) {
       await message.ack();
@@ -115,30 +131,11 @@ export class CommandBusReceiver<
       return;
     }
 
-    const { command, responseTopicName } = parsedBusMessageResult.value;
+    const { command, metadata, responseTopicName } =
+      parsedBusMessageResult.value;
+    const commandId = metadata.id;
 
-    let response: CommandBusResponse;
-
-    // Only the handler is guarded here. Publishing the response is a separate
-    // concern below, so that a broker failure is never reported as a command
-    // handler failure.
-    try {
-      const handlerResult = await commandHandler(command);
-
-      response = handlerResult.isErr()
-        ? failureResponse(command.id, handlerResult.error, "COMMAND_REJECTED")
-        : {
-            commandId: command.id,
-            result: "SUCCESS",
-            payload: handlerResult.value,
-          };
-    } catch (err) {
-      response = failureResponse(
-        command.id,
-        this.#handlerThrew(err),
-        "HANDLER_THREW",
-      );
-    }
+    const response = await this.#runHandler(commandHandler, command, metadata);
 
     // Acked exactly once, whatever the handler decided: a command that failed
     // must not be reprocessed.
@@ -155,9 +152,51 @@ export class CommandBusReceiver<
       this.#eventEmitter.emit(
         "failure",
         new Error(
-          `${this.name}: Failed to publish the response of command ${command.id}`,
+          `${this.name}: Failed to publish the response of command ${commandId}`,
           { cause: err },
         ),
+      );
+    }
+  }
+
+  /**
+   * Validates the command, then runs the handler. Only these are guarded:
+   * publishing the response is a separate concern, so that a broker failure is
+   * never reported as a command handler failure.
+   */
+  async #runHandler(
+    commandHandler: CommandHandler<Command, Metadata>,
+    rawCommand: BusCommand,
+    metadata: Metadata,
+  ): Promise<CommandBusResponse> {
+    const commandId = metadata.id;
+    let command: Command;
+
+    try {
+      command = this.#validator(rawCommand);
+    } catch (err) {
+      return failureResponse(
+        commandId,
+        err instanceof Error ? err : new Error(String(err)),
+        "INVALID_COMMAND",
+      );
+    }
+
+    try {
+      const handlerResult = await commandHandler(command, metadata);
+
+      return handlerResult.isErr()
+        ? failureResponse(commandId, handlerResult.error, "COMMAND_REJECTED")
+        : {
+            commandId,
+            result: "SUCCESS",
+            payload: handlerResult.value,
+          };
+    } catch (err) {
+      return failureResponse(
+        commandId,
+        this.#handlerThrew(err),
+        "HANDLER_THREW",
       );
     }
   }
@@ -277,7 +316,7 @@ export class CommandBusReceiver<
     }
   }
 
-  onError(errorHandler: (error: Error) => void) {
+  onError(errorHandler: ErrorHandler) {
     this.#responsePublisher.onError(errorHandler);
     this.#commandSubscriber.onError(errorHandler);
 
@@ -286,7 +325,7 @@ export class CommandBusReceiver<
     });
   }
 
-  status(): CommandBusStatus {
+  status(): BusStatus {
     return this.#status;
   }
 }
@@ -299,13 +338,13 @@ export class CommandBusReceiver<
  * getting the error. So every one of them has a fallback.
  *
  * `code` is the error's own `code` when it has one, else `defaultCode`, which
- * says how the handler failed. `context` is `DomainError`'s context. It has to
+ * says how it failed. `context` is `DomainError`'s context. It has to
  * be JSON-serializable to cross the wire.
  */
 function failureResponse(
   commandId: string,
   error: Error,
-  defaultCode: "COMMAND_REJECTED" | "HANDLER_THREW",
+  defaultCode: "COMMAND_REJECTED" | "HANDLER_THREW" | "INVALID_COMMAND",
 ): CommandBusResponse {
   const { code, context } = error as { code?: unknown; context?: unknown };
 

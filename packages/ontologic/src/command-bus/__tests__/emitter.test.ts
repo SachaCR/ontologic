@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 
 import { CommandBusEmitter } from "../emitter";
+import { Command } from "../../action";
 import {
   type IListenerConnector,
   type IOrderedPublisherConnector,
@@ -10,14 +11,21 @@ import {
   type BusCommand,
   type CommandBusMessage,
   type CommandBusResponse,
+  type CommandMetadata,
 } from "../interfaces";
 
 function command(overrides?: Partial<BusCommand>): BusCommand {
   return {
-    id: "cmd-1",
     name: "PlaceOrder",
     payload: { orderId: "order-1" },
-    metadata: { correlationId: "corr-1" },
+    ...overrides,
+  };
+}
+
+function metadata(overrides?: Partial<CommandMetadata>): CommandMetadata {
+  return {
+    id: "cmd-1",
+    createdAt: "2026-01-01T00:00:00.000Z",
     ...overrides,
   };
 }
@@ -157,7 +165,11 @@ describe("CommandBusEmitter.send", () => {
     const { emitter } = rig();
 
     await expect(
-      emitter.send({ command: command(), orderingKey: "order-1" }),
+      emitter.send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      }),
     ).rejects.toThrow("Command Bus Emitter is not started");
   });
 
@@ -166,8 +178,40 @@ describe("CommandBusEmitter.send", () => {
     await emitter.start();
 
     await expect(
-      emitter.send({ command: command({ id: "" }), orderingKey: "order-1" }),
-    ).rejects.toThrow("Invalid BusCommand: id is an empty string");
+      emitter.send({
+        command: command({ name: "" }),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      }),
+    ).rejects.toThrow("Invalid BusCommand: name is an empty string");
+  });
+
+  it("rejects metadata that fails validation", async () => {
+    const { emitter } = rig();
+    await emitter.start();
+
+    await expect(
+      emitter.send({
+        command: command(),
+        metadata: metadata({ id: "" }),
+        orderingKey: "order-1",
+      }),
+    ).rejects.toThrow("Invalid Metadata: id is an empty string");
+  });
+
+  it("rejects metadata whose createdAt is not an ISO date time", async () => {
+    const { emitter } = rig();
+    await emitter.start();
+
+    await expect(
+      emitter.send({
+        command: command(),
+        metadata: metadata({ createdAt: "yesterday" }),
+        orderingKey: "order-1",
+      }),
+    ).rejects.toThrow(
+      "Invalid Metadata: createdAt is not a valid ISO date time string",
+    );
   });
 
   it("does not publish a command that fails validation", async () => {
@@ -175,7 +219,11 @@ describe("CommandBusEmitter.send", () => {
     await emitter.start();
 
     await emitter
-      .send({ command: command({ id: "" }), orderingKey: "order-1" })
+      .send({
+        command: command(),
+        metadata: metadata({ id: "" }),
+        orderingKey: "order-1",
+      })
       .catch(() => {});
 
     expect(published).toEqual([]);
@@ -187,6 +235,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -196,6 +245,34 @@ describe("CommandBusEmitter.send", () => {
     expect(publishedMessage()).toEqual({
       responseTopicName: "responses",
       command: command(),
+      metadata: metadata(),
+    });
+  });
+
+  it("publishes a use-case Command through its toJSON", async () => {
+    class PlaceOrderCommand extends Command<
+      "PLACE_ORDER",
+      { orderId: string }
+    > {
+      constructor(payload: { orderId: string }) {
+        super({ name: "PLACE_ORDER", payload });
+      }
+    }
+    const { emitter, deliver, publishedMessage } = rig();
+    await emitter.start();
+
+    const sending = emitter.send({
+      command: new PlaceOrderCommand({ orderId: "order-1" }),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
+    await deliver(JSON.stringify(successResponse()));
+    await sending;
+
+    expect(publishedMessage().command).toEqual({
+      kind: "command",
+      name: "PLACE_ORDER",
+      payload: { orderId: "order-1" },
     });
   });
 
@@ -205,6 +282,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -220,6 +298,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -234,6 +313,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -251,6 +331,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -265,11 +346,16 @@ describe("CommandBusEmitter.send", () => {
 
     const inFlight = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
     await expect(
-      emitter.send({ command: command(), orderingKey: "order-1" }),
+      emitter.send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      }),
     ).rejects.toThrow("Command with id cmd-1 already in flight");
 
     await deliver(JSON.stringify(successResponse()));
@@ -282,6 +368,7 @@ describe("CommandBusEmitter.send", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -299,7 +386,11 @@ describe("CommandBusEmitter.send", () => {
     await emitter.start();
 
     await expect(
-      emitter.send({ command: command(), orderingKey: "order-1" }),
+      emitter.send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      }),
     ).rejects.toThrow(brokerError);
   });
 
@@ -310,7 +401,11 @@ describe("CommandBusEmitter.send", () => {
     await emitter.start();
 
     await emitter
-      .send({ command: command(), orderingKey: "order-1" })
+      .send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      })
       .catch(() => {});
 
     expect(emitter.metrics().inFlightCommands).toBe(0);
@@ -322,6 +417,7 @@ describe("CommandBusEmitter.send", () => {
 
     const result = await emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
 
@@ -342,6 +438,7 @@ describe("CommandBusEmitter.send", () => {
 
       const sending = emitter.send({
         command: command(),
+        metadata: metadata(),
         orderingKey: "order-1",
       });
 
@@ -358,7 +455,11 @@ describe("CommandBusEmitter.send", () => {
     const { emitter } = rig({ timeout: 20 });
     await emitter.start();
 
-    await emitter.send({ command: command(), orderingKey: "order-1" });
+    await emitter.send({
+      command: command(),
+      metadata: metadata(),
+      orderingKey: "order-1",
+    });
 
     expect(emitter.metrics().inFlightCommands).toBe(0);
   });
@@ -441,6 +542,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = emitter.stop();
@@ -456,6 +558,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     await emitter.stop();
@@ -469,13 +572,15 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = emitter.stop();
 
     await expect(
       emitter.send({
-        command: { ...command(), id: "cmd-2" },
+        command: command(),
+        metadata: metadata({ id: "cmd-2" }),
         orderingKey: "order-2",
       }),
     ).rejects.toThrow("Command Bus Emitter is stopping");
@@ -489,6 +594,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = emitter.stop();
@@ -506,6 +612,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = emitter.stop();
@@ -532,6 +639,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = [emitter.stop(), emitter.stop()];
@@ -548,7 +656,11 @@ describe("CommandBusEmitter lifecycle", () => {
       const { emitter } = rig({ timeout: 600_000 });
       await emitter.start();
 
-      void emitter.send({ command: command(), orderingKey: "order-1" });
+      void emitter.send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      });
       let stopped = false;
       void emitter.stop().then(() => {
         stopped = true;
@@ -568,7 +680,11 @@ describe("CommandBusEmitter lifecycle", () => {
       const { emitter } = rig({ timeout: 600_000 });
       await emitter.start();
 
-      void emitter.send({ command: command(), orderingKey: "order-1" });
+      void emitter.send({
+        command: command(),
+        metadata: metadata(),
+        orderingKey: "order-1",
+      });
       const stopping = emitter.stop();
       await vi.advanceTimersByTimeAsync(120_000);
       await stopping;
@@ -585,6 +701,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     await emitter.stop({ timeout: 20 });
@@ -604,6 +721,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     await emitter.stop({ timeout: 20 });
@@ -620,6 +738,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     await emitter.stop({ timeout: 20 });
@@ -634,6 +753,7 @@ describe("CommandBusEmitter lifecycle", () => {
 
     const sending = emitter.send({
       command: command(),
+      metadata: metadata(),
       orderingKey: "order-1",
     });
     const stopping = emitter.stop();

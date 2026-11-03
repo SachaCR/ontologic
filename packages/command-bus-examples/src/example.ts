@@ -1,7 +1,7 @@
 import { InMemoryCommandBusConnectors } from "ontologic";
 
 import { startPlaceOrderBus } from "./commandBus";
-import { placeOrderCommand } from "./domain/placeOrder";
+import { placeOrder } from "./domain/placeOrder";
 
 /**
  * Runnable end to end: `pnpm example:in-memory`.
@@ -20,7 +20,7 @@ async function main() {
   });
 
   const accepted = await bus.emitter.send({
-    command: placeOrderCommand({
+    ...placeOrder({
       id: "cmd-1",
       orderId: "order-1",
       customerId: "customer-1",
@@ -43,7 +43,7 @@ async function main() {
   // The handler refuses this one. A refusal travels back as an Err, not a
   // thrown error: the business said no, and that is an ordinary answer.
   const refused = await bus.emitter.send({
-    command: placeOrderCommand({
+    ...placeOrder({
       id: "cmd-2",
       orderId: "order-2",
       customerId: "customer-1",

@@ -3,16 +3,16 @@ import { describe, it, expect } from "vitest";
 import {
   EmptyOrderError,
   handlePlaceOrder,
-  placeOrderCommand,
+  parsePlaceOrder,
+  placeOrder,
+  PlaceOrderCommand,
 } from "../domain/placeOrder";
 
 function command(items: { sku: string; quantity: number }[]) {
-  return placeOrderCommand({
-    id: "cmd-1",
+  return new PlaceOrderCommand({
     orderId: "order-1",
     customerId: "customer-1",
     items,
-    correlationId: "corr-1",
   });
 }
 
@@ -45,12 +45,47 @@ describe("handlePlaceOrder", () => {
   });
 });
 
-describe("placeOrderCommand", () => {
-  it("builds an envelope that survives a JSON round trip", async () => {
-    // The bus stringifies commands, so anything that does not survive this is
-    // not a command.
-    const built = command([{ sku: "BOOK-1", quantity: 2 }]);
+describe("parsePlaceOrder", () => {
+  it("rebuilds a PlaceOrderCommand from its JSON form", () => {
+    // The bus stringifies commands, so this is exactly what the receiver gets.
+    const wire = JSON.parse(
+      JSON.stringify(command([{ sku: "BOOK-1", quantity: 2 }])),
+    );
 
-    expect(JSON.parse(JSON.stringify(built))).toEqual(built);
+    expect(parsePlaceOrder(wire)).toBeInstanceOf(PlaceOrderCommand);
+  });
+
+  it("keeps the payload through the JSON round trip", () => {
+    const sent = command([{ sku: "BOOK-1", quantity: 2 }]);
+
+    const received = parsePlaceOrder(JSON.parse(JSON.stringify(sent)));
+
+    expect(received.payload).toEqual(sent.payload);
+  });
+
+  it("refuses another command", () => {
+    expect(() =>
+      parsePlaceOrder({ name: "CANCEL_ORDER", payload: {} }),
+    ).toThrow("Expected a PLACE_ORDER command, got CANCEL_ORDER");
+  });
+
+  it("refuses a payload with missing fields", () => {
+    expect(() =>
+      parsePlaceOrder({ name: "PLACE_ORDER", payload: { orderId: "o-1" } }),
+    ).toThrow("PLACE_ORDER: invalid payload");
+  });
+});
+
+describe("placeOrder", () => {
+  it("puts the command id and correlation id in the metadata", () => {
+    const { metadata } = placeOrder({
+      id: "cmd-1",
+      orderId: "order-1",
+      customerId: "customer-1",
+      items: [],
+      correlationId: "corr-1",
+    });
+
+    expect(metadata).toMatchObject({ id: "cmd-1", correlationId: "corr-1" });
   });
 });

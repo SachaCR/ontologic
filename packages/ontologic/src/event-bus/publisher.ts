@@ -2,6 +2,7 @@ import { IDomainEventBusPublisher } from "./interfaces";
 import { DomainEventInterface } from "../domainEvent";
 import { validateMetadata } from "./validateMetadata";
 import { IPublisherConnector } from "../bus-connectors";
+import { type ErrorHandler } from "../messaging";
 
 export class DomainEventBusPublisher<
   Event extends DomainEventInterface,
@@ -67,7 +68,16 @@ export class DomainEventBusPublisher<
     return this.#publisherConnector.status;
   }
 
-  onError(handler: (error: unknown) => void): void {
+  /**
+   * Delegates to the connector.
+   *
+   * @throws if its connection check fails.
+   */
+  async checkConnection(): Promise<boolean> {
+    return this.#publisherConnector.checkConnection();
+  }
+
+  onError(handler: ErrorHandler): void {
     this.#publisherConnector.onError(handler);
   }
 }
