@@ -41,7 +41,7 @@ function failureResponse(
     result: "FAILURE",
     error: {
       name: "Error",
-      code: "OOPS",
+      code: "COMMAND_REJECTED",
       message: "Command handler threw",
       stack: "Error: Command handler threw\n    at <anonymous>",
       context: null,
@@ -274,7 +274,12 @@ describe("commandBusResponseSchema", () => {
     const result = commandBusResponseSchema.safeParse({
       commandId: "cmd-1",
       result: "FAILURE",
-      error: { name: "Error", code: "OOPS", message: "boom", stack: null },
+      error: {
+        name: "Error",
+        code: "COMMAND_REJECTED",
+        message: "boom",
+        stack: null,
+      },
     });
 
     expect(result._unsafeUnwrapErr().message).toBe(

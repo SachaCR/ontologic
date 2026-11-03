@@ -7,7 +7,10 @@ software that speaks your domain's language, and the tools built around it.
 
 | Package | Published as | What it is |
 | --- | --- | --- |
-| [`packages/ontologic`](packages/ontologic) | [`ontologic`](https://www.npmjs.com/package/ontologic) | The library. Domain entities, invariants, domain events, the Result pattern, repositories, the event bus and outbox relay, and typed resumable workflows. Zero runtime dependencies. |
+| [`packages/ontologic`](packages/ontologic) | [`ontologic`](https://www.npmjs.com/package/ontologic) | The library. Domain entities, invariants, domain events, the Result pattern, repositories, the event bus and outbox relay, the command bus, and typed resumable workflows. Zero runtime dependencies. |
+| [`packages/redis-connectors`](packages/redis-connectors) | [`@ontologics/redis-connectors`](https://www.npmjs.com/package/@ontologics/redis-connectors) | Redis connectors for the command bus: streams for commands, pub/sub for responses. |
+| [`packages/sqs-connectors`](packages/sqs-connectors) | [`@ontologics/sqs-connectors`](https://www.npmjs.com/package/@ontologics/sqs-connectors) | SQS FIFO connectors for sending and receiving commands, ordered by `MessageGroupId`. |
+| [`packages/command-bus-examples`](packages/command-bus-examples) | not published | Runnable command bus examples, and the shared contract the connectors are tested against. |
 | [`packages/domain-explorer`](packages/domain-explorer) | [`@ontologics/domain-explorer`](https://www.npmjs.com/package/@ontologics/domain-explorer) | Reads an Ontologic codebase and generates a single self-contained HTML page documenting its domain model — aggregates, value objects, events, typed errors, invariants, repositories and use cases. |
 | [`packages/library-example`](packages/library-example) | not published | A NestJS library-management app demonstrating the library on a real domain, and the source for the articles under its `docs/`. |
 | [`website`](website) | ontologic.site | The documentation site (Docusaurus), including the `llms.txt` generated from it. |

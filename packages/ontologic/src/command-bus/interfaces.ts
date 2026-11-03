@@ -1,6 +1,9 @@
 import { Result } from "../result";
 
-export type CommandBusStatus = "STOPPED" | "STARTED";
+/**
+ * `STOPPING` is the drain: new work is refused while in-flight work finishes.
+ */
+export type CommandBusStatus = "STOPPED" | "STARTED" | "STOPPING";
 
 /**
  * This interface describes the structure of a command. A command is a message that contains a name and a payload.
@@ -30,7 +33,7 @@ export interface CommandEmitter<Command extends BusCommand> {
   ): Promise<CommandHandlerResponse>;
 
   start(): Promise<void>;
-  stop(): Promise<void>;
+  stop(options?: StopOptions): Promise<void>;
   onError(errorHandler: (error: Error) => void): void;
   metrics(): CommandBusMetrics;
   status(): CommandBusStatus;
@@ -43,10 +46,19 @@ export interface CommandReceiver<Command extends BusCommand> {
   ): void;
 
   start(): Promise<void>;
-  stop(): Promise<void>;
+  stop(options?: StopOptions): Promise<void>;
   onError(errorHandler: (error: Error) => void): void;
   status(): CommandBusStatus;
   checkConnection(): Promise<boolean>;
+}
+
+export interface StopOptions {
+  /**
+   * Hard limit, in ms, on the graceful drain. Once it elapses, `stop()` stops
+   * the connectors anyway and reports the work it abandoned through
+   * `onError`. Defaults to 2 minutes.
+   */
+  timeout?: number;
 }
 
 /**
@@ -78,7 +90,6 @@ export type CommandMap = Map<string, CommandResolver>;
 export interface CommandResolver {
   startTime: number;
   resolve: (value: CommandBusResponse) => void;
-  reject: (error: CommandBusResponse) => void;
 }
 
 export interface CommandBusMetrics {

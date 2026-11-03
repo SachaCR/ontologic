@@ -45,7 +45,7 @@
     "@aws-sdk/client-sqs": "^3.750.0"
   },
   "peerDependencies": {
-    "ontologic": ">=1.9.0"
+    "ontologic": ">=1.10.0"
   },
   "devDependencies": {
     "@types/node": "^25.4.0",

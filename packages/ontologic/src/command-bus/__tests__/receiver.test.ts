@@ -12,6 +12,8 @@ import {
   type CommandHandlerResponse,
 } from "../interfaces";
 import { err, ok } from "../../result";
+import { DomainError } from "../../domainError";
+import { commandBusResponseSchema } from "../schemas";
 
 function command(): BusCommand {
   return {
@@ -198,6 +200,119 @@ describe("CommandBusReceiver.process", () => {
     });
   });
 
+  it("codes a returned error COMMAND_REJECTED when it carries no code", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => err(new Error("order already paid")),
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { code: "COMMAND_REJECTED" },
+    });
+  });
+
+  it("codes a thrown error HANDLER_THREW when it carries no code", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => {
+        throw new Error("boom");
+      },
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { code: "HANDLER_THREW" },
+    });
+  });
+
+  it("keeps the error's own code when it has one", async () => {
+    const domainError = Object.assign(new Error("order already paid"), {
+      code: "ALREADY_PAID",
+    });
+
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => err(domainError),
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { code: "ALREADY_PAID" },
+    });
+  });
+
+  it("carries a DomainError's context in the response", async () => {
+    const domainError = new DomainError({
+      name: "ORDER_ALREADY_PAID",
+      message: "order already paid",
+      context: { orderId: "order-1" },
+    });
+
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => err(domainError),
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { context: { orderId: "order-1" } },
+    });
+  });
+
+  it("sends a null context for an error that has none", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => err(new Error("order already paid")),
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { context: null },
+    });
+  });
+
+  it("keeps the name and stack of a thrown error", async () => {
+    const thrown = new Error("boom");
+    thrown.name = "PAYMENT_GATEWAY_DOWN";
+
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => {
+        throw thrown;
+      },
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { name: "PAYMENT_GATEWAY_DOWN", stack: thrown.stack },
+    });
+  });
+
+  it("keeps the context of a thrown DomainError", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => {
+        throw new DomainError({
+          name: "ORDER_LOCKED",
+          message: "order is locked",
+          context: { orderId: "order-1" },
+        });
+      },
+    });
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      error: { context: { orderId: "order-1" } },
+    });
+  });
+
+  it("publishes a response the emitter accepts for an error with no message", async () => {
+    const { published } = await processOneMessage({
+      content: validContent,
+      handler: async () => err(new Error()),
+    });
+
+    const result = commandBusResponseSchema.safeParse(
+      parseResponse(published[0]?.message),
+    );
+
+    expect(result.isOk()).toBe(true);
+  });
+
   it("acks only once when publishing the response fails", async () => {
     const { message } = await processOneMessage({
       content: validContent,
@@ -271,5 +386,255 @@ describe("CommandBusReceiver.process", () => {
     await processOneMessage({ content: "not json at all", handler });
 
     expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * A started receiver whose handler only returns when the test says so, to
+ * catch it mid-command. Connector stops are recorded in order.
+ */
+async function startedReceiverWithSlowHandler(options?: {
+  /** The command subscriber's stop never returns, like a stuck poll loop. */
+  subscriberStopHangs?: boolean;
+}) {
+  const published: { topicName: string; message: string }[] = [];
+  const stopped: string[] = [];
+  const handler = vi.fn(async () => {
+    await handlerReleased;
+    return ok({ ok: true });
+  });
+
+  let releaseHandler: () => void = () => {};
+  const handlerReleased = new Promise<void>((resolve) => {
+    releaseHandler = resolve;
+  });
+
+  let handle: (message: ReceivedMessage) => Promise<void> = async () => {};
+
+  const commandSubscriber: IOrderedListenerConnector = {
+    kind: "ordered-listener",
+    status: "STOPPED",
+    start: async () => {},
+    stop: async () => {
+      stopped.push("commandSubscriber");
+
+      if (options?.subscriberStopHangs) {
+        await new Promise(() => {});
+      }
+    },
+    onError: () => {},
+    checkConnection: async () => true,
+    topicName: () => "commands",
+    onMessage: (messageHandler) => {
+      handle = messageHandler;
+    },
+  };
+
+  const responsePublisher: IDynamicPublisherConnector = {
+    kind: "dynamic-publisher",
+    status: "STOPPED",
+    start: async () => {},
+    stop: async () => {
+      stopped.push("responsePublisher");
+    },
+    onError: () => {},
+    checkConnection: async () => true,
+    publishTo: async (args) => {
+      published.push(args);
+    },
+  };
+
+  const receiver = new CommandBusReceiver<BusCommand>({
+    commandSubscriber,
+    responsePublisher,
+  });
+
+  const reportedErrors: Error[] = [];
+  receiver.onError((error) => reportedErrors.push(error));
+
+  receiver.process(handler);
+  await receiver.start();
+
+  return {
+    receiver,
+    reportedErrors,
+    handler,
+    published,
+    stopped,
+    releaseHandler,
+    /** Hands the receiver a message, as the broker would. Not awaited. */
+    deliver: (content = validContent) => {
+      const message = receivedMessage(content);
+      const handling = handle(message);
+      return { message, handling };
+    },
+  };
+}
+
+/** Lets pending promise callbacks and short timers run. */
+const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+describe("CommandBusReceiver.stop", () => {
+  it("still publishes the response of a command being handled", async () => {
+    const { receiver, published, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    const { handling } = deliver();
+    const stopping = receiver.stop();
+    releaseHandler();
+    await Promise.all([handling, stopping]);
+
+    expect(parseResponse(published[0]?.message)).toMatchObject({
+      commandId: "cmd-1",
+      result: "SUCCESS",
+    });
+  });
+
+  it("waits for the command being handled before it resolves", async () => {
+    const { receiver, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    deliver();
+    let stopped = false;
+    const stopping = receiver.stop().then(() => {
+      stopped = true;
+    });
+    await tick();
+
+    expect(stopped).toBe(false);
+
+    releaseHandler();
+    await stopping;
+  });
+
+  it("stops the command subscriber before the response publisher", async () => {
+    const { receiver, stopped, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    const { handling } = deliver();
+    const stopping = receiver.stop();
+    releaseHandler();
+    await Promise.all([handling, stopping]);
+
+    expect(stopped).toEqual(["commandSubscriber", "responsePublisher"]);
+  });
+
+  it("nacks a command that arrives while stopping", async () => {
+    const { receiver, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    const first = deliver();
+    const stopping = receiver.stop();
+    const late = deliver();
+    await late.handling;
+    releaseHandler();
+    await Promise.all([first.handling, stopping]);
+
+    expect(late.message.nack).toHaveBeenCalledTimes(1);
+    expect(late.message.ack).not.toHaveBeenCalled();
+  });
+
+  it("does not run the handler for a command that arrives while stopping", async () => {
+    const { receiver, handler, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    const first = deliver();
+    const stopping = receiver.stop();
+    const late = deliver();
+    await late.handling;
+    releaseHandler();
+    await Promise.all([first.handling, stopping]);
+
+    expect(handler).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports STOPPED once drained", async () => {
+    const { receiver, releaseHandler, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    const { handling } = deliver();
+    const stopping = receiver.stop();
+    releaseHandler();
+    await Promise.all([handling, stopping]);
+
+    expect(receiver.status()).toBe("STOPPED");
+  });
+
+  it("does not force the stop before 2 minutes by default", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { receiver, deliver } = await startedReceiverWithSlowHandler();
+
+      deliver();
+      let stopped = false;
+      void receiver.stop().then(() => {
+        stopped = true;
+      });
+      await vi.advanceTimersByTimeAsync(119_999);
+
+      expect(stopped).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("forces the stop after 2 minutes by default", async () => {
+    vi.useFakeTimers();
+
+    try {
+      const { receiver, deliver } = await startedReceiverWithSlowHandler();
+
+      deliver();
+      const stopping = receiver.stop();
+      await vi.advanceTimersByTimeAsync(120_000);
+      await stopping;
+
+      expect(receiver.status()).toBe("STOPPED");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops the response publisher when the stop is forced", async () => {
+    const { receiver, stopped, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    deliver();
+    await receiver.stop({ timeout: 20 });
+
+    expect(stopped).toEqual(["commandSubscriber", "responsePublisher"]);
+  });
+
+  it("reports the commands a forced stop abandoned", async () => {
+    const { receiver, reportedErrors, deliver } =
+      await startedReceiverWithSlowHandler();
+
+    deliver();
+    await receiver.stop({ timeout: 20 });
+
+    expect(reportedErrors[0]?.message).toBe(
+      "[CommandBusReceiver] Stop timed out after 20ms: 1 command(s) still being handled were abandoned",
+    );
+  });
+
+  it("does not ack a command a forced stop abandoned", async () => {
+    const { receiver, deliver } = await startedReceiverWithSlowHandler();
+
+    const { message } = deliver();
+    await receiver.stop({ timeout: 20 });
+
+    expect(message.ack).not.toHaveBeenCalled();
+  });
+
+  it("forces the stop when the command subscriber's own stop hangs", async () => {
+    const { receiver, deliver } = await startedReceiverWithSlowHandler({
+      subscriberStopHangs: true,
+    });
+
+    deliver();
+    await receiver.stop({ timeout: 20 });
+
+    expect(receiver.status()).toBe("STOPPED");
   });
 });

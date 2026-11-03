@@ -1,6 +1,7 @@
 import { DomainEventInterface } from "../domainEvent";
 import { EventEmitter } from "node:events";
 import { validateMetadata } from "./validateMetadata";
+import { eventBusMessageSchema } from "./schemas";
 import { EventHandler, IDomainEventBusListener } from "./interfaces";
 import { IListenerConnector, ReceivedMessage } from "../bus-connectors";
 
@@ -52,15 +53,20 @@ export class DomainEventBusListener<
 
     this.#listenerConnector.onMessage(async (message: ReceivedMessage) => {
       try {
-        // TODO: Maybe add a type EventBusMessage {event, metadata} and validate it here.
-        const { event, metadata } = JSON.parse(message.content);
+        const envelopeResult = eventBusMessageSchema.safeParse(
+          JSON.parse(message.content),
+        );
 
-        if (!event || !event.name) {
-          this.#eventEmitter.emit("failure", "Event Received without a name");
+        if (envelopeResult.isErr()) {
+          // Routing needs `event.name`. A body that cannot supply one will not
+          // supply one on redelivery either, so this acks instead of nacking.
+          this.#eventEmitter.emit("failure", envelopeResult.error);
           await message.ack();
 
           return;
         }
+
+        const { event, metadata } = envelopeResult.value;
 
         const eventHandler =
           this.#eventHandlersMap.get(event.name) ??
