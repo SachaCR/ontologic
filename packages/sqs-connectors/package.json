@@ -1,7 +1,7 @@
 {
   "name": "@ontologics/sqs-connectors",
   "version": "0.1.0",
-  "description": "SQS FIFO connectors for the Ontologic command bus: ordered command delivery by MessageGroupId.",
+  "description": "SQS connectors for the Ontologic command and event buses: FIFO queues processed one message group at a time, groups in parallel.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -42,7 +42,8 @@
     "url": "https://github.com/SachaCR/ontologic/issues"
   },
   "dependencies": {
-    "@aws-sdk/client-sqs": "^3.750.0"
+    "@aws-sdk/client-sqs": "^3.750.0",
+    "fastq": "^1.20.1"
   },
   "peerDependencies": {
     "ontologic": ">=1.10.0"

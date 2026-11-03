@@ -4,13 +4,7 @@ import {
   testCommandBusConnectors,
   type ConnectorContractHarness,
 } from "./contract";
-import {
-  RedisDynamicPublisher,
-  RedisListener,
-  RedisOrderedListener,
-  RedisOrderedPublisher,
-} from "@ontologics/redis-connectors";
-import { type CommandBusConnectors } from "ontologic";
+import { RedisCommandBusConnectors } from "../redis";
 
 /**
  * Opt-in: these tests need a reachable Redis, so they are skipped unless
@@ -21,69 +15,6 @@ import { type CommandBusConnectors } from "ontologic";
  */
 const REDIS_URL = process.env["REDIS_URL"];
 
-/**
- * The Redis half of a command bus.
- *
- * Note the asymmetry, which is the whole design rather than an oversight:
- * commands go through a *stream* with a consumer group, because a command is
- * not volatile — someone is blocked waiting for its answer, and it must survive
- * a handler crashing. Responses go through *pub/sub*, because by the time one
- * is late its caller has already timed out, so there is nothing worth
- * redelivering.
- */
-export class RedisCommandBusConnectors implements CommandBusConnectors {
-  commandOrderedListener: RedisOrderedListener;
-  commandOrderedPublisher: RedisOrderedPublisher;
-  responseListener: RedisListener;
-  responseDynamicPublisher: RedisDynamicPublisher;
-
-  constructor(params: { redisUrl: string; namespace: string }) {
-    const commandTopic = `commands-${params.namespace}`;
-    const responseTopic = `responses-${params.namespace}`;
-
-    this.commandOrderedListener = new RedisOrderedListener({
-      topicName: commandTopic,
-      redisUrl: params.redisUrl,
-      // Caps how long stop() waits on the read loop, so teardown between tests
-      // stays quick.
-      blockMs: 200,
-    });
-
-    this.commandOrderedPublisher = new RedisOrderedPublisher({
-      topicName: commandTopic,
-      redisUrl: params.redisUrl,
-    });
-
-    this.responseListener = new RedisListener({
-      topicName: responseTopic,
-      redisUrl: params.redisUrl,
-    });
-
-    this.responseDynamicPublisher = new RedisDynamicPublisher({
-      redisUrl: params.redisUrl,
-    });
-  }
-
-  /**
-   * Closes every client, whatever state it reached.
-   *
-   * `stop()` returns early on a connector that never started, so this is safe
-   * to call after a partial start as well as a clean run. Failures are
-   * swallowed: a teardown problem must not mask the assertion that already
-   * failed.
-   */
-  async disconnect(): Promise<void> {
-    await Promise.all(
-      [
-        this.commandOrderedListener,
-        this.commandOrderedPublisher,
-        this.responseListener,
-        this.responseDynamicPublisher,
-      ].map((connector) => connector.stop().catch(() => {})),
-    );
-  }
-}
-
 let counter = 0;
 
 const harness: ConnectorContractHarness = {
@@ -93,9 +24,15 @@ const harness: ConnectorContractHarness = {
     // draining whatever the last one left behind.
     counter += 1;
 
+    const namespace = `${process.pid}-${Date.now()}-${counter}`;
+
     return new RedisCommandBusConnectors({
       redisUrl: REDIS_URL ?? "redis://127.0.0.1:6379",
-      namespace: `${process.pid}-${Date.now()}-${counter}`,
+      commandTopic: `commands-${namespace}`,
+      responseTopic: `responses-${namespace}`,
+      // Caps how long stop() waits on the read loop, so teardown between tests
+      // stays quick.
+      blockMs: 200,
     });
   },
 

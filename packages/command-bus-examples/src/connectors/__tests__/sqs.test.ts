@@ -8,18 +8,12 @@ import {
   SqsOrderedListener,
   SqsOrderedPublisher,
 } from "@ontologics/sqs-connectors";
-import {
-  RedisDynamicPublisher,
-  RedisListener,
-} from "@ontologics/redis-connectors";
-import { type CommandBusConnectors } from "ontologic";
+import { SqsCommandBusConnectors } from "../sqs";
 
 /**
  * Opt-in, and it needs *two* services: the architecture under test is SQS FIFO
  * for commands and Redis pub/sub for responses, so both have to be reachable.
  *
- *   docker run -d --rm -p 4566:4566 localstack/localstack
- *   docker run -d --rm -p 6379:6379 redis:7-alpine
  *   SQS_ENDPOINT=http://localhost:4566 REDIS_URL=redis://127.0.0.1:6379 \
  *     pnpm --filter command-bus-examples test
  */
@@ -32,74 +26,6 @@ const LOCALSTACK_CREDENTIALS = {
   secretAccessKey: "test",
 };
 
-/**
- * Commands on SQS, responses on Redis.
- *
- * The split is the point, not a limitation. A command is durable work someone
- * is blocked waiting for, so it wants a FIFO queue with real delivery
- * guarantees. A response whose caller has already timed out is worth nothing,
- * so it wants a channel that costs nothing to create and nothing to clean up —
- * and SQS has no ephemeral queue primitive to offer, while a Redis pub/sub
- * channel is not even allocated until someone subscribes.
- */
-export class SqsCommandBusConnectors implements CommandBusConnectors {
-  commandOrderedListener: SqsOrderedListener;
-  commandOrderedPublisher: SqsOrderedPublisher;
-  responseListener: RedisListener;
-  responseDynamicPublisher: RedisDynamicPublisher;
-
-  constructor(params: {
-    sqsEndpoint: string;
-    redisUrl: string;
-    namespace: string;
-  }) {
-    const queueName = `commands-${params.namespace}.fifo`;
-
-    const sqs = {
-      queueName,
-      region: "us-east-1",
-      endpoint: params.sqsEndpoint,
-      credentials: LOCALSTACK_CREDENTIALS,
-      ensureQueue: true,
-    };
-
-    this.commandOrderedListener = new SqsOrderedListener({
-      ...sqs,
-      // Long polling would otherwise put a floor under each test; stop() aborts
-      // the poll anyway, this just keeps an idle loop cheap.
-      waitTimeSeconds: 1,
-    });
-
-    this.commandOrderedPublisher = new SqsOrderedPublisher(sqs);
-
-    this.responseListener = new RedisListener({
-      topicName: `responses-${params.namespace}`,
-      redisUrl: params.redisUrl,
-    });
-
-    this.responseDynamicPublisher = new RedisDynamicPublisher({
-      redisUrl: params.redisUrl,
-    });
-  }
-
-  /**
-   * Closes everything, whatever state it reached. `stop()` returns early on a
-   * connector that never started, so this is safe after a partial start.
-   * Failures are swallowed: a teardown problem must not mask the assertion that
-   * already failed.
-   */
-  async disconnect(): Promise<void> {
-    await Promise.all(
-      [
-        this.commandOrderedListener,
-        this.commandOrderedPublisher,
-        this.responseListener,
-        this.responseDynamicPublisher,
-      ].map((connector) => connector.stop().catch(() => {})),
-    );
-  }
-}
-
 let counter = 0;
 
 const harness: ConnectorContractHarness = {
@@ -108,10 +34,18 @@ const harness: ConnectorContractHarness = {
     // shared one would leave each test consuming whatever the last left behind.
     counter += 1;
 
+    const namespace = `${process.pid}-${Date.now()}-${counter}`;
+
     return new SqsCommandBusConnectors({
       sqsEndpoint: SQS_ENDPOINT ?? "http://localhost:4566",
       redisUrl: REDIS_URL ?? "redis://127.0.0.1:6379",
-      namespace: `${process.pid}-${Date.now()}-${counter}`,
+      queueName: `commands-${namespace}.fifo`,
+      responseTopic: `responses-${namespace}`,
+      region: "us-east-1",
+      ensureQueue: true,
+      // Long polling would otherwise put a floor under each test; stop() aborts
+      // the poll anyway, this just keeps an idle loop cheap.
+      waitTimeSeconds: 1,
     });
   },
 

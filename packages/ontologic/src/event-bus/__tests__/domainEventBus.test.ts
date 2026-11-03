@@ -707,3 +707,82 @@ describe("event bus components share the BusComponent contract", () => {
     expect(onError.mock.calls[0]?.[0]).toEqual(new Error("a string"));
   });
 });
+
+describe("event bus over ordered connectors", () => {
+  it("delivers through an ordered listener", async () => {
+    const connectors = new InMemoryConnectors();
+    const received: TestEvent[] = [];
+    const listener = new DomainEventBusListener<TestEvent>({
+      listenerConnector: connectors.orderedListener,
+      options: { validator: parseTestEvent },
+    });
+    listener.listenTo("TestEvent", async (event) => {
+      received.push(event);
+    });
+    await listener.start();
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.orderedPublisher,
+    });
+    await publisher.start();
+
+    await publisher.publish(makeEvent(), makeMetadata(), {
+      orderingKey: "entity-1",
+    });
+
+    expect(received).toHaveLength(1);
+  });
+
+  it("forwards the ordering key to an ordered publisher", async () => {
+    const connectors = new InMemoryConnectors();
+    const publish = vi.spyOn(connectors.orderedPublisher, "publish");
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.orderedPublisher,
+    });
+    await publisher.start();
+
+    await publisher.publish(makeEvent(), makeMetadata(), {
+      orderingKey: "entity-1",
+    });
+
+    expect(publish.mock.calls[0]?.[1]).toEqual({ orderingKey: "entity-1" });
+  });
+
+  it("refuses to publish to an ordered publisher without an ordering key", async () => {
+    const connectors = new InMemoryConnectors();
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.orderedPublisher,
+    });
+    await publisher.start();
+
+    await expect(
+      publisher.publish(makeEvent(), makeMetadata()),
+    ).rejects.toThrow(
+      "[DomainEventBusPublisher] An ordered publisher connector needs an orderingKey",
+    );
+  });
+
+  it("does not publish anything when the ordering key is missing", async () => {
+    const connectors = new InMemoryConnectors();
+    const publish = vi.spyOn(connectors.orderedPublisher, "publish");
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.orderedPublisher,
+    });
+    await publisher.start();
+
+    await publisher.publish(makeEvent(), makeMetadata()).catch(() => {});
+
+    expect(publish).not.toHaveBeenCalled();
+  });
+
+  it("still publishes without an ordering key to a plain publisher", async () => {
+    const connectors = new InMemoryConnectors();
+    const publisher = new DomainEventBusPublisher<TestEvent>({
+      publisherConnector: connectors.publisher,
+    });
+    await publisher.start();
+
+    await expect(
+      publisher.publish(makeEvent(), makeMetadata()),
+    ).resolves.toBeUndefined();
+  });
+});

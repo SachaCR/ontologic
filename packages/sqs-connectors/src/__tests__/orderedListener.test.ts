@@ -70,7 +70,11 @@ function listener(
 
 /** Deliver a batch on the first receive, then idle. */
 function deliver(
-  messages: { Body?: string; ReceiptHandle?: string }[],
+  messages: {
+    Body?: string;
+    ReceiptHandle?: string;
+    Attributes?: Record<string, string>;
+  }[],
   options?: { failOn?: string },
 ) {
   let delivered = false;
@@ -230,14 +234,15 @@ describe("SqsOrderedListener", () => {
       });
     });
 
-    it("processes a batch one message at a time", async () => {
-      // The invariant that keeps FIFO ordering. Handling a batch concurrently
-      // would throw away the very thing a FIFO queue is chosen for, and a
-      // round-trip test cannot see the difference.
+    it("processes one message group's messages one at a time", async () => {
+      // The invariant that keeps FIFO ordering. Handling a group's messages
+      // concurrently would throw away the very thing a FIFO queue is chosen
+      // for, and a round-trip test cannot see the difference.
+      const group = { MessageGroupId: "order-1" };
       deliver([
-        { Body: "first", ReceiptHandle: "r-1" },
-        { Body: "second", ReceiptHandle: "r-2" },
-        { Body: "third", ReceiptHandle: "r-3" },
+        { Body: "first", ReceiptHandle: "r-1", Attributes: group },
+        { Body: "second", ReceiptHandle: "r-2", Attributes: group },
+        { Body: "third", ReceiptHandle: "r-3", Attributes: group },
       ]);
 
       const events: string[] = [];
@@ -315,6 +320,53 @@ describe("SqsOrderedListener", () => {
       expect(reported[0]?.message).toBe(
         "[SQS/OrderedListener] Failed to ack a message",
       );
+    });
+  });
+
+  describe("failure options", () => {
+    it("gives a nacked message the nack visibility it is configured with", async () => {
+      deliver([{ Body: "payload", ReceiptHandle: "r-1" }]);
+      const connector = new SqsOrderedListener({
+        queueName: "events.fifo",
+        region: "us-east-1",
+        nackVisibilitySeconds: 30,
+      });
+      running.push(connector);
+      connector.onMessage(async (message) => message.nack());
+
+      await connector.start();
+      await waitUntil(
+        () =>
+          client.commandsOfType("ChangeMessageVisibilityCommand").length > 0,
+      );
+
+      expect(
+        client.commandsOfType("ChangeMessageVisibilityCommand")[0],
+      ).toMatchObject({ input: { VisibilityTimeout: 30 } });
+    });
+
+    it("discards a message past maxDeliveries", async () => {
+      deliver([
+        {
+          Body: "poison",
+          ReceiptHandle: "r-1",
+          Attributes: { ApproximateReceiveCount: "6" },
+        },
+      ]);
+      const onDiscard = vi.fn();
+      const connector = new SqsOrderedListener({
+        queueName: "commands.fifo",
+        region: "us-east-1",
+        maxDeliveries: 5,
+        onDiscard,
+      });
+      running.push(connector);
+      connector.onMessage(async () => {});
+
+      await connector.start();
+      await waitUntil(() => onDiscard.mock.calls.length > 0);
+
+      expect(onDiscard.mock.calls[0]?.[1]).toBe(6);
     });
   });
 

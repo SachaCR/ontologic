@@ -62,13 +62,33 @@ export function createSqsClient(options: SqsConnectionOptions): SQSClient {
  * attribute otherwise. Checked in the constructor so a typo fails where it was
  * made rather than on the first publish.
  */
+export function isFifoQueueName(queueName: string): boolean {
+  return queueName.endsWith(".fifo");
+}
+
 export function assertFifoQueueName(
   connectorName: string,
   queueName: string,
 ): void {
-  if (!queueName.endsWith(".fifo")) {
+  if (!isFifoQueueName(queueName)) {
     throw new Error(
       `[${connectorName}] A FIFO queue name must end in ".fifo", got "${queueName}"`,
+    );
+  }
+}
+
+/**
+ * The unordered connectors target a standard queue. A FIFO queue is ordered,
+ * which is what the `Ordered` connectors are for, and it would also refuse
+ * every publish that carries no `MessageGroupId`.
+ */
+export function assertStandardQueueName(
+  connectorName: string,
+  queueName: string,
+): void {
+  if (isFifoQueueName(queueName)) {
+    throw new Error(
+      `[${connectorName}] A standard queue name must not end in ".fifo", got "${queueName}". Use the ordered connector for a FIFO queue`,
     );
   }
 }
@@ -94,12 +114,17 @@ export async function resolveQueueUrl(
         new CreateQueueCommand({
           QueueName: options.queueName,
           Attributes: {
-            FifoQueue: "true",
-            // The publisher sends no MessageDeduplicationId — it only ever sees
-            // an opaque string and cannot read the command's id — so the queue
-            // has to derive one by hashing the body.
-            ContentBasedDeduplication: "true",
             VisibilityTimeout: String(options.visibilityTimeoutSeconds ?? 30),
+            // A standard queue (no `.fifo` suffix) takes neither attribute.
+            ...(isFifoQueueName(options.queueName)
+              ? {
+                  FifoQueue: "true",
+                  // The publisher sends no MessageDeduplicationId — it only
+                  // ever sees an opaque string and cannot read the command's
+                  // id — so the queue has to derive one by hashing the body.
+                  ContentBasedDeduplication: "true",
+                }
+              : {}),
           },
         }),
       );

@@ -4,5 +4,7 @@
 // constructors. `@ontologics/redis-connectors` omits its `socketOptions.ts` for
 // the same reason.
 export type { SqsConnectionOptions } from "./client";
+export * from "./listener";
 export * from "./orderedListener";
+export * from "./publisher";
 export * from "./orderedPublisher";

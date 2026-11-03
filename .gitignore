@@ -23,3 +23,8 @@ reports/
 # once, and one rendered a private codebase's whole domain model into a public
 # repository. Root-level only: the committed demo lives under website/static.
 /*.html
+
+# Machine-local settings (broker URLs, endpoints). Each package that reads one
+# commits a .env.example next to it instead.
+.env
+!.env.example
